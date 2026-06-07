@@ -1,0 +1,18 @@
+{
+  "name": "nanoclaw-music-agent",
+  "version": "1.0.0",
+  "description": "Spotify release scanner, AI review generator, and GitBook publisher",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "scan": "node scan-releases.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "undici": "^8.3.0"
+  }
+}
