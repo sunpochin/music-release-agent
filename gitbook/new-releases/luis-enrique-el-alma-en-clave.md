@@ -1,4 +1,3 @@
----
 ![專輯封面](https://i.scdn.co/image/ab67616d0000b273d8180d474ad91c285ed69889)
 
 ### 音樂靈魂的深度共振：Luis Enrique《El Alma en Clave》樂評
@@ -35,7 +34,6 @@
 
 **《El Alma en Clave》是一場拉丁音樂的靈魂儀式，Luis Enrique 以其無與倫比的歌喉與深邃的音樂理解，將傳統薩爾薩昇華至藝術的新高度。這不僅是節奏的躍動，更是心靈的共振，是對時間與情感的溫柔詠嘆。**
 
----
 🎧 立即聆聽《El Alma en Clave》：
 [https://open.spotify.com/album/3WreOf2LKfp6dfM9NwMGHP](https://open.spotify.com/album/3WreOf2LKfp6dfM9NwMGHP)
 ---

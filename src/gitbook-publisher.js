@@ -136,13 +136,56 @@ export async function gitPushChanges(commitMessage) {
       throw e;
     }
 
-    console.log(`[GitBook/GitOps] 🚀 正在推送至 GitHub 遠端倉庫 [origin/${currentBranch}]...`);
-    await execFilePromise('git', ['push', 'origin', currentBranch]);
-    console.log(`[GitBook/GitOps] 🎉 GitOps 自動推送完成！GitBook 將在數秒內自動同步並上線新頁面。`);
+    try {
+      console.log(`[GitBook/GitOps] 🚀 正在推送至 GitHub 遠端倉庫 [origin/${currentBranch}]...`);
+      await execFilePromise('git', ['push', 'origin', currentBranch]);
+      console.log(`[GitBook/GitOps] 🎉 GitOps 自動推送完成！GitBook 將在數秒內自動同步並上線新頁面。`);
+    } catch (pushErr) {
+      const pushErrMsg = pushErr.message || '';
+      // 若尚未設定遠端倉庫 origin，則進行降級警告但不中斷程序
+      if (pushErrMsg.includes("does not appear to be a git repository") || pushErrMsg.includes("No such remote")) {
+        console.warn(`[GitBook/GitOps] ⚠️ 未偵測到遠端倉庫 'origin'，僅在本地完成 Git 提交，跳過推送步驟。`);
+      } else {
+        throw pushErr;
+      }
+    }
   } catch (err) {
     console.error(`[GitBook/GitOps] ❌ GitOps 自動同步失敗:`, err.message || err);
     throw err;
   }
+}
+
+// [技術] 輔助防禦函式：移除 AI 輸出中偽裝成 YAML Front Matter 的 markdown 包裝線 (防範 GitBook 編譯報錯)
+// [童趣] 摘掉奇妙小帽子：把故事書頭尾不小心戴錯的夾心餅乾線（---）摘掉，這樣故事書讀起來才順暢！
+function stripMalformedFrontMatter(markdown) {
+  let lines = markdown.split('\n');
+  if (lines.length > 0 && lines[0].trim() === '---') {
+    let nextIndex = -1;
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === '---') {
+        nextIndex = i;
+        break;
+      }
+    }
+    
+    if (nextIndex !== -1) {
+      let isMarkdown = false;
+      for (let i = 1; i < nextIndex; i++) {
+        let line = lines[i].trim();
+        if (line.startsWith('#') || line.startsWith('!') || line.startsWith('*') || (line.startsWith('-') && !line.includes(':'))) {
+          isMarkdown = true;
+          break;
+        }
+      }
+      
+      if (isMarkdown) {
+        lines.splice(nextIndex, 1);
+        lines.shift();
+        return lines.join('\n');
+      }
+    }
+  }
+  return markdown;
 }
 
 /**
@@ -161,8 +204,10 @@ export async function publishToGitBook(album, reviewMarkdown, skipPush = false) 
   const relativeFilePath = `new-releases/${fileName}`;
   const fullFilePath = path.join(RELEASES_DIR, fileName);
 
+  const cleanedMarkdown = stripMalformedFrontMatter(reviewMarkdown);
+
   console.log(`[GitBook/Publisher] 📝 正在寫入樂評檔案至: ${fullFilePath}...`);
-  await fs.writeFile(fullFilePath, reviewMarkdown, 'utf-8');
+  await fs.writeFile(fullFilePath, cleanedMarkdown, 'utf-8');
 
   // 更新 SUMMARY.md 大綱索引
   await updateSummary(title, relativeFilePath);

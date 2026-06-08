@@ -1,4 +1,3 @@
----
 
 ![專輯封面](https://i.scdn.co/image/ab67616d0000b273658ba929c26d1e45337668f2){width=300px}
 
@@ -32,7 +31,6 @@ Carlos D'Castro，這位在當代音樂圖景中以其深刻情感與細膩敘�
 
 **情感評分：9.0 / 10**
 
----
 
 🎧 **立即前往 Spotify 聆聽 Carlos D'Castro《Y Si Te Quedas, ¿Qué?》：**
 [https://open.spotify.com/album/1LB6ZVgpescVSYwi51HCDM](https://open.spotify.com/album/1LB6ZVgpescVSYwi51HCDM)
