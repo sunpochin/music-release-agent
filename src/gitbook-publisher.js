@@ -19,8 +19,8 @@ const execFilePromise = util.promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 定義本地 GitBook 目錄路徑 (存放於專案根目錄的 gitbook 目錄)
-const GITBOOK_DIR = path.join(__dirname, '../gitbook');
+// 定義本地 GitBook 目錄路徑 (指向已獨立的 social-dancing-notes 內容倉庫)
+const GITBOOK_DIR = '/Users/pac/codes/interview/social-dancing-notes';
 const RELEASES_DIR = path.join(GITBOOK_DIR, 'new-releases');
 const SUMMARY_PATH = path.join(GITBOOK_DIR, 'SUMMARY.md');
 
