@@ -87,9 +87,9 @@ npm start
 ### 4. 測試覆蓋率分析與 32% 未覆蓋解釋 (面試高階考點)
 當面試官挑戰：「為什麼核心邏輯覆蓋率很高，但整體的總語句覆蓋率是 68%？那未覆蓋的 32% 是什麼？」您可以給出符合資深全端與架構師素養的專業回答：
 *   **未覆蓋代碼分布**：
-    *   [musicbrainz-client.js](file:///Users/pac/codes/interview/music-release-agent/src/musicbrainz-client.js) (~77% 未覆蓋)：處理實體 HTTP 聯網請求。在測試中被 Mock 擋板隔離，防止執行真實測試時觸發 MusicBrainz 官方 1 req/s 限制而導致 IP 遭封鎖。
-    *   [spotify-auth.js](file:///Users/pac/codes/interview/music-release-agent/src/spotify-auth.js) (~64% 未覆蓋)：處理三方 OAuth 跳轉登入、憑證交換與本地 Token JSON 的持久化讀寫。這類 UI 跳轉與檔案系統 I/O 流程不適合納入單元測試。
-    *   [playback-service.js](file:///Users/pac/codes/interview/music-release-agent/src/services/playback-service.js) (~55% 未覆蓋)：控制實體 Spotify 播放器設備（如調整音量、下一首）。此類控制需要當前帳號有 Premium 資格並綁定真實播放器，在單元測試中皆透過 Mock 隔離。
+    *   `src/musicbrainz-client.js` (~77% 未覆蓋)：處理實體 HTTP 聯網請求。在測試中被 Mock 擋板隔離，防止執行真實測試時觸發 MusicBrainz 官方 1 req/s 限制而導致 IP 遭封鎖。
+    *   `src/spotify-auth.js` (~64% 未覆蓋)：處理三方 OAuth 跳轉登入、憑證交換與本地 Token JSON 的持久化讀寫。這類 UI 跳轉與檔案系統 I/O 流程不適合納入單元測試。
+    *   `src/services/playback-service.js` (~55% 未覆蓋)：控制實體 Spotify 播放器設備（如調整音量、下一首）。此類控制需要當前帳號有 Premium 資格並綁定真實播放器，在單元測試中皆透過 Mock 隔離。
 *   **軟體工程架構思維（測試金字塔）**：
     *   **確定性與測試速度 (No Flaky Tests)**：單元測試專注於驗證「業務邏輯（Business Logic）」與「狀態機（State Machine）」（例如 `CircuitBreaker` 熔斷器為 100% 覆蓋，`CacheService` 與 `ReleaseScanner` 為 90%+ 覆蓋）。單元測試不應實體聯網或寫檔，以防外部服務偶發性當機或頻率限制導致測試隨機失敗。
     *   **職責分工**：這些未覆蓋的部分屬於 E2E/整合測試（如使用 Playwright 或 Cypress 進行端到端模擬）的範疇，在單元測試階段透過 Mock 隔離是維持高測試速度與穩定性的標準做法。
