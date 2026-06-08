@@ -126,6 +126,8 @@ export async function getSpotifyArtistAlbums(artistId, days = 30) {
   const artist = { id: artistId };
   const bypass = process.env.SPOTIFY_BYPASS_CACHE === 'true';
   const cache = await cacheService.read();
+  // 防禦性程式設計：若舊版快取缺少 artist_albums 欄位，預設為空物件
+  cache.artist_albums = cache.artist_albums || {};
   const now = Date.now();
 
   if (!bypass && cache.artist_albums[artistId] && cacheService.isValid(cache.artist_albums[artistId].timestamp)) {

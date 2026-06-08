@@ -39,7 +39,7 @@ export class MusicBrainzDiscoveryStrategy extends ReleaseDiscoveryStrategy {
       return [];
     }
 
-    const rawAlbums = await albumsFn(mbid, days);
+    const rawAlbums = (await albumsFn(mbid, days)) || [];
     
     return rawAlbums.map(album => ({
       id: album.id,

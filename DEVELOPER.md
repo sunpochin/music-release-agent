@@ -96,7 +96,20 @@ npm start
 
 ---
 
-## 📡 社群發布 SaaS 系統 API 突破與防禦策略
+## 🛡️ 防禦性快取修正說明
+
+在 `src/spotify-client.js` 中，我們在讀取本地快取後加入以下保護程式碼：
+```js
+const cache = await cacheService.read();
+// 防禦性程式設計：若舊版快取缺少 artist_albums 欄位，預設為空物件
+cache.artist_albums = cache.artist_albums || {};
+const now = Date.now();
+```
+這段程式碼的目的在於防止 **舊版快取檔案** 沒有 `artist_albums` 欄位時，直接存取 `cache.artist_albums[artistId]` 會拋出 `TypeError`，從而導致整個掃描流程崩潰。加入預設空物件後，即使快取缺失該欄位，程式仍能正常走向快取檢查與寫入流程。
+
+> **防禦性程式設計原則**：在系統邊界或向後相容層加入安全預設值，確保舊資料不會破壞新程式的執行。此做法與我們在 `MusicBrainzDiscoveryStrategy` 中加入 `rawAlbums = (await albumsFn(...)) || []` 的防禦性處理屬同理。
+
+此變更已同步於測試，所有單元測試均成功通過，確保功能在升級過程中的穩定性。
 
 在面試中，面試官經常會挑戰一個極具深度的架構問題：**「像 Socialync 這樣的社群排程工具，是如何突破 Meta、LinkedIn 這些巨頭設下的企業審查、OAuth 驗證與嚴格 API 牆的？」**
 
