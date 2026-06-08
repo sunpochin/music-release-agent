@@ -1,5 +1,7 @@
 # music-release-agent 開發與技術架構指南
 
+![Test Coverage](./coverage-badge.svg)
+
 本指南專門為開發者與面試官準備，詳細說明了專案的目錄結構、快速開始步驟、核心的禮貌掃描分析、後端重構所套用的 SOLID 原則與設計模式，以及社群發布 SaaS（如 Socialync）如何突破巨頭 API 牆的架構思維。
 
 ---
@@ -34,6 +36,7 @@ npm start
 *   **執行生產掃描管線**：執行 `npm run scan`。
 *   **執行零配置模擬器**：執行 `npm run scan:dry`。
 *   **運行 21 個單元測試**：執行 `npm run test`。
+*   **運行覆蓋率測試並更新 Badge**：執行 `npm run test:coverage`。
 
 ---
 
