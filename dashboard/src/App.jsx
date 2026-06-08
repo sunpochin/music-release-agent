@@ -18,6 +18,14 @@ function App() {
   // 儲存本地 AI 樂評之介紹與總結
   const [albumReview, setAlbumReview] = useState({ introduction: '', summary: '' })
   
+  // 專輯曲目與單曲 AI 分析狀態
+  const [tracks, setTracks] = useState([])
+  const [selectedTrack, setSelectedTrack] = useState(null)
+  const [tracksLoading, setTracksLoading] = useState(false)
+  const [analysisData, setAnalysisData] = useState('')
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('lyrics') // 'lyrics' | 'analysis'
+  
   const shareCardRef = useRef(null)
 
   useEffect(() => {
@@ -40,6 +48,32 @@ function App() {
     }
   }, [selectedAlbum])
 
+  // 當選取專輯時，自後端 API 取得專輯歌曲清單 (動態隨選載入)
+  useEffect(() => {
+    if (selectedAlbum) {
+      setTracks([])
+      setSelectedTrack(null)
+      setLyricsData('')
+      setAnalysisData('')
+      setTracksLoading(true)
+      fetch(`/api/albums/${selectedAlbum.id}/tracks`)
+        .then(res => res.json())
+        .then(data => {
+          setTracks(data)
+          if (data && data.length > 0) {
+            setSelectedTrack(data[0]) // 預設選中第一首歌曲
+          }
+        })
+        .catch(err => console.error("Failed to fetch album tracks", err))
+        .finally(() => setTracksLoading(false))
+    } else {
+      setTracks([])
+      setSelectedTrack(null)
+      setLyricsData('')
+      setAnalysisData('')
+    }
+  }, [selectedAlbum])
+
   // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
   const generateShareFile = useCallback(async () => {
     if (!shareCardRef.current || !selectedAlbum) return
@@ -52,14 +86,14 @@ function App() {
       // 優化：直接使用 HTML5 Canvas toBlob API，避免 Base64 序列化的記憶體與 CPU 開銷
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
       if (!blob) throw new Error('Canvas to Blob conversion failed')
-      const file = new File([blob], `share-${selectedAlbum.name}.png`, { type: 'image/png' })
+      const file = new File([blob], `share-${selectedTrack ? selectedTrack.name : selectedAlbum.name}.png`, { type: 'image/png' })
       setShareFile(file)
     } catch (err) {
       console.error("Failed to pre-generate share file", err)
     }
-  }, [selectedAlbum])
+  }, [selectedAlbum, selectedTrack])
 
-  // 當選取專輯、歌詞或本地樂評更新時，在背景非同步預先產生圖卡檔案
+  // 當選取專輯、歌曲、歌詞、歌曲分析或頁籤更新時，在背景非同步預先產生圖卡檔案
   useEffect(() => {
     if (selectedAlbum) {
       setShareFile(null) // 先清空舊檔案
@@ -70,7 +104,7 @@ function App() {
     } else {
       setShareFile(null)
     }
-  }, [selectedAlbum, lyricsData, albumReview, generateShareFile])
+  }, [selectedAlbum, selectedTrack, lyricsData, analysisData, albumReview, activeTab, generateShareFile])
 
   // 僅選取專輯並重設歌詞與載入狀態，不自動執行 AI 歌詞搜尋
   const handleSelectAlbum = (album) => {
@@ -79,9 +113,9 @@ function App() {
     setIsLoading(false)
   }
 
-  // 手動觸發 AI 歌詞搜尋與翻譯
+// 手動觸發 AI 歌詞搜尋與翻譯 (綁定選中的單曲)
   const handleFetchLyrics = async () => {
-    if (!selectedAlbum) return
+    if (!selectedAlbum || !selectedTrack) return
     setIsLoading(true)
     setLyricsData('')
     
@@ -91,7 +125,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           artistName: selectedAlbum.artistName || 'Unknown Artist', 
-          trackName: selectedAlbum.name 
+          trackName: selectedTrack.name 
         })
       })
       const result = await res.json()
@@ -104,6 +138,35 @@ function App() {
       setLyricsData("翻譯過程發生錯誤。")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // 手動觸發單曲 AI 賞析與分析
+  const handleAnalyzeTrack = async () => {
+    if (!selectedAlbum || !selectedTrack) return
+    setAnalysisLoading(true)
+    setAnalysisData('')
+    
+    try {
+      const res = await fetch('/api/tracks/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          artistName: selectedAlbum.artistName || 'Unknown Artist', 
+          trackName: selectedTrack.name,
+          albumName: selectedAlbum.name
+        })
+      })
+      const result = await res.json()
+      if (result.text) {
+        setAnalysisData(result.text)
+      } else {
+        setAnalysisData("無法取得歌曲分析。")
+      }
+    } catch (err) {
+      setAnalysisData("分析過程發生錯誤。")
+    } finally {
+      setAnalysisLoading(false)
     }
   }
 
@@ -181,21 +244,31 @@ function App() {
             <div className="flex-1 overflow-y-auto p-4 lg:p-8 lg:pt-4">
               <div className="max-w-6xl flex flex-col lg:flex-row gap-6">
                 
-                {/* 專輯與系統診斷資訊面板 */}
+                {/* 專輯、曲目列表與系統診斷資訊面板 */}
                 <MetadataPanel 
                   selectedAlbum={selectedAlbum}
                   albumReview={albumReview}
                   shareFile={shareFile}
+                  tracks={tracks}
+                  selectedTrack={selectedTrack}
+                  setSelectedTrack={setSelectedTrack}
+                  tracksLoading={tracksLoading}
                 />
 
                 {/* AI 雙語歌詞與圖卡導出面板 */}
                 <AILyricsPanel 
                   selectedAlbum={selectedAlbum}
+                  selectedTrack={selectedTrack}
                   lyricsData={lyricsData}
                   isLoading={isLoading}
                   isExporting={isExporting}
                   handleFetchLyrics={handleFetchLyrics}
                   exportShareCard={exportShareCard}
+                  analysisData={analysisData}
+                  analysisLoading={analysisLoading}
+                  handleAnalyzeTrack={handleAnalyzeTrack}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
                 />
 
               </div>
@@ -215,8 +288,9 @@ function App() {
          <ShareCard 
             ref={shareCardRef} 
             album={selectedAlbum} 
+            track={selectedTrack}
             artistName={selectedAlbum?.artistName || 'Featured Artist'} 
-            lyrics={lyricsData} 
+            lyrics={activeTab === 'lyrics' ? lyricsData : analysisData} 
             introduction={albumReview?.introduction}
          />
       </div>

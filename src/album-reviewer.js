@@ -161,3 +161,82 @@ function buildReviewPrompt(album) {
 請務必使用繁體中文撰寫，語氣兼具「感性共鳴」與「嚴謹專業」，排版清晰、善用 Markdown 標題、條列式清單與粗體標記，字數控制在 600 至 1000 字之間。
 `;
 }
+
+/**
+ * 使用 AI 針對單曲進行深度賞析（支援雙路路由：Gemini + Ollama 降級）
+ * @param {string} artistName - 歌手名稱
+ * @param {string} trackName - 歌曲名稱
+ * @param {string} albumName - 專輯名稱
+ * @returns {Promise<string>} 生成的 Markdown 賞析報告
+ */
+export async function generateTrackAnalysis(artistName, trackName, albumName) {
+  const isLocalMode = isCloudDisabled() || !process.env.GEMINI_API_KEY;
+
+  const prompt = `
+請為以下歌曲撰寫一篇精煉、感性且富含音樂性分析的 Markdown 歌曲賞析報告。
+
+---
+🎧 **歌曲元數據**：
+- 歌曲名稱: ${trackName}
+- 歌手: ${artistName}
+- 所屬專輯: ${albumName || '未知專輯'}
+---
+
+【賞析報告撰寫規範】：
+1. **歌曲意境與背景**：簡述這首歌曲傳達的主題、情感溫度與意境（如孤寂、溫暖、迷幻等）。
+2. **音樂風格與技術剖析**：分析歌曲的節奏、配器編排（人聲、吉他、合成器等）以及編曲上的層次感。
+3. **精選歌詞賞析**：挑選或設想一句最動人的核心歌詞，進行深刻的情感解讀。
+4. **一針見血總結**：以粗體字寫出 1-2 句極具文采的總結。
+
+請務必使用繁體中文撰寫，字數控制在 300 至 500 字之間，排版簡潔美觀。
+`;
+
+  const systemInstruction = "你是一位極具音樂素養與洞察力的資深樂評人。請以優雅、深刻的繁體中文為歌曲撰寫精緻的賞析報告。";
+
+  if (isLocalMode) {
+    console.log(`[Reviewer/Local] 🤖 啟動本地備用大腦 qwen2.5:14b 進行歌曲賞析...`);
+    try {
+      const response = await fetch('http://127.0.0.1:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        dispatcher: ollamaAgent,
+        body: JSON.stringify({
+          model: 'qwen2.5:14b',
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: prompt }
+          ],
+          stream: false
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ollama 響應錯誤: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.message.content;
+    } catch (err) {
+      console.error(`[Reviewer/Local] ❌ 本地歌曲賞析失敗:`, err.message || err);
+      throw err;
+    }
+  }
+
+  console.log(`[Reviewer/Cloud] ☁️ 正在呼叫雲端 Gemini 進行歌曲賞析: ${trackName} - ${artistName}...`);
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{ text: prompt }],
+      config: {
+        systemInstruction: systemInstruction
+      }
+    });
+
+    console.log(`[Reviewer/Cloud] ✅ 雲端 Gemini 歌曲賞析生成成功！`);
+    return response.text;
+  } catch (error) {
+    console.error(`[Reviewer/Cloud] ⚠️ 雲端生成失敗，啟動熔斷並自動降級...`, error.message || error);
+    triggerCircuitBreaker();
+    return await generateTrackAnalysis(artistName, trackName, albumName);
+  }
+}
