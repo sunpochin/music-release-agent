@@ -42,7 +42,8 @@ const ShareCard = forwardRef(({ album, lyrics, artistName, introduction }, ref) 
           <div className="text-base font-medium text-gray-200 leading-relaxed max-h-[140px] overflow-hidden text-ellipsis line-clamp-5">
             {/* 優先顯示歌詞片段，其次顯示本地 AI 樂評介紹，最後才使用預設文案 */}
             {lyrics ? (
-              lyrics.slice(0, 150) + '...'
+              // 移除 Markdown 格式標籤（如 #, *, _, -）並整理空白以確保圖卡顯示純文字
+              lyrics.replace(/[#*_\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 150) + '...'
             ) : introduction ? (
               introduction
             ) : (
