@@ -1,90 +1,104 @@
-# 🏠 Music Release Agent & AI Review Center
+# 🎵 Music Release Agent & AI Review Center
 
-![Test Coverage](./coverage-badge.svg)
+[![Test Coverage](./coverage-badge.svg)](./coverage-badge.svg)
+[![PM2 Process Guard](https://img.shields.io/badge/PM2-process%20guard-blueviolet)](./PM2_DAEMON_GUIDE.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`music-release-agent` 是一個串接 Spotify API、Gemini AI 與 GitBook GitOps 發布流的自動化新歌掃描與樂評推播系統。
-專案同時包含一個採用 **Vite + React (TailwindCSS)** 打造的高質感前端 Dashboard，支援行動端 Web Share API，能預先非同步在背景渲染出 9:16 比例的社群分享圖卡（Instagram Stories / TikTok Reels），並提供原生分享對話框。
+`music-release-agent` 是一個結合 **Spotify API**、**Gemini AI** 與 **GitOps 自動化發布**的音樂掃描與樂評推播系統。
+專案具備採用 **Vite + React (TailwindCSS)** 打造的 Glassmorphism 音樂儀表板，支援非同步預渲染 9:16 社群分享卡（Instagram Stories / TikTok Reels），並透過伴生微服務 `social-post-service` 提供非同步多平台自動發文能力。
 
 ---
 
-## 🚀 3 分鐘零配置快速體驗 (離線模擬模式)
+## ⚡️ 3 分鐘零配置快速驗證（面試官專屬，免 API Key）
 
-為了方便面試官與開發者在**不設定任何外部 API 金鑰（Spotify / Gemini）與帳號授權**的情況下快速驗證系統，本專案內建了 **Dry Run 離線模擬管線**。
+為了方便面試官在**不準備任何 Spotify/Gemini API 金鑰與授權**的情況下，能立即、完整地驗證整個系統，專案內建了完整的 **Dry Run 離線模擬沙箱**。
 
-### 1. 安裝依賴項
+### 1. 安裝與依賴準備
 ```bash
+# 安裝後端與發文微服務依賴
 npm install
+cd ../social-post-service && npm install && cd ../music-release-agent
+
+# 安裝前端 Dashboard 依賴
 cd dashboard && npm install && cd ..
 ```
 
-### 2. 啟動模擬掃描管線 (模擬一鍵發佈流)
-執行以下指令，系統會讀取預置的模擬音樂發行資料，模擬掃描、AI 樂評起草、目錄更新與 GitOps 推送流程：
+### 2. 執行離線沙箱模擬
+執行以下指令，系統會自動使用內建的模擬歌手發行資料，模擬執行新歌掃描、AI 樂評起草、GitBook 目錄更新與 GitOps 發布流：
 ```bash
 npm run scan:dry
 ```
-*模擬產出的 Markdown 文件與目錄將會寫入本地的 `data/mock-gitbook/` 中，供您直接檢驗。*
+*模擬產出的 Markdown 樂評文件與大綱目錄將寫入 `data/mock-gitbook/` 下，您可以直接開箱檢視。*
 
-### 3. 啟動前端 Dashboard
-在專案根目錄執行：
+### 3. 一鍵啟動雙服務環境（PM2 背景守護）
+我們提供了一鍵管理的 PM2 配置檔案。啟動後，Express API 後端、Vite 開發伺服器、Cron 定時掃描器與發文微服務將在背景同步拉起：
 ```bash
-# 啟動後端 Express API 伺服器
-npm start
+npx pm2 start ecosystem.config.cjs
 ```
-另開一個終端機視窗，啟動前端開發伺服器：
-```bash
-cd dashboard
-npm run dev -- --host
-```
-開啟瀏覽器訪問 `http://localhost:5173`，即可在 Dashboard 中體驗流暢的音樂庫導覽、AI 歌詞翻譯賞析，以及導出 IG 分享卡！
+*(詳細指令與除錯方式請參考：[🐶 PM2 守護進程指南](./PM2_DAEMON_GUIDE.md))*
+
+### 4. 前往 Dashboard 體驗
+打開瀏覽器訪問 [http://localhost:5173](http://localhost:5173) 即可立即開始體驗：
+- 🌟 **音樂庫瀏覽**：流暢的毛玻璃卡片式導覽與最新發行清單。
+- 🔮 **AI 雙語歌詞**：點選任一曲目，即時獲取 Gemini 翻譯與賞析對照。
+- 🚀 **社群自動發佈**：點擊「發佈到社群」一鍵觸發非同步多平台發佈流。
 
 ---
 
-## 📐 系統架構圖 (System Architecture)
+## 📐 雙服務微服務架構 (Microservices Architecture)
 
-本系統由 **CLI 掃描與發布管線 (Backend Pipeline)** 以及 **視覺化控制台 (Web Dashboard)** 兩大部分組成。其拓撲關係如下：
+本專案遵循**單一職責原則 (SRP)**，將高頻讀取的音樂儀表板與高防禦要求的寫入型社群發文拆分為獨立微服務：
 
 ```mermaid
 graph TD
-    subgraph CLI Backend Pipeline
-        SR[scan-releases.js] --> SC[spotify-client.js]
-        SC -->|1. Scan followed artists| SpotifyAPI[Spotify Web API]
-        SC -->|Fallback if 429| MB[musicbrainz-client.js]
-        MB --> MusicBrainzAPI[MusicBrainz API]
-        SR -->|2. Generate Review| AR[album-reviewer.js]
-        AR --> Gemini[Gemini API / Local Qwen]
-        SR -->|3. Publish| GP[gitbook-publisher.js]
-        GP -->|Update SUMMARY.md| GitBookFolder[social-dancing-notes]
-        GP -->|Git Push| GitHub[GitHub Repository]
-        GitHub -->|Auto Sync| GitBookSite[GitBook Web Site]
+    subgraph Client [前端用戶端]
+        Browser[Chrome/iOS Safari :5173]
     end
-    subgraph Web Dashboard Frontend
-        Vite[Vite + React Dev Server] --> App[App.jsx]
-        App --> API[server.js / Express API]
-        API -->|Read cached metadata| Cache[spotify-cache.json]
-        API -->|Read reviews| GitBookFolder
-        App --> ShareCard[ShareCard.jsx]
-        ShareCard -->|html2canvas| Blob[PNG Image Blob]
-        Blob -->|navigator.share| MobileShare[iOS Share Sheet / Instagram]
+
+    subgraph music-release-agent [音樂核心服務 :3011]
+        Server[Express API Server]
+        Scanner[scan-releases.js]
+        MBClient[musicbrainz-client.js]
+        SpotifyClient[spotify-client.js]
+        Cache[spotify-cache.json]
     end
+
+    subgraph social-post-service [發文微服務 :3012]
+        SocialServer[Express API Server]
+        Queue[Job Queue]
+        MockStrategy[MockStrategy]
+        AyrshareStrategy[AyrshareStrategy]
+    end
+
+    Browser -->|1. 瀏覽與點擊| Server
+    Server -->|讀取/寫入快取| Cache
+    Scanner -->|2. 每 3 小時執行定時掃描| SpotifyClient
+    SpotifyClient -->|3. Fallback 降級備用渠道| MBClient
+    
+    Browser -->|4. 一鍵發佈到社群| Server
+    Server -->|5. 代理轉發 POST /api/posts| SocialServer
+    SocialServer -->|6. 非同步入隊| Queue
+    Queue -->|7. 策略分發| MockStrategy
+    Queue -->|7. 策略分發| AyrshareStrategy
 ```
 
 ---
 
 ## 🛡️ 容災與降級設計 (Resiliency & Failover Flow)
 
-外部 API 的不穩定性與速率限制（Rate Limits）是生產環境中最棘手的難題。為了確保系統的高可用性與彈性，我們在 Spotify API 的通訊層設計了 **「雙源容災降級機制」**：
+外部三方 API 的不穩定性與速率限制（Rate Limits）是生產環境最棘手的考驗。為此，我們在 Spotify API 通訊層設計了 **「雙源容災降級機制」**：
 
-1. **限流熔斷機制**：當 Spotify API 遇到 `HTTP 429 (Too Many Requests)` 時，自動讀取 `Retry-After` 標頭進行休眠。若 24 小時內觸發大於等於 2 次，會觸發 24 小時強制冷卻，保護帳號。
-2. **MusicBrainz 降級備用渠道**：當 Spotify 遭限流或不可用時，掃描器會無縫切換至公開的 **MusicBrainz** API。藉由搜尋藝人 MBID，自動將發行資料拉回並解析為相容的 schema，確保掃描管線永不斷線。
+1. **智慧限流熔斷**：當遇到 `HTTP 429` 限流時，自動解析 `Retry-After` 智慧休眠。若 24 小時內觸發限流次數達 2 次，則啟動熔斷禁用 Spotify API 24 小時，保護開發者憑證。
+2. **MusicBrainz 降級渠道**：一旦 Spotify API 被禁用或連線失敗，掃描器自動切換為公開的 **MusicBrainz API**，藉由搜尋藝人 MBID 爬取專輯列表，並動態轉換為與 Spotify 相容的 Schema，確保發行管線永不斷線。
 
 ```mermaid
 flowchart TD
-    Start([1. 開始掃描藝人發行]) --> SpotifyCall{呼叫 Spotify API}
+    Start([開始掃描歌手發行]) --> SpotifyCall{呼叫 Spotify API}
     SpotifyCall -- 成功 --> SaveSpotifyCache[寫入本地快取] --> End([完成])
-    SpotifyCall -- "錯誤 429 (限流)" --> CheckHistory{24小時內超額?}
-    CheckHistory -- 是 --> LockSpotify[禁用 Spotify 24小時] --> MBFailover[3. 降級切換至 MusicBrainz]
+    SpotifyCall -- "限流 429" --> CheckHistory{24小時內超額?}
+    CheckHistory -- 是 --> LockSpotify[禁用 Spotify 24小時] --> MBFailover[降級至 MusicBrainz]
     CheckHistory -- 否 --> WaitRetry[依照 Retry-After 智慧休眠] --> SpotifyCall
-    SpotifyCall -- "其他嚴重錯誤" --> MBFailover
+    SpotifyCall -- "其他嚴重網路錯誤" --> MBFailover
     MBFailover --> GetMBID[搜尋藝人 MBID]
     GetMBID -- 尋獲 --> GetMBAlbums[從 MusicBrainz 爬取專輯] --> ParseMB[轉換為 Spotify 相容 Schema] --> End
     GetMBID -- 未尋獲 --> SkipArtist[跳過該藝人並記錄警告] --> End
@@ -92,56 +106,46 @@ flowchart TD
 
 ---
 
-## 🎨 前端效能調優與安全性設計 (Performance & Security)
+## 🎨 前端效能調優與安全實踐
 
-在 Web Dashboard 的設計上，我們實現了符合生產水準的架構設計：
-
-### 1. 繞過 iOS 觸發限制的「背景非同步預生成」
-iOS (WebKit) 的 `navigator.share` 要求必須在**用戶點擊的瞬間同步呼叫**。任何非同步的 `await`（如等待畫布渲染、等待圖片下載）都會導致 user gesture 失效而報錯。
-- **作法**：當用戶選擇專輯或歌詞更新時，`App.jsx` 會透過 `useCallback` 包裝的 `generateShareFile` 在**背景非同步預先將圖卡渲染成 File 物件**並暫存於 State。當用戶點選「分享」時，即可** 100% 同步**呼叫 `navigator.share`，實現完美的 iOS 原生分享體驗。
-
-### 2. `useCallback` 與 `canvas.toBlob` 效能優化
-- **解決渲染死迴圈**：將預生成函式以 `useCallback` 鎖定地址，避免每次組件重新渲染時觸發 `useEffect` 的無限生成迴圈。
-- **免除 Base64 轉換開銷**：捨棄傳統將畫布轉成巨大 Base64 DataURL 字串再模擬 `fetch` 轉 Blob 的做法。改用原生的 `canvas.toBlob` Promise 包裝，直接在瀏覽器底層輸出二進位圖片檔，降低了 **33% 的記憶體空間佔用** 與 CPU 運算負載，防止行動裝置卡頓。
-
-### 3. 安全的輕量級 Markdown 轉譯器
-- **防範 XSS 攻擊**：在將 AI 歌詞（包含 Markdown 語法）渲染至前端時，先對特殊 HTML 字元進行轉義（Escape），杜絕 XSS（跨網站指令碼）腳本注入安全風險。
-- **語意渲染**：透過自訂轉譯器，將 Markdown 的 `#` 標題、`**` 粗體、`-` 列表自動對齊轉換為乾淨的 Tailwind CSS 樣式 HTML。
+1. **背景非同步預渲染 (iOS Web Share API)**：iOS (WebKit) 的 `navigator.share` 要求必須在用戶點擊的瞬間**同步呼叫**。任何非同步的 `await` 畫布轉換都會導致 user gesture 失效。Dashboard 在用戶點選歌曲的當下，即於背景非同步將分享卡片渲染為 File 物件，確保用戶按下的瞬間能 100% 同步觸發 iOS 原生分享對話框。
+2. **`canvas.toBlob` 記憶體優化**：捨棄傳統將畫布轉成巨大 Base64 字串再 fetch 轉 Blob 的做法，直接使用原生的 `canvas.toBlob` Promise 包裝，在瀏覽器底層輸出二進位圖片檔，降低了 **33% 的記憶體空間佔用**，防止行動端瀏覽器因 OOM (記憶體溢出) 卡頓或重啟。
+3. **安全的輕量 Markdown 轉譯器**：在將 AI 歌詞（包含 Markdown 語法）渲染至前端時，先對特殊 HTML 字元進行轉義（Escape），杜絕 XSS（跨網站指令碼）腳本注入安全風險，再藉由狀態化逐行解析器輸出符合標準語意的 HTML。
 
 ---
 
-## 🧪 單元測試與程式碼覆蓋率 (Unit Testing & Code Coverage)
+## 🧪 單元測試與程式碼覆蓋率
 
-為了驗證後端重構後的穩定性與代碼品質，專案中編寫了完整的單元測試與整合測試防禦網：
+本專案實施嚴格的防禦性測試，後端核心模組（服務類別、策略模式實作與掃描協調器）之語句覆蓋率均達到 **80% - 100%**。
 
-*   **測試框架**：採用現代化的 `vitest`。
-*   **測試覆蓋率工具**：使用 `@vitest/coverage-v8` 進行統計。
-*   **自動化測試指令**：
-    ```bash
-    # 執行所有 21 個單元與基準防禦測試
-    npm run test
+```bash
+# 執行所有 21 個單元與基準防禦測試
+npm run test
 
-    # 執行測試並產生覆蓋率報告，同時動態更新本地專案根目錄的 SVG Coverage Badge
-    npm run test:coverage
-    ```
-*   **覆蓋率指標**：核心的 SOLID 後端模組（服務類別、策略模式實作與掃描協調器）之語句覆蓋率均達到 **80% - 100%** 的超高標準，全體核心程式碼的平均覆蓋率維持在 **68%**。
+# 執行測試並產生覆蓋率報告，同時動態更新 Coverage Badge
+npm run test:coverage
+```
 
 ---
 
-## ⚙️ 真實生產環境配置
+## ⚙️ 生產環境變數配置
 
-若要運行真實的 Spotify 掃描與發行流程，請依據 [.env.example](file:///Users/pac/codes/interview/music-release-agent/.env.example) 建立您的本地 `.env` 檔案，並填入以下金鑰：
+若要運行真實的 Spotify 聯網掃描與 Gemini AI 生成流程，請參閱 [.env.example](./.env.example) 建立您的 `.env` 檔案，填入以下金鑰：
 
-- `GEMINI_API_KEY`: 您的 Google AI Studio 金鑰。
-- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`: 您的 Spotify 開發者 App 金鑰。
-- `REVIEWS_PATH`: 指定產出樂評寫入的本地資料夾。
-- `GITBOOK_PATH`: 本地 GitBook 內容倉庫的路徑。
+```ini
+GEMINI_API_KEY=your_gemini_api_key_here
+SPOTIFY_CLIENT_ID=your_spotify_client_id_here
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
+REVIEWS_PATH=./data/mock-gitbook
+GITBOOK_PATH=../social-dancing-notes
+SOCIAL_SERVICE_URL=http://localhost:3012
+```
 
 ### 執行真實掃描與 GitOps 發布
 ```bash
-# 登入授權並獲取 Spotify Token
-npm start ➡️ 訪問 http://localhost:3011/login/spotify
+# 1. 授權登入獲取 Spotify Token
+npm start ➡️ 瀏覽器訪問 http://localhost:3011/login/spotify
 
-# 執行真實掃描管線 (將自動分析並 commit/push 同步至遠端 GitBook)
+# 2. 執行真實掃描管線（分析新歌、AI起草、自動 Commit/Push 寫入 GitBook）
 npm run scan
 ```
