@@ -6,11 +6,12 @@ import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js'
 import { translateLyrics } from './src/lyrics-translator.js';
 import { getSpotifyAlbumTracks } from './src/spotify-client.js';
 import { generateTrackAnalysis } from './src/album-reviewer.js';
+import { socialClient } from './src/services/social-client.js';
 
 dotenv.config();
 
 const app = express();
-app.use(express.json()); // 解析 JSON body
+app.use(express.json({ limit: '10mb' })); // 解析 JSON body，允許較大的 base64 圖片
 const PORT = process.env.PORT || 3011;
 
 // 提供 React 前端靜態檔案 (發布後)
@@ -175,6 +176,47 @@ app.post('/api/tracks/analyze', async (req, res) => {
   }
 });
 
+// 社群自動發文代理端點 — 轉發請求至 social-post-service 微服務
+app.post('/api/social/publish', async (req, res) => {
+  const { caption, platforms, imageBase64 } = req.body;
+
+  if (!caption) {
+    return res.status(400).json({ error: '缺少必要欄位: caption（發文文案）' });
+  }
+
+  try {
+    const result = await socialClient.publishPost({
+      imageBase64,
+      caption,
+      platforms: platforms || ['threads']
+    });
+    // 回傳 202 Accepted 與 jobId 供前端輪詢狀態
+    res.status(202).json(result);
+  } catch (err) {
+    console.error('[Server] ❌ 社群發文服務不可達:', err.message);
+    res.status(502).json({ error: `社群發文服務不可達: ${err.message}` });
+  }
+});
+
+// 查詢社群發文任務狀態
+app.get('/api/social/status/:jobId', async (req, res) => {
+  try {
+    const status = await socialClient.getPostStatus(req.params.jobId);
+    res.json(status);
+  } catch (err) {
+    res.status(502).json({ error: `無法查詢發文狀態: ${err.message}` });
+  }
+});
+
+// 社群發文服務健康檢查
+app.get('/api/social/health', async (_req, res) => {
+  const isHealthy = await socialClient.isHealthy();
+  res.json({
+    service: 'social-post-service',
+    reachable: isHealthy,
+    url: process.env.SOCIAL_SERVICE_URL || 'http://localhost:3012'
+  });
+});
 app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
