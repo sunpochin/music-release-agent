@@ -66,6 +66,28 @@ npx pm2 stop social-post-service
 npx pm2 delete all
 ```
 
+## ⚠️ 疑難排解：解決狀態為 Errored 與 Cluster/Fork 模式衝突
+
+如果您先前已啟動過此服務，PM2 會在記憶體中快取舊的進程設定。這可能導致以下問題：
+- 前端 Dashboard (以 `npm` 啟動) 被錯誤分配到 `cluster`（集群）模式而直接崩潰（狀態顯示為 `errored`）。
+- 主後端或發文微服務因 ES Module 載入衝突而在 `cluster` 模式下報錯。
+
+### 🛠️ 重新加載全新 Fork 配置的三步驟：
+
+1. **停止並清除舊的快取進程**（只會清除本專案相關的進程，不會影響您本地其他 PM2 任務）：
+   ```bash
+   npx pm2 delete music-release-agent-server music-release-agent-dashboard social-post-service spotify-release-scanner
+   ```
+
+2. **確保本地已載入最新的程式碼**（已於 `ecosystem.config.cjs` 明確寫入 `exec_mode: 'fork'`）。
+
+3. **重新加載啟動服務**：
+   ```bash
+   npx pm2 start ecosystem.config.cjs
+   ```
+
+執行後再輸入 `npx pm2 list`，即可確認所有本專案服務均以綠色的 `online` 狀態與 `fork` 模式順利運轉！
+
 ---
 
 ## 💡 進程守護的優勢（面試必聊加分點）
