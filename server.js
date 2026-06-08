@@ -1,13 +1,20 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs/promises';
 import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js';
+import { translateLyrics } from './src/lyrics-translator.js';
 
 dotenv.config();
 
 const app = express();
+app.use(express.json()); // 解析 JSON body
 const PORT = process.env.PORT || 3011;
 
-app.get('/', (_req, res) => {
+// 提供 React 前端靜態檔案 (發布後)
+app.use(express.static(path.join(process.cwd(), 'dashboard/dist')));
+
+app.get('/api', (_req, res) => {
   res.json({
     name: 'nanoclaw-music-agent',
     status: 'ok',
@@ -17,6 +24,62 @@ app.get('/', (_req, res) => {
       healthz: '/healthz'
     }
   });
+});
+
+// 取得緩存的音樂發行資料
+app.get('/api/albums', async (_req, res) => {
+  try {
+    const dataPath = path.join(process.cwd(), 'data/spotify-cache.json');
+    const content = await fs.readFile(dataPath, 'utf-8');
+    const cache = JSON.parse(content);
+    
+    // 建立藝人 ID 到名稱的對照表
+    const artistMap = {};
+    if (cache.followed_artists && cache.followed_artists.data) {
+      cache.followed_artists.data.forEach(artist => {
+        artistMap[artist.id] = artist.name;
+      });
+    }
+    
+    // 整理所有藝人的專輯，並注入藝人名稱
+    const allAlbums = [];
+    if (cache.artist_albums) {
+      for (const artistId in cache.artist_albums) {
+        if (cache.artist_albums[artistId] && cache.artist_albums[artistId].data) {
+          const artistName = artistMap[artistId] || '未知藝人';
+          const albumsWithArtist = cache.artist_albums[artistId].data.map(album => ({
+            ...album,
+            artistName,
+            artistId
+          }));
+          allAlbums.push(...albumsWithArtist);
+        }
+      }
+    }
+    
+    // 依照發行日期反向排序
+    allAlbums.sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
+    
+    res.json(allAlbums);
+  } catch (err) {
+    console.error('Failed to read albums cache:', err);
+    res.status(500).json({ error: 'Failed to load albums' });
+  }
+});
+
+// 翻譯歌詞 API
+app.post('/api/lyrics', async (req, res) => {
+  const { artistName, trackName } = req.body;
+  if (!artistName || !trackName) {
+    return res.status(400).json({ error: 'Missing artistName or trackName' });
+  }
+  
+  try {
+    const translation = await translateLyrics(artistName, trackName);
+    res.json({ text: translation });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/healthz', (_req, res) => {
