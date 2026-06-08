@@ -119,14 +119,7 @@ export class ReleaseScanner extends EventEmitter {
         }
         scannerState[artist.id].last_scanned_at = new Date().toISOString();
         
-        // 如果此批次取得的專輯中帶有 mbid，可予以儲存 (例如 MusicBrainz 策略傳回的 uri 中含 UUID)
-        const mbUri = artistAlbums.find(a => a.uri && a.uri.startsWith('musicbrainz:'));
-        if (mbUri) {
-          const uuid = mbUri.uri.split(':').pop();
-          if (uuid) {
-            scannerState[artist.id].musicbrainz_mbid = uuid;
-          }
-        }
+        // 移除原先依賴專輯 URI 更新藝人 MBID 的快取邏輯，避免錯誤覆蓋。
       } else {
         this.emit('artist:scan_failure', {
           name: artist.name,

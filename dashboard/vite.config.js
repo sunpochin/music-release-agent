@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    allowedHosts: ['.ngrok-free.app', '.ngrok.io'], // 允許 ngrok 轉發的域名，以利行動端測試
+    allowedHosts: true, // 允許所有域名轉發（如 ngrok, Cloudflare Tunnel 等），方便行動端測試
     proxy: {
       '/api': {
         target: 'http://localhost:3011',
