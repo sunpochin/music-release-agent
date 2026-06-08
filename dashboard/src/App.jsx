@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Disc3, Music, Sparkles, Share2, Download, AlertCircle, Info, Calendar, Layers, ExternalLink } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import ShareCard from './components/ShareCard'
@@ -47,10 +47,10 @@ function App() {
     } else {
       setShareFile(null)
     }
-  }, [selectedAlbum, lyricsData, albumReview])
+  }, [selectedAlbum, lyricsData, albumReview, generateShareFile])
 
   // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
-  const generateShareFile = async () => {
+  const generateShareFile = useCallback(async () => {
     if (!shareCardRef.current || !selectedAlbum) return
     try {
       const canvas = await html2canvas(shareCardRef.current, {
@@ -58,15 +58,15 @@ function App() {
         backgroundColor: '#121212',
         useCORS: true
       })
-      const image = canvas.toDataURL("image/png")
-      const response = await fetch(image)
-      const blob = await response.blob()
+      // 優化：直接使用 HTML5 Canvas toBlob API，避免 Base64 序列化的記憶體與 CPU 開銷
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      if (!blob) throw new Error('Canvas to Blob conversion failed')
       const file = new File([blob], `share-${selectedAlbum.name}.png`, { type: 'image/png' })
       setShareFile(file)
     } catch (err) {
       console.error("Failed to pre-generate share file", err)
     }
-  }
+  }, [selectedAlbum])
 
   // 僅選取專輯並重設歌詞與載入狀態，不自動執行 AI 歌詞搜尋
   const handleSelectAlbum = (album) => {
