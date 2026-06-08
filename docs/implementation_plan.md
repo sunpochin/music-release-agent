@@ -21,30 +21,30 @@
 ### Backend API & AI Services
 
 ---
-#### [MODIFY] [server.js](file:///Users/pac/codes/interview/music-release-agent/server.js)
+#### [MODIFY] `server.js`
 - 新增 `GET /api/albums` 讀取 `data/spotify-cache.json` 並回傳依時間排序的最新專輯與歌曲清單。
 - 新增 `POST /api/lyrics` 接收 `artistName` 與 `trackName`，呼叫 AI 翻譯並回傳。
 - 加入 Express 靜態檔案伺服，將 `dashboard/dist` 作為前端產出目錄供瀏覽器存取。
 
-#### [NEW] [src/lyrics-translator.js](file:///Users/pac/codes/interview/music-release-agent/src/lyrics-translator.js)
+#### [NEW] `src/lyrics-translator.js`
 - 仿照 `album-reviewer.js`，建立使用 `@google/genai` 的模組。
 - 撰寫 Prompt：給定歌手與歌名，要求 AI 回傳結構化的原文與繁體中文歌詞對照。
 
 ### Frontend Dashboard (Vite + React)
 
 ---
-#### [NEW] [dashboard/package.json](file:///Users/pac/codes/interview/music-release-agent/dashboard/package.json)
+#### [NEW] `dashboard/package.json`
 - 獨立的 Vite + React 前端專案。
 - 引入 `html2canvas` 或 `dom-to-image` 來將網頁 DOM 元素轉換成可下載的分享圖片 (Share Card)。
 
-#### [NEW] [dashboard/src/App.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/App.jsx)
+#### [NEW] `dashboard/src/App.jsx`
 - 實作主要的三欄位/兩欄位版面 (側邊欄、專輯/歌曲列表、AI 歌詞與翻譯面板)。
 
-#### [NEW] [dashboard/src/index.css](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/index.css)
+#### [NEW] `dashboard/src/index.css`
 - 導入 TailwindCSS 的基底指令。
 - 使用 Tailwind 的 utility classes 來實作毛玻璃 (backdrop-filter)、動態 Hover 效果與響應式排版。
 
-#### [NEW] [dashboard/src/components/ShareCard.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/components/ShareCard.jsx)
+#### [NEW] `dashboard/src/components/ShareCard.jsx`
 - 一個隱藏或可預覽的 9:16 (1080x1920 比例) 視覺元件。
 - 內部排版包含：專輯封面、歌曲名稱、最經典的一段翻譯歌詞。
 - 點擊「分享至 IG/TikTok」時，將此元件渲染成圖片提供下載。
