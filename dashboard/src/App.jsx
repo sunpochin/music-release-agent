@@ -11,6 +11,8 @@ function App() {
   const [isExporting, setIsExporting] = useState(false)
   // 儲存預先產生的圖卡檔案，以利 iOS Safari 進行同步分享
   const [shareFile, setShareFile] = useState(null)
+  // 儲存本地 AI 樂評之介紹與總結
+  const [albumReview, setAlbumReview] = useState({ introduction: '', summary: '' })
   
   const shareCardRef = useRef(null)
 
@@ -21,7 +23,20 @@ function App() {
       .catch(err => console.error("Failed to fetch albums", err))
   }, [])
 
-  // 當選取專輯或歌詞更新時，在背景非同步預先產生圖卡檔案
+  // 當選取專輯時，自後端 API 取得本地 AI 樂評的介紹與總結
+  useEffect(() => {
+    if (selectedAlbum) {
+      setAlbumReview({ introduction: '', summary: '' }) // 先清空舊資料
+      fetch(`/api/review?artistName=${encodeURIComponent(selectedAlbum.artistName || '')}&albumName=${encodeURIComponent(selectedAlbum.name || '')}`)
+        .then(res => res.json())
+        .then(data => setAlbumReview(data))
+        .catch(err => console.error("Failed to fetch album review", err))
+    } else {
+      setAlbumReview({ introduction: '', summary: '' })
+    }
+  }, [selectedAlbum])
+
+  // 當選取專輯、歌詞或本地樂評更新時，在背景非同步預先產生圖卡檔案
   useEffect(() => {
     if (selectedAlbum) {
       setShareFile(null) // 先清空舊檔案
@@ -32,7 +47,7 @@ function App() {
     } else {
       setShareFile(null)
     }
-  }, [selectedAlbum, lyricsData])
+  }, [selectedAlbum, lyricsData, albumReview])
 
   // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
   const generateShareFile = async () => {
@@ -98,7 +113,8 @@ function App() {
           await navigator.share({
             files: [shareFile],
             title: `分享《${selectedAlbum.name}》`,
-            text: `推薦這首好歌！這是來自 ${selectedAlbum.artistName || '未知藝人'} 的作品。`
+            // 優先使用本地 AI 樂評之精選總結或介紹作為分享推薦文案
+            text: albumReview?.summary || albumReview?.introduction || `推薦這首好歌！這是來自 ${selectedAlbum.artistName || '未知藝人'} 的作品。`
           })
           return // 成功分享直接返回
         }
@@ -232,7 +248,14 @@ function App() {
                       <div className="bg-white/5 p-4 rounded-xl space-y-2">
                         <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">作品介紹</p>
                         <p className="leading-relaxed text-gray-200">
-                          此發行作品由藝人 <strong className="text-spotify-green">{selectedAlbum.artistName || '未知藝人'}</strong> 創作，類型為 <strong className="text-white">{selectedAlbum.type === 'album' ? '專輯 (Album)' : '單曲 (Single)'}</strong>，共收錄 {selectedAlbum.total_tracks} 首曲目。這張作品於 {selectedAlbum.release_date} 正式發行，已成功自 Spotify 同步至我們的本地快取資料庫。
+                          {/* 若有從本地 AI 樂評載入介紹，則優先顯示，否則回退至預設元數據描述 */}
+                          {albumReview?.introduction ? (
+                            albumReview.introduction
+                          ) : (
+                            <>
+                              此發行作品由藝人 <strong className="text-spotify-green">{selectedAlbum.artistName || '未知藝人'}</strong> 創作，類型為 <strong className="text-white">{selectedAlbum.type === 'album' ? '專輯 (Album)' : '單曲 (Single)'}</strong>，共收錄 {selectedAlbum.total_tracks} 首曲目。這張作品於 {selectedAlbum.release_date} 正式發行，已成功自 Spotify 同步至我們的本地快取資料庫。
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -328,6 +351,7 @@ function App() {
             album={selectedAlbum} 
             artistName={selectedAlbum?.artistName || 'Featured Artist'} 
             lyrics={lyricsData} 
+            introduction={albumReview?.introduction}
          />
       </div>
     </div>

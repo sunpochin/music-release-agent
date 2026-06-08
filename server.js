@@ -67,6 +67,67 @@ app.get('/api/albums', async (_req, res) => {
   }
 });
 
+// 輔助函式：將字串轉為 URL 友善的 Slug 格式，需與 GitBook 發布器一致
+function generateSlug(text) {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-\u4e00-\u9fa5]+/g, '')
+    .replace(/\-\-+/g, '-');
+}
+
+// 輔助函式：解析 AI 樂評 markdown 檔案，擷取作品介紹與精選總結
+function extractReviewParts(markdown) {
+  const lines = markdown.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  
+  let introduction = '';
+  let summary = '';
+  
+  // 尋找第一個非圖片、非標題且非連結的段落作為作品介紹
+  for (const line of lines) {
+    if (line.startsWith('!') || line.startsWith('#') || line.startsWith('---') || line.startsWith('🎧') || line.startsWith('[')) {
+      continue;
+    }
+    if (line.startsWith('**') && line.endsWith('**')) {
+      continue;
+    }
+    introduction = line;
+    break;
+  }
+  
+  // 從尾端往前尋找最後一個粗體段落作為分享的精選總結
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (line.startsWith('**') && line.endsWith('**')) {
+      summary = line.replace(/^\*\*|\*\*$/g, ''); // 移除粗體標籤
+      break;
+    }
+  }
+  
+  return { introduction, summary };
+}
+
+// 取得本地 AI 樂評介紹與總結 API
+app.get('/api/review', async (req, res) => {
+  const { artistName, albumName } = req.query;
+  if (!artistName || !albumName) {
+    return res.status(400).json({ error: 'Missing artistName or albumName' });
+  }
+
+  try {
+    const slug = generateSlug(`${artistName}-${albumName}`) || 'unknown';
+    const filePath = path.join('/Users/pac/codes/interview/social-dancing-notes/new-releases', `${slug}.md`);
+    const content = await fs.readFile(filePath, 'utf-8');
+    const parts = extractReviewParts(content);
+    res.json(parts);
+  } catch (err) {
+    // 找不到檔案時回傳空值，不報錯
+    res.json({ introduction: '', summary: '' });
+  }
+});
+
 // 翻譯歌詞 API
 app.post('/api/lyrics', async (req, res) => {
   const { artistName, trackName } = req.body;

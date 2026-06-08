@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
 
-const ShareCard = forwardRef(({ album, lyrics, artistName }, ref) => {
+const ShareCard = forwardRef(({ album, lyrics, artistName, introduction }, ref) => {
   if (!album) return null;
 
   return (
@@ -28,6 +28,7 @@ const ShareCard = forwardRef(({ album, lyrics, artistName }, ref) => {
         <img 
           src={album.image} 
           alt={album.name} 
+          crossOrigin="anonymous"
           className="w-48 h-48 rounded-xl shadow-2xl mb-6 object-cover border border-white/10"
         />
         <h2 className="text-2xl font-black text-center mb-1 leading-tight">{album.name}</h2>
@@ -39,7 +40,14 @@ const ShareCard = forwardRef(({ album, lyrics, artistName }, ref) => {
         <div className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl relative">
           <div className="absolute -top-3 left-4 text-4xl text-spotify-green opacity-50 font-serif">"</div>
           <div className="text-base font-medium text-gray-200 leading-relaxed max-h-[140px] overflow-hidden text-ellipsis line-clamp-5">
-            {lyrics ? lyrics.slice(0, 150) + '...' : `這首來自《${album.name}》的動人旋律已正式發行。\n點擊一同感受音符中的溫度與 AI 歌詞深度解析！`}
+            {/* 優先顯示歌詞片段，其次顯示本地 AI 樂評介紹，最後才使用預設文案 */}
+            {lyrics ? (
+              lyrics.slice(0, 150) + '...'
+            ) : introduction ? (
+              introduction
+            ) : (
+              `這首來自《${album.name}》的動人旋律已正式發行。\n點擊一同感受音符中的溫度與 AI 歌詞深度解析！`
+            )}
           </div>
           <div className="absolute -bottom-6 right-4 text-4xl text-spotify-green opacity-50 font-serif">"</div>
         </div>
