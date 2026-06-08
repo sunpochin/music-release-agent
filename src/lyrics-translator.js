@@ -3,15 +3,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
-
 export async function translateLyrics(artistName, trackName) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('Missing GEMINI_API_KEY in environment variables');
   }
 
+  const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY
+  });
   const prompt = `
 請為我尋找並翻譯以下歌曲的歌詞：
 - 歌手：${artistName}
