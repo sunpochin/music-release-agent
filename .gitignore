@@ -10,3 +10,4 @@ data/system-state.json
 data/spotify-cache.json
 data/mock-gitbook/
 .npm-cache/
+coverage/

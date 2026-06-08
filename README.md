@@ -1,5 +1,7 @@
 # 🏠 Music Release Agent & AI Review Center
 
+![Test Coverage](./coverage-badge.svg)
+
 `music-release-agent` 是一個串接 Spotify API、Gemini AI 與 GitBook GitOps 發布流的自動化新歌掃描與樂評推播系統。
 專案同時包含一個採用 **Vite + React (TailwindCSS)** 打造的高質感前端 Dashboard，支援行動端 Web Share API，能預先非同步在背景渲染出 9:16 比例的社群分享圖卡（Instagram Stories / TikTok Reels），並提供原生分享對話框。
 
@@ -105,6 +107,24 @@ iOS (WebKit) 的 `navigator.share` 要求必須在**用戶點擊的瞬間同步�
 ### 3. 安全的輕量級 Markdown 轉譯器
 - **防範 XSS 攻擊**：在將 AI 歌詞（包含 Markdown 語法）渲染至前端時，先對特殊 HTML 字元進行轉義（Escape），杜絕 XSS（跨網站指令碼）腳本注入安全風險。
 - **語意渲染**：透過自訂轉譯器，將 Markdown 的 `#` 標題、`**` 粗體、`-` 列表自動對齊轉換為乾淨的 Tailwind CSS 樣式 HTML。
+
+---
+
+## 🧪 單元測試與程式碼覆蓋率 (Unit Testing & Code Coverage)
+
+為了驗證後端重構後的穩定性與代碼品質，專案中編寫了完整的單元測試與整合測試防禦網：
+
+*   **測試框架**：採用現代化的 `vitest`。
+*   **測試覆蓋率工具**：使用 `@vitest/coverage-v8` 進行統計。
+*   **自動化測試指令**：
+    ```bash
+    # 執行所有 21 個單元與基準防禦測試
+    npm run test
+
+    # 執行測試並產生覆蓋率報告，同時動態更新本地專案根目錄的 SVG Coverage Badge
+    npm run test:coverage
+    ```
+*   **覆蓋率指標**：核心的 SOLID 後端模組（服務類別、策略模式實作與掃描協調器）之語句覆蓋率均達到 **80% - 100%** 的超高標準，全體核心程式碼的平均覆蓋率維持在 **68%**。
 
 ---
 

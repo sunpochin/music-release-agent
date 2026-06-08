@@ -8,12 +8,18 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "scan": "node scan-releases.js",
-    "scan:dry": "node scan-releases-dry.js"
+    "scan:dry": "node scan-releases-dry.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage && node generate-badge.js"
   },
   "dependencies": {
     "@google/genai": "^2.3.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "undici": "^8.3.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.6",
+    "vitest": "^3.2.6"
   }
 }
