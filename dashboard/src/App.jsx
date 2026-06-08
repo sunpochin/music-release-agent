@@ -40,19 +40,6 @@ function App() {
     }
   }, [selectedAlbum])
 
-  // 當選取專輯、歌詞或本地樂評更新時，在背景非同步預先產生圖卡檔案
-  useEffect(() => {
-    if (selectedAlbum) {
-      setShareFile(null) // 先清空舊檔案
-      const timer = setTimeout(() => {
-        generateShareFile()
-      }, 600) // 延遲 600ms 確保 ShareCard DOM 已渲染完畢
-      return () => clearTimeout(timer)
-    } else {
-      setShareFile(null)
-    }
-  }, [selectedAlbum, lyricsData, albumReview, generateShareFile])
-
   // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
   const generateShareFile = useCallback(async () => {
     if (!shareCardRef.current || !selectedAlbum) return
@@ -71,6 +58,19 @@ function App() {
       console.error("Failed to pre-generate share file", err)
     }
   }, [selectedAlbum])
+
+  // 當選取專輯、歌詞或本地樂評更新時，在背景非同步預先產生圖卡檔案
+  useEffect(() => {
+    if (selectedAlbum) {
+      setShareFile(null) // 先清空舊檔案
+      const timer = setTimeout(() => {
+        generateShareFile()
+      }, 600) // 延遲 600ms 確保 ShareCard DOM 已渲染完畢
+      return () => clearTimeout(timer)
+    } else {
+      setShareFile(null)
+    }
+  }, [selectedAlbum, lyricsData, albumReview, generateShareFile])
 
   // 僅選取專輯並重設歌詞與載入狀態，不自動執行 AI 歌詞搜尋
   const handleSelectAlbum = (album) => {
