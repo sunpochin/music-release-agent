@@ -114,17 +114,17 @@ export async function gitPushChanges(commitMessage) {
   try {
     // [技術] 使用 execFile 代替 exec 以安全傳遞參數，防範惡意 commitMessage 命令注入漏洞
     // [童趣] 戴上魔法防護手套：用 execFile 像捏橡皮泥一樣抓緊程式參數，不讓怪人利用古怪符號把木馬偷偷塞進去！
-    const { stdout: branchStdout } = await execFilePromise('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+    const { stdout: branchStdout } = await execFilePromise('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: GITBOOK_DIR });
     const currentBranch = branchStdout.trim();
     console.log(`[GitBook/GitOps] 📍 當前分支為: ${currentBranch}`);
 
     console.log(`[GitBook/GitOps] ➕ 正在將 GitBook 目錄加入暫存區...`);
-    await execFilePromise('git', ['add', 'gitbook/']);
+    await execFilePromise('git', ['add', '.'], { cwd: GITBOOK_DIR });
 
     console.log(`[GitBook/GitOps] 💾 正在提交變更: "${commitMessage}"...`);
     // 預防無變動提交出錯
     try {
-      await execFilePromise('git', ['commit', '-m', commitMessage]);
+      await execFilePromise('git', ['commit', '-m', commitMessage], { cwd: GITBOOK_DIR });
     } catch (e) {
       const errMessage = e.message || '';
       // 僅在確定是「無變動」的情況下才安全跳過，其餘錯誤應主動拋出以利除錯
@@ -138,7 +138,7 @@ export async function gitPushChanges(commitMessage) {
 
     try {
       console.log(`[GitBook/GitOps] 🚀 正在推送至 GitHub 遠端倉庫 [origin/${currentBranch}]...`);
-      await execFilePromise('git', ['push', 'origin', currentBranch]);
+      await execFilePromise('git', ['push', 'origin', currentBranch], { cwd: GITBOOK_DIR });
       console.log(`[GitBook/GitOps] 🎉 GitOps 自動推送完成！GitBook 將在數秒內自動同步並上線新頁面。`);
     } catch (pushErr) {
       const pushErrMsg = pushErr.message || '';
