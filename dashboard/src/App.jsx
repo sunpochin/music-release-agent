@@ -238,7 +238,16 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-white/10">
+                  <div className="mt-6 pt-4 border-t border-white/10 space-y-4">
+                    {/* 偵錯小工具，方便實機測試排查 */}
+                    <div className="bg-white/5 p-3 rounded-xl text-[11px] text-gray-400 font-mono space-y-1">
+                      <p className="text-spotify-green font-bold text-[10px] uppercase tracking-wider mb-1">系統偵錯資訊</p>
+                      <p>HTTPS 安全連線: {window.location.protocol === 'https:' ? '🟢 是' : '🔴 否 (不支援原生分享)'}</p>
+                      <p>原生分享 API: {navigator.share ? '🟢 支援' : '🔴 否'}</p>
+                      <p>原生檔案分享: {navigator.canShare && navigator.canShare({ files: [new File([], 'test.png', { type: 'image/png' })] }) ? '🟢 支援' : '🔴 否'}</p>
+                      <p>分享圖卡狀態: {shareFile ? '🟢 已就緒' : '⏳ 生成中/失敗'}</p>
+                    </div>
+
                     <a 
                       href={selectedAlbum.url} 
                       target="_blank" 
