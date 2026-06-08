@@ -118,7 +118,9 @@ app.get('/api/review', async (req, res) => {
 
   try {
     const slug = generateSlug(`${artistName}-${albumName}`) || 'unknown';
-    const filePath = path.join('/Users/pac/codes/interview/social-dancing-notes/new-releases', `${slug}.md`);
+    // 讀取環境變數設定的樂評路徑，並以本地 reviews 目錄為安全降級備用
+    const reviewsDir = process.env.REVIEWS_PATH || path.join(process.cwd(), 'reviews');
+    const filePath = path.join(reviewsDir, `${slug}.md`);
     const content = await fs.readFile(filePath, 'utf-8');
     const parts = extractReviewParts(content);
     res.json(parts);
