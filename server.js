@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js';
 import { translateLyrics } from './src/lyrics-translator.js';
+import { getSpotifyAlbumTracks } from './src/spotify-client.js';
+import { generateTrackAnalysis } from './src/album-reviewer.js';
 
 dotenv.config();
 
@@ -141,6 +143,34 @@ app.post('/api/lyrics', async (req, res) => {
     const translation = await translateLyrics(artistName, trackName);
     res.json({ text: translation });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 獲取專輯曲目 API (動態隨選載入)
+app.get('/api/albums/:id/tracks', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const tracks = await getSpotifyAlbumTracks(id);
+    res.json(tracks);
+  } catch (err) {
+    console.error(`Failed to get tracks for album ${id}:`, err);
+    res.status(500).json({ error: 'Failed to load tracks' });
+  }
+});
+
+// 歌曲級別 AI 分析 API (動態隨選生成)
+app.post('/api/tracks/analyze', async (req, res) => {
+  const { artistName, trackName, albumName } = req.body;
+  if (!artistName || !trackName) {
+    return res.status(400).json({ error: 'Missing artistName or trackName' });
+  }
+  
+  try {
+    const analysis = await generateTrackAnalysis(artistName, trackName, albumName);
+    res.json({ text: analysis });
+  } catch (err) {
+    console.error(`Failed to analyze track ${trackName}:`, err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -72,28 +72,40 @@ function parseMarkdownToHtml(markdown) {
   }).join('\n');
 }
 
-// AI 歌詞控制面板元件：負責歌詞抓取、加載動態、雙語歌詞渲染，以及觸發導出/分享圖卡
+// AI 歌詞控制面板元件：負責歌詞抓取、單曲 AI 分析、雙頁籤切換與圖卡導出
 const AILyricsPanel = ({ 
   selectedAlbum, 
+  selectedTrack,
   lyricsData, 
   isLoading, 
   isExporting, 
   handleFetchLyrics, 
-  exportShareCard 
+  exportShareCard,
+  analysisData,
+  analysisLoading,
+  handleAnalyzeTrack,
+  activeTab = 'lyrics',
+  setActiveTab
 }) => {
   if (!selectedAlbum) return null
 
   return (
     <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
-        <h2 className="text-xl font-bold flex items-center gap-2 text-spotify-green">
-          <Sparkles size={20} /> AI 雙語歌詞翻譯與賞析
-        </h2>
+      {/* 頂部標題與操作按鈕 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-white/10 pb-4">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2 text-spotify-green">
+            <Sparkles size={20} /> AI 歌曲智囊助手
+          </h2>
+          <p className="text-xs text-gray-400 mt-1 truncate max-w-xs sm:max-w-md">
+            當前選中: <span className="text-white font-bold">{selectedTrack ? selectedTrack.name : selectedAlbum.name}</span>
+          </p>
+        </div>
         
         {/* 匯出按鈕，在導出中或加載中時禁用 */}
         <button 
           onClick={exportShareCard}
-          disabled={isExporting || isLoading}
+          disabled={isExporting || isLoading || analysisLoading}
           className="bg-white text-black hover:bg-spotify-green hover:scale-105 transition-all px-4 py-2 rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
         >
           {isExporting ? <AlertCircle size={16} className="animate-spin" /> : <Download size={16} />}
@@ -101,34 +113,90 @@ const AILyricsPanel = ({
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col justify-center">
-        {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
-            <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
-            <p className="animate-pulse font-medium text-center">Gemini AI 正在編寫精美的雙語歌詞與樂評...</p>
-          </div>
-        ) : lyricsData ? (
-          <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
-            {/* 使用自訂 Markdown 轉譯器安全且優美地顯示歌詞 */}
-            <div dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
-          </div>
-        ) : (
-          <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">
-            <Sparkles size={48} className="text-gray-500 opacity-40 animate-pulse" />
-            <div className="space-y-2">
-              <h3 className="text-lg font-bold text-gray-300">尚未產生 AI 歌詞</h3>
-              <p className="text-sm text-gray-500 max-w-md">
-                目前僅載入本地庫中存儲的專輯資訊。您可以隨時匯出純淨版限動卡，或者點擊下方按鈕啟動 AI 深入解析這首歌的歌詞意境。
-              </p>
+      {/* 雙頁籤切換 Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-white/5 pb-2">
+        <button
+          onClick={() => setActiveTab('lyrics')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            activeTab === 'lyrics'
+              ? 'bg-spotify-green/20 text-spotify-green border border-spotify-green/30'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          🎵 AI 雙語歌詞
+        </button>
+        <button
+          onClick={() => setActiveTab('analysis')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            activeTab === 'analysis'
+              ? 'bg-spotify-green/20 text-spotify-green border border-spotify-green/30'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          🧠 歌曲 AI 賞析
+        </button>
+      </div>
+
+      {/* 內容渲染區域 */}
+      <div className="flex-1 flex flex-col justify-center min-h-[300px]">
+        {activeTab === 'lyrics' ? (
+          // 頁籤一：AI 雙語歌詞
+          isLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
+              <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
+              <p className="animate-pulse font-medium text-center">Gemini AI 正在編寫精美的雙語歌詞與翻譯...</p>
             </div>
-            <button 
-              onClick={handleFetchLyrics}
-              className="bg-spotify-green text-black hover:scale-105 transition-all px-6 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-spotify-green/20"
-            >
-              <Sparkles size={16} />
-              尋找歌詞與 AI 翻譯
-            </button>
-          </div>
+          ) : lyricsData ? (
+            <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
+              <div dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
+            </div>
+          ) : (
+            <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">
+              <Sparkles size={48} className="text-gray-500 opacity-40 animate-pulse" />
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-gray-300">尚未產生 AI 歌詞</h3>
+                <p className="text-sm text-gray-500 max-w-md">
+                  您可以點擊下方按鈕，請 AI 尋找這首單曲的原文歌詞，並為其翻譯成優雅的繁體中文。
+                </p>
+              </div>
+              <button 
+                onClick={handleFetchLyrics}
+                className="bg-spotify-green text-black hover:scale-105 transition-all px-6 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-spotify-green/20"
+              >
+                <Sparkles size={16} />
+                尋找歌詞與 AI 翻譯
+              </button>
+            </div>
+          )
+        ) : (
+          // 頁籤二：歌曲 AI 賞析
+          analysisLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
+              <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
+              <p className="animate-pulse font-medium text-center">AI 樂評大腦正在深度分析編曲與音樂風格...</p>
+            </div>
+          ) : analysisData ? (
+            <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
+              <div dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(analysisData) }} />
+            </div>
+          ) : (
+            <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">
+              <Sparkles size={48} className="text-gray-500 opacity-40 animate-pulse" />
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-gray-300">尚未進行單曲分析</h3>
+                <p className="text-sm text-gray-500 max-w-md">
+                  點擊下方按鈕，請資深 AI 樂評人為這首單曲起草一份精緻的音樂風格剖析與意境賞析報告。
+                </p>
+              </div>
+              <button 
+                onClick={handleAnalyzeTrack}
+                className="bg-spotify-green text-black hover:scale-105 transition-all px-6 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-spotify-green/20"
+              >
+                <Sparkles size={16} />
+                開始歌曲 AI 賞析
+              </button>
+            </div>
+          )
         )}
       </div>
     </div>
