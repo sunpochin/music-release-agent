@@ -9,6 +9,8 @@ function App() {
   const [lyricsData, setLyricsData] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  // 儲存預先產生的圖卡檔案，以利 iOS Safari 進行同步分享
+  const [shareFile, setShareFile] = useState(null)
   
   const shareCardRef = useRef(null)
 
@@ -18,6 +20,38 @@ function App() {
       .then(data => setAlbums(data))
       .catch(err => console.error("Failed to fetch albums", err))
   }, [])
+
+  // 當選取專輯或歌詞更新時，在背景非同步預先產生圖卡檔案
+  useEffect(() => {
+    if (selectedAlbum) {
+      setShareFile(null) // 先清空舊檔案
+      const timer = setTimeout(() => {
+        generateShareFile()
+      }, 600) // 延遲 600ms 確保 ShareCard DOM 已渲染完畢
+      return () => clearTimeout(timer)
+    } else {
+      setShareFile(null)
+    }
+  }, [selectedAlbum, lyricsData])
+
+  // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
+  const generateShareFile = async () => {
+    if (!shareCardRef.current || !selectedAlbum) return
+    try {
+      const canvas = await html2canvas(shareCardRef.current, {
+        scale: 2,
+        backgroundColor: '#121212',
+        useCORS: true
+      })
+      const image = canvas.toDataURL("image/png")
+      const response = await fetch(image)
+      const blob = await response.blob()
+      const file = new File([blob], `share-${selectedAlbum.name}.png`, { type: 'image/png' })
+      setShareFile(file)
+    } catch (err) {
+      console.error("Failed to pre-generate share file", err)
+    }
+  }
 
   // 僅選取專輯並重設歌詞與載入狀態，不自動執行 AI 歌詞搜尋
   const handleSelectAlbum = (album) => {
@@ -55,10 +89,31 @@ function App() {
   }
 
   const exportShareCard = async () => {
-    if (!shareCardRef.current) return
+    if (!selectedAlbum) return
+
+    // 如果預先產生的檔案已經在背景準備妥當，則「完全同步」呼叫 Web Share API 繞過 Safari 的 transient user activation 限制
+    if (shareFile) {
+      try {
+        if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+          await navigator.share({
+            files: [shareFile],
+            title: `分享《${selectedAlbum.name}》`,
+            text: `推薦這首好歌！這是來自 ${selectedAlbum.artistName || '未知藝人'} 的作品。`
+          })
+          return // 成功分享直接返回
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          // 使用者主動取消分享，直接忽略
+          return
+        }
+        console.error("Native share failed, falling back to download", err)
+      }
+    }
+
+    // 備用降級方案 (Fallback)：如果背景圖片還在產生中，或是電腦版不支援原生分享，則執行畫布編譯下載
     setIsExporting(true)
     try {
-      // 使用 html2canvas 產生二倍解析度的圖卡畫布
       const canvas = await html2canvas(shareCardRef.current, {
         scale: 2,
         backgroundColor: '#121212',
@@ -66,26 +121,12 @@ function App() {
       })
       const image = canvas.toDataURL("image/png")
       
-      // 轉換 Data URL 為 Blob 與 File 物件，以便呼叫系統原生分享
-      const response = await fetch(image)
-      const blob = await response.blob()
-      const file = new File([blob], `share-${selectedAlbum?.name || 'card'}.png`, { type: 'image/png' })
-
-      // 檢查瀏覽器是否支援 Web Share API 分享檔案（行動端瀏覽器如 Safari / Chrome 支援）
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: `分享《${selectedAlbum?.name}》`,
-          text: `推薦這首好歌！這是來自 ${selectedAlbum?.artistName || '未知藝人'} 的作品。`
-        })
-      } else {
-        // 如果是電腦版或不支援的瀏覽器，自動降級為直接下載
-        const link = document.createElement('a')
-        link.href = image
-        link.download = `share-${selectedAlbum?.name || 'card'}.png`
-        link.click()
-        
-        // 給予提示引導手動發文
+      const link = document.createElement('a')
+      link.href = image
+      link.download = `share-${selectedAlbum.name || 'card'}.png`
+      link.click()
+      
+      if (!navigator.canShare) {
         alert("圖卡已成功下載！由於您使用的是電腦，請手動將下載的圖片上傳至 Instagram/TikTok 限時動態分享。")
       }
     } catch (err) {
