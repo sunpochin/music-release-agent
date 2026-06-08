@@ -572,8 +572,13 @@ export async function scanRecentNewReleases(days = 30, batchSize = null) {
     return timeA - timeB;
   });
 
-  // 決定本次要掃描的藝人批次 (確保在 24 小時/8次排程內能完成一輪完整掃描，最少為 15 人)
-  const finalBatchSize = batchSize !== null ? batchSize : Math.max(15, Math.ceil(followedArtists.length / 8));
+  // 讀取掃描週期天數（預設為 7 天跑完一輪），並依據每天 8 次（每 3 小時一次）計算總執行次數
+  const scanCycleDays = parseInt(process.env.SCAN_CYCLE_DAYS, 10) || 7;
+  const runsPerDay = 8;
+  const totalRunsInCycle = scanCycleDays * runsPerDay;
+
+  // 決定本次要掃描的藝人批次 (確保在設定天數/執行次數內能完成一輪完整掃描，最少為 15 人)
+  const finalBatchSize = batchSize !== null ? batchSize : Math.max(15, Math.ceil(followedArtists.length / totalRunsInCycle));
   const targetArtists = sortedArtists.slice(0, finalBatchSize);
   const remainingCount = followedArtists.length - targetArtists.length;
 
