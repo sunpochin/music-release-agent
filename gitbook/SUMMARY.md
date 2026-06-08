@@ -2,6 +2,13 @@
 
 * [🏠 首頁](README.md)
 * [🎵 最新藝人新發行樂評](new-releases/README.md)
+  * [AI巷仔內 - 西藏度亡經・舊屋篇](new-releases/ai巷仔內-西藏度亡經舊屋篇.md)
+  * [AI巷仔內 - 背影 | 給兄長的歌](new-releases/ai巷仔內-背影-給兄長的歌.md)
+  * [AI巷仔內 - 西藏度亡經・明光篇](new-releases/ai巷仔內-西藏度亡經明光篇.md)
+  * [Chantel - Amor de Verano](new-releases/chantel-amor-de-verano.md)
+  * [Mark Towns - Moonlit Caribbean Night](new-releases/mark-towns-moonlit-caribbean-night.md)
+  * [Mark Towns - Last Night](new-releases/mark-towns-last-night.md)
+  * [Sergio George - Besame Bonito (Salsa Version)](new-releases/sergio-george-besame-bonito-salsa-version.md)
   * [Las Migas - CHASING THE SUN](new-releases/las-migas-chasing-the-sun.md)
   * [MARIANA Y LA MAKYNARIA - Demasiado Fuerte](new-releases/mariana-y-la-makynaria-demasiado-fuerte.md)
   * [Carlos D'Castro - Y Si Te Quedas, ¿Qué?](new-releases/carlos-dcastro-y-si-te-quedas-qu.md)
