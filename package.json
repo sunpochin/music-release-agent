@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "scan": "node scan-releases.js"
+    "scan": "node scan-releases.js",
+    "scan:dry": "node scan-releases-dry.js"
   },
   "dependencies": {
     "@google/genai": "^2.3.0",
