@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Disc3, Music, Sparkles, Share2, Download, AlertCircle, Info, Calendar, Layers, ExternalLink } from 'lucide-react'
+import { Disc3, Music, Sparkles, Share2, Download, AlertCircle, Info, Calendar, Layers, ExternalLink, Send } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import ShareCard from './components/ShareCard'
 import Sidebar from './components/Sidebar'
@@ -27,6 +27,9 @@ function App() {
   const [activeTab, setActiveTab] = useState('lyrics') // 'lyrics' | 'analysis'
   
   const shareCardRef = useRef(null)
+  // 社群自動發文狀態
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishResult, setPublishResult] = useState(null)
 
   useEffect(() => {
     fetch('/api/albums')
@@ -221,6 +224,53 @@ function App() {
     }
   }
 
+  // 自動發文到社群平台（Facebook / X / Threads）
+  const handlePublishToSocial = async () => {
+    if (!selectedAlbum || isPublishing) return
+    setIsPublishing(true)
+    setPublishResult(null)
+
+    try {
+      // 將 ShareCard 渲染為 base64 圖片
+      let imageBase64 = null
+      if (shareCardRef.current) {
+        const canvas = await html2canvas(shareCardRef.current, {
+          scale: 2,
+          backgroundColor: '#121212',
+          useCORS: true
+        })
+        imageBase64 = canvas.toDataURL('image/png')
+      }
+
+      // 組裝文案：優先使用 AI 樂評摘要
+      const caption = albumReview?.summary
+        || albumReview?.introduction
+        || `🎵 新專輯推薦！來自 ${selectedAlbum.artistName || '未知藝人'} 的《${selectedAlbum.name}》\n\n#MusicRelease #NewMusic`
+
+      const res = await fetch('/api/social/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caption,
+          platforms: ['threads', 'facebook'],
+          imageBase64
+        })
+      })
+
+      const result = await res.json()
+
+      if (res.ok) {
+        setPublishResult({ success: true, jobId: result.jobId })
+      } else {
+        setPublishResult({ success: false, error: result.error })
+      }
+    } catch (err) {
+      setPublishResult({ success: false, error: err.message })
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   return (
     <div className="flex h-screen bg-spotify-dark text-white overflow-hidden font-sans selection:bg-spotify-green selection:text-black">
       {/* Sidebar 側邊欄 */}
@@ -262,13 +312,16 @@ function App() {
                   lyricsData={lyricsData}
                   isLoading={isLoading}
                   isExporting={isExporting}
-                  handleFetchLyrics={handleFetchLyrics}
+                  isPublishing={isPublishing}
+                  publishResult={publishResult}
+                                    handleFetchLyrics={handleFetchLyrics}
                   exportShareCard={exportShareCard}
                   analysisData={analysisData}
                   analysisLoading={analysisLoading}
                   handleAnalyzeTrack={handleAnalyzeTrack}
                   activeTab={activeTab}
                   setActiveTab={setActiveTab}
+                  handlePublishToSocial={handlePublishToSocial}
                 />
 
               </div>

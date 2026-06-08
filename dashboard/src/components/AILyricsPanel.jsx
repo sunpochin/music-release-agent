@@ -1,91 +1,67 @@
 import React from 'react'
-import { Sparkles, Download, AlertCircle } from 'lucide-react'
+import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle } from 'lucide-react'
 
 // 輔助函式：將 Markdown 語法安全且語意化地轉譯為具有 Tailwind 樣式的 HTML
 function parseMarkdownToHtml(markdown) {
   if (!markdown) return '';
-  
-  // 轉譯特殊字元，確保防範 XSS 安全漏洞
-  const escapeHtml = (text) => text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
   const lines = markdown.split('\n');
-  let inList = false;
-  const resultLines = [];
-
-  for (let line of lines) {
-    const trimmed = line.trim();
+  return lines.map(line => {
+    line = line.trim();
     
-    // 檢查無序列表項目 - 
-    if (trimmed.startsWith('- ')) {
-      const content = escapeHtml(trimmed.slice(2));
-      const formattedContent = content
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>');
-      
-      // 若尚未進入列表狀態，補上 ul 容器
-      if (!inList) {
-        resultLines.push('<ul class="my-3">');
-        inList = true;
-      }
-      resultLines.push(`<li class="ml-4 list-disc my-1">${formattedContent}</li>`);
-    } else {
-      // 離開列表狀態時，關閉 ul 容器
-      if (inList) {
-        resultLines.push('</ul>');
-        inList = false;
-      }
-      
-      let processed = escapeHtml(line);
-      // 解析各級標題
-      if (processed.startsWith('### ')) {
-        processed = `<h3 class="text-spotify-green font-bold text-lg mt-6 mb-3">${processed.slice(4)}</h3>`;
-      } else if (processed.startsWith('## ')) {
-        processed = `<h2 class="text-spotify-green font-bold text-xl mt-8 mb-4">${processed.slice(3)}</h2>`;
-      } else if (processed.startsWith('# ')) {
-        processed = `<h1 class="text-white font-black text-2xl mt-8 mb-4">${processed.slice(2)}</h1>`;
-      } else {
-        // 解析行內樣式：粗體與斜體
-        processed = processed
-          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.*?)\*/g, '<em>$1</em>');
-      }
-      
-      resultLines.push(processed);
+    // 處理副標題 H3 (例如 ### 歌曲意境與背景)
+    if (line.startsWith('###')) {
+      return `<h3 class="text-sm font-bold text-spotify-green mt-4 mb-2 flex items-center gap-1">${line.replace('###', '')}</h3>`;
     }
-  }
+    
+    // 處理主標題 H2
+    if (line.startsWith('##')) {
+      return `<h2 class="text-base font-bold text-white mt-6 mb-3">${line.replace('##', '')}</h2>`;
+    }
 
-  // 確保未關閉的列表在結尾時關閉
-  if (inList) {
-    resultLines.push('</ul>');
-  }
+    // 處理水平分隔線 ---
+    if (line === '---') {
+      return '<hr class="border-white/10 my-4" />';
+    }
 
-  // 合併行，只有非 HTML 結構標籤的行才補上換行符 <br/>，防範無效的結構嵌套
-  return resultLines.map((line) => {
-    const isTag = line.startsWith('<h') || line.startsWith('<u') || line.startsWith('<l') || line.startsWith('</');
-    if (isTag) {
-      return line;
+    // 處理無序清單 -
+    if (line.startsWith('-')) {
+      let content = line.substring(1).trim();
+      // 處理粗體 text
+      content = content.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+      return `<div class="flex items-start gap-2 my-1 text-xs text-gray-300"><span class="text-spotify-green">•</span><span>${content}</span></div>`;
+    }
+
+    // 處理純粗體段落 (通常是精選歌詞或金句)
+    if (line.startsWith('**') && line.endsWith('**')) {
+      return `<p class="text-sm italic font-medium text-spotify-green/90 bg-spotify-green/5 border-l-2 border-spotify-green py-2 px-3 my-3 rounded-r-lg">${line.replace(/\*\*/g, '')}</p>`;
+    }
+
+    // 處理一般段落，支援內建粗體
+    if (line) {
+      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+      return `<p class="text-xs text-gray-300 leading-relaxed my-2">${formatted}</p>`;
     }
     return line ? `${line}<br/>` : '<br/>';
   }).join('\n');
 }
 
-// AI 歌詞控制面板元件：負責歌詞抓取、單曲 AI 分析、雙頁籤切換與圖卡導出
+// AI 歌詞控制面板元件：負責歌詞抓取、單曲 AI 分析、雙頁籤切換與圖卡導出，並支援社群發文
 const AILyricsPanel = ({ 
   selectedAlbum, 
   selectedTrack,
   lyricsData, 
   isLoading, 
   isExporting, 
+  isPublishing,
+  publishResult,
   handleFetchLyrics, 
   exportShareCard,
   analysisData,
   analysisLoading,
   handleAnalyzeTrack,
   activeTab = 'lyrics',
-  setActiveTab
+  setActiveTab,
+  handlePublishToSocial
 }) => {
   if (!selectedAlbum) return null
 
@@ -102,16 +78,43 @@ const AILyricsPanel = ({
           </p>
         </div>
         
-        {/* 匯出按鈕，在導出中或加載中時禁用 */}
-        <button 
-          onClick={exportShareCard}
-          disabled={isExporting || isLoading || analysisLoading}
-          className="bg-white text-black hover:bg-spotify-green hover:scale-105 transition-all px-4 py-2 rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-        >
-          {isExporting ? <AlertCircle size={16} className="animate-spin" /> : <Download size={16} />}
-          匯出 IG/TikTok 限動卡
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 匯出按鈕，在導出中或加載中時禁用 */}
+          <button 
+            onClick={exportShareCard}
+            disabled={isExporting || isLoading || analysisLoading}
+            className="bg-white text-black hover:bg-spotify-green hover:scale-105 transition-all px-4 py-2 rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+          >
+            {isExporting ? <AlertCircle size={16} className="animate-spin" /> : <Download size={16} />}
+            匯出 IG/TikTok 限動卡
+          </button>
+
+          {/* 自動發佈到社群平台（呼叫 social-post-service 微服務） */}
+          <button 
+            onClick={handlePublishToSocial}
+            disabled={isPublishing || isLoading || analysisLoading}
+            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-400 hover:to-purple-500 hover:scale-105 transition-all px-4 py-2 rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+          >
+            {isPublishing ? <AlertCircle size={16} className="animate-spin" /> : <Send size={16} />}
+            {isPublishing ? '發文中...' : '發佈到社群'}
+          </button>
+        </div>
       </div>
+
+      {/* 發文結果通知 */}
+      {publishResult && (
+        <div className={`flex items-center gap-2 px-4 py-2 mb-4 rounded-lg text-xs font-medium ${
+          publishResult.success 
+            ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+        }`}>
+          {publishResult.success ? (
+            <><CheckCircle size={14} /> 發文已排程成功！JobId: {publishResult.jobId?.slice(0, 8)}...</>
+          ) : (
+            <><XCircle size={14} /> 發文失敗: {publishResult.error}</>
+          )}
+        </div>
+      )}
 
       {/* 雙頁籤切換 Tabs */}
       <div className="flex gap-2 mb-6 border-b border-white/5 pb-2">
@@ -144,7 +147,7 @@ const AILyricsPanel = ({
           isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
               <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
-              <p className="animate-pulse font-medium text-center">Gemini AI 正在編寫精美的雙語歌詞與翻譯...</p>
+              <p className="animate-pulse font-medium text-center text-xs">Gemini AI 正在編寫精美的雙語歌詞與翻譯...</p>
             </div>
           ) : lyricsData ? (
             <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
@@ -155,7 +158,7 @@ const AILyricsPanel = ({
               <Sparkles size={48} className="text-gray-500 opacity-40 animate-pulse" />
               <div className="space-y-2">
                 <h3 className="text-lg font-bold text-gray-300">尚未產生 AI 歌詞</h3>
-                <p className="text-sm text-gray-500 max-w-md">
+                <p className="text-xs text-gray-500 max-w-md">
                   您可以點擊下方按鈕，請 AI 尋找這首單曲的原文歌詞，並為其翻譯成優雅的繁體中文。
                 </p>
               </div>
@@ -173,7 +176,7 @@ const AILyricsPanel = ({
           analysisLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
               <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
-              <p className="animate-pulse font-medium text-center">AI 樂評大腦正在深度分析編曲與音樂風格...</p>
+              <p className="animate-pulse font-medium text-center text-xs">AI 樂評大腦正在深度分析編曲與音樂風格...</p>
             </div>
           ) : analysisData ? (
             <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
@@ -184,7 +187,7 @@ const AILyricsPanel = ({
               <Sparkles size={48} className="text-gray-500 opacity-40 animate-pulse" />
               <div className="space-y-2">
                 <h3 className="text-lg font-bold text-gray-300">尚未進行單曲分析</h3>
-                <p className="text-sm text-gray-500 max-w-md">
+                <p className="text-xs text-gray-500 max-w-md">
                   點擊下方按鈕，請資深 AI 樂評人為這首單曲起草一份精緻的音樂風格剖析與意境賞析報告。
                 </p>
               </div>

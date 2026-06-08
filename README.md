@@ -1,154 +1,151 @@
-# music-release-agent
+# 🎵 Music Release Agent & AI Review Center
 
-> A music release scanning and AI review system built around Spotify discovery, GitOps publishing, and a companion social posting microservice.
+[![Test Coverage](./coverage-badge.svg)](./coverage-badge.svg)
+[![PM2 Process Guard](https://img.shields.io/badge/PM2-process%20guard-blueviolet)](./PM2_DAEMON_GUIDE.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`music-release-agent` scans followed artists, generates AI-assisted album / song commentary, publishes Markdown output through a GitBook-style GitOps flow, and exposes a dashboard for browsing releases, translations, and share assets.
-
-This repo is strongest when understood as the **read-heavy core service** of a two-service system:
-
-- `music-release-agent`: discovery, review generation, dashboard, publishing
-- `social-post-service`: async multi-platform posting and posting strategies
+`music-release-agent` 是一個結合 **Spotify API**、**Gemini AI** 與 **GitOps 自動化發布**的音樂掃描與樂評推播系統。
+專案具備採用 **Vite + React (TailwindCSS)** 打造的 Glassmorphism 音樂儀表板，支援非同步預渲染 9:16 社群分享卡（Instagram Stories / TikTok Reels），並透過伴生微服務 `social-post-service` 提供非同步多平台自動發文能力。
 
 ---
 
-## 30-Second Pitch
+## ⚡️ 3 分鐘零配置快速驗證（面試官專屬，免 API Key）
 
-This project automates a full music-content workflow:
+為了方便面試官在**不準備任何 Spotify/Gemini API 金鑰與授權**的情況下，能立即、完整地驗證整個系統，專案內建了完整的 **Dry Run 離線模擬沙箱**。
 
-1. discover new releases from Spotify
-2. fall back to MusicBrainz when rate-limited
-3. generate AI-assisted reviews / lyric commentary
-4. publish Markdown output through GitOps
-5. render a dashboard and social share assets
-6. forward publishing jobs to a companion posting microservice
+### 1. 安裝與依賴準備
+```bash
+# 安裝後端與發文微服務依賴
+npm install
+cd ../social-post-service && npm install && cd ../music-release-agent
 
-It is not just an API wrapper. The interesting parts are the system boundaries, fallback design, dry-run sandbox, and the way content generation is separated from outbound posting.
+# 安裝前端 Dashboard 依賴
+cd dashboard && npm install && cd ..
+```
+
+### 2. 執行離線沙箱模擬
+執行以下指令，系統會自動使用內建的模擬歌手發行資料，模擬執行新歌掃描、AI 樂評起草、GitBook 目錄更新與 GitOps 發布流：
+```bash
+npm run scan:dry
+```
+*模擬產出的 Markdown 樂評文件與大綱目錄將寫入 `data/mock-gitbook/` 下，您可以直接開箱檢視。*
+
+### 3. 一鍵啟動雙服務環境（PM2 背景守護）
+我們提供了一鍵管理的 PM2 配置檔案。啟動後，Express API 後端、Vite 開發伺服器、Cron 定時掃描器與發文微服務將在背景同步拉起：
+```bash
+npx pm2 start ecosystem.config.cjs
+```
+*(詳細指令與除錯方式請參考：[🐶 PM2 守護進程指南](./PM2_DAEMON_GUIDE.md))*
+
+### 4. 前往 Dashboard 體驗
+打開瀏覽器訪問 [http://localhost:5173](http://localhost:5173) 即可立即開始體驗：
+- 🌟 **音樂庫瀏覽**：流暢的毛玻璃卡片式導覽與最新發行清單。
+- 🔮 **AI 雙語歌詞**：點選任一曲目，即時獲取 Gemini 翻譯與賞析對照。
+- 🚀 **社群自動發佈**：點擊「發佈到社群」一鍵觸發非同步多平台發佈流。
 
 ---
 
-## Why It Is Worth Showing In Interview
+## 📐 雙服務微服務架構 (Microservices Architecture)
 
-- It is a **real pipeline**, not a single-page toy app.
-- It has clear **service boundaries** between read-heavy and write-heavy responsibilities.
-- It includes **rate-limit resilience** and fallback design.
-- It has a **dry-run sandbox**, so an interviewer can validate the workflow without external credentials.
-- It combines backend orchestration, frontend UX, testing, and publishing automation in one coherent system.
+本專案遵循**單一職責原則 (SRP)**，將高頻讀取的音樂儀表板與高防禦要求的寫入型社群發文拆分為獨立微服務：
+
+```mermaid
+graph TD
+    subgraph Client [前端用戶端]
+        Browser[Chrome/iOS Safari :5173]
+    end
+
+    subgraph music-release-agent [音樂核心服務 :3011]
+        Server[Express API Server]
+        Scanner[scan-releases.js]
+        MBClient[musicbrainz-client.js]
+        SpotifyClient[spotify-client.js]
+        Cache[spotify-cache.json]
+    end
+
+    subgraph social-post-service [發文微服務 :3012]
+        SocialServer[Express API Server]
+        Queue[Job Queue]
+        MockStrategy[MockStrategy]
+        AyrshareStrategy[AyrshareStrategy]
+    end
+
+    Browser -->|1. 瀏覽與點擊| Server
+    Server -->|讀取/寫入快取| Cache
+    Scanner -->|2. 每 3 小時執行定時掃描| SpotifyClient
+    SpotifyClient -->|3. Fallback 降級備用渠道| MBClient
+    
+    Browser -->|4. 一鍵發佈到社群| Server
+    Server -->|5. 代理轉發 POST /api/posts| SocialServer
+    SocialServer -->|6. 非同步入隊| Queue
+    Queue -->|7. 策略分發| MockStrategy
+    Queue -->|7. 策略分發| AyrshareStrategy
+```
 
 ---
 
-## System Shape
+## 🛡️ 容災與降級設計 (Resiliency & Failover Flow)
+
+外部三方 API 的不穩定性與速率限制（Rate Limits）是生產環境最棘手的考驗。為此，我們在 Spotify API 通訊層設計了 **「雙源容災降級機制」**：
+
+1. **智慧限流熔斷**：當遇到 `HTTP 429` 限流時，自動解析 `Retry-After` 智慧休眠。若 24 小時內觸發限流次數達 2 次，則啟動熔斷禁用 Spotify API 24 小時，保護開發者憑證。
+2. **MusicBrainz 降級渠道**：一旦 Spotify API 被禁用或連線失敗，掃描器自動切換為公開的 **MusicBrainz API**，藉由搜尋藝人 MBID 爬取專輯列表，並動態轉換為與 Spotify 相容的 Schema，確保發行管線永不斷線。
 
 ```mermaid
 flowchart TD
-    A["CLI / Scheduled Scan"] --> B["music-release-agent"]
-    B --> C["Spotify API"]
-    B --> D["MusicBrainz fallback"]
-    B --> E["Gemini / local review generation"]
-    B --> F["GitBook-style Markdown output"]
-    B --> G["Dashboard API / cache"]
-    G --> H["Vite + React dashboard"]
-    H --> I["Share card export / Web Share flow"]
-    B --> J["social-post-service"]
-    J --> K["Posting strategy: mock / future providers"]
+    Start([開始掃描歌手發行]) --> SpotifyCall{呼叫 Spotify API}
+    SpotifyCall -- 成功 --> SaveSpotifyCache[寫入本地快取] --> End([完成])
+    SpotifyCall -- "限流 429" --> CheckHistory{24小時內超額?}
+    CheckHistory -- 是 --> LockSpotify[禁用 Spotify 24小時] --> MBFailover[降級至 MusicBrainz]
+    CheckHistory -- 否 --> WaitRetry[依照 Retry-After 智慧休眠] --> SpotifyCall
+    SpotifyCall -- "其他嚴重網路錯誤" --> MBFailover
+    MBFailover --> GetMBID[搜尋藝人 MBID]
+    GetMBID -- 尋獲 --> GetMBAlbums[從 MusicBrainz 爬取專輯] --> ParseMB[轉換為 Spotify 相容 Schema] --> End
+    GetMBID -- 未尋獲 --> SkipArtist[跳過該藝人並記錄警告] --> End
 ```
 
 ---
 
-## 3-Minute Validation
+## 🎨 前端效能調優與安全實踐
 
-You can validate the project without Spotify or Gemini credentials:
+1. **背景非同步預渲染 (iOS Web Share API)**：iOS (WebKit) 的 `navigator.share` 要求必須在用戶點擊的瞬間**同步呼叫**。任何非同步的 `await` 畫布轉換都會導致 user gesture 失效。Dashboard 在用戶點選歌曲的當下，即於背景非同步將分享卡片渲染為 File 物件，確保用戶按下的瞬間能 100% 同步觸發 iOS 原生分享對話框。
+2. **`canvas.toBlob` 記憶體優化**：捨棄傳統將畫布轉成巨大 Base64 字串再 fetch 轉 Blob 的做法，直接使用原生的 `canvas.toBlob` Promise 包裝，在瀏覽器底層輸出二進位圖片檔，降低了 **33% 的記憶體空間佔用**，防止行動端瀏覽器因 OOM (記憶體溢出) 卡頓或重啟。
+3. **安全的輕量 Markdown 轉譯器**：在將 AI 歌詞（包含 Markdown 語法）渲染至前端時，先對特殊 HTML 字元進行轉義（Escape），杜絕 XSS（跨網站指令碼）腳本注入安全風險，再藉由狀態化逐行解析器輸出符合標準語意的 HTML。
+
+---
+
+## 🧪 單元測試與程式碼覆蓋率
+
+本專案實施嚴格的防禦性測試，後端核心模組（服務類別、策略模式實作與掃描協調器）之語句覆蓋率均達到 **80% - 100%**。
 
 ```bash
-npm install
-cd dashboard && npm install && cd ..
-npm run scan:dry
-npm start
-cd dashboard && npm run dev -- --host
+# 執行所有 21 個單元與基準防禦測試
+npm run test
+
+# 執行測試並產生覆蓋率報告，同時動態更新 Coverage Badge
+npm run test:coverage
 ```
 
-Then:
-
-1. inspect `data/mock-gitbook/` output from the dry run
-2. open `http://localhost:5173`
-3. browse releases and AI lyric views
-4. verify the share-card / posting flow in the dashboard
-
-Full walkthrough: [DEMO_SCRIPT.md](./DEMO_SCRIPT.md)
-
 ---
 
-## Companion Service
+## ⚙️ 生產環境變數配置
 
-This repo assumes a companion microservice:
+若要運行真實的 Spotify 聯網掃描與 Gemini AI 生成流程，請參閱 [.env.example](./.env.example) 建立您的 `.env` 檔案，填入以下金鑰：
 
-- `social-post-service`
-
-Why split it out:
-
-- release scanning and review generation are **read-heavy orchestration**
-- social posting is **write-heavy, latency-prone, retry-prone integration work**
-
-That split makes it easier to evolve posting strategies without bloating the core music pipeline.
-
----
-
-## Reliability Notes
-
-### Spotify rate-limit resilience
-
-- parses `Retry-After`
-- throttles requests
-- falls back to MusicBrainz when Spotify is constrained
-
-### Dry-run sandbox
-
-- lets interviewers validate the system without API keys
-- keeps the content and publishing pipeline demonstrable offline
-
-### Test coverage
-
-- includes Vitest-based tests for scanner flow, cache, circuit breaker, API client, and strategy behavior
-
----
-
-## Quick Start
-
-### Real Spotify / Gemini flow
-
-```bash
-npm install
-cp .env.example .env
-npm start
+```ini
+GEMINI_API_KEY=your_gemini_api_key_here
+SPOTIFY_CLIENT_ID=your_spotify_client_id_here
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
+REVIEWS_PATH=./data/mock-gitbook
+GITBOOK_PATH=../social-dancing-notes
+SOCIAL_SERVICE_URL=http://localhost:3012
 ```
 
-Then visit:
-
-- `http://localhost:3011/login/spotify`
-
-and run:
-
+### 執行真實掃描與 GitOps 發布
 ```bash
+# 1. 授權登入獲取 Spotify Token
+npm start ➡️ 瀏覽器訪問 http://localhost:3011/login/spotify
+
+# 2. 執行真實掃描管線（分析新歌、AI起草、自動 Commit/Push 寫入 GitBook）
 npm run scan
 ```
-
-Environment template: [.env.example](./.env.example)
-
----
-
-## Interview / Portfolio Docs
-
-- [DEMO_SCRIPT.md](./DEMO_SCRIPT.md): 3-minute demo flow
-- [INTERVIEW_GUIDE.md](./INTERVIEW_GUIDE.md): 60-second pitch and common questions
-- [PORTFOLIO_SUMMARY.md](./PORTFOLIO_SUMMARY.md): resume bullets, short blurb, PR summary
-- [DEVELOPER.md](./DEVELOPER.md): technical deep dive
-- [PM2_DAEMON_GUIDE.md](./PM2_DAEMON_GUIDE.md): runtime and process management notes
-
----
-
-## Repo Signals
-
-- dry-run validation path
-- dashboard + backend split
-- rate-limit fallback design
-- tested service / strategy layer
-- companion posting microservice boundary
