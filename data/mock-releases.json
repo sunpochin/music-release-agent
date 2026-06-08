@@ -1,0 +1,41 @@
+[
+  {
+    "id": "3WreOf2LKfp6dfM9NwMGHP",
+    "name": "El Alma en Clave",
+    "release_date": "2026-05-15",
+    "release_date_precision": "day",
+    "total_tracks": 11,
+    "type": "album",
+    "uri": "spotify:album:3WreOf2LKfp6dfM9NwMGHP",
+    "url": "https://open.spotify.com/album/3WreOf2LKfp6dfM9NwMGHP",
+    "image": "https://i.scdn.co/image/ab67616d0000b273d8180d474ad91c285ed69889",
+    "primary_artist": "Luis Enrique",
+    "artist_genres": ["salsa", "latin", "tropical"]
+  },
+  {
+    "id": "5nK9pvrS3xtr0nGzNFGuuQq",
+    "name": "La Malanga (Salsa Classic)",
+    "release_date": "2026-06-01",
+    "release_date_precision": "day",
+    "total_tracks": 1,
+    "type": "single",
+    "uri": "spotify:track:5nK9pvrS3xtr0nGzNFGuuQq",
+    "url": "https://open.spotify.com/track/5nK9pvrS3xtr0nGzNFGuuQq",
+    "image": "https://i.scdn.co/image/ab67616d0000b273a7c645b2b2b1cf56b8be889a",
+    "primary_artist": "Bobby Valentin",
+    "artist_genres": ["salsa", "fania", "latin-jazz"]
+  },
+  {
+    "id": "6wWp1JO8wL9qEeVV0TRHY3",
+    "name": "Chasing the Sun",
+    "release_date": "2026-06-08",
+    "release_date_precision": "day",
+    "total_tracks": 10,
+    "type": "album",
+    "uri": "spotify:album:6wWp1JO8wL9qEeVV0TRHY3",
+    "url": "https://open.spotify.com/album/6wWp1JO8wL9qEeVV0TRHY3",
+    "image": "https://i.scdn.co/image/ab67616d0000b27390ab94c8e7ef9e8b7be889ab",
+    "primary_artist": "Las Migas",
+    "artist_genres": ["flamenco", "rumba", "latin-pop"]
+  }
+]
