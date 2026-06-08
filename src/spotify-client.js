@@ -519,7 +519,7 @@ export async function getSpotifyArtistAlbums(artistId, days = 30) {
  * @param {number|null} batchSize - 本次分批掃描的藝人數量上限，預設 15 位。設為 null 則掃描全部。
  * @returns {Promise<Array<object>>} 近期新發行去重後的清單
  */
-export async function scanRecentNewReleases(days = 30, batchSize = 15) {
+export async function scanRecentNewReleases(days = 30, batchSize = null) {
   // 載入狀態檔以進行狀態化排序與 MBID 快取對齊
   const stateFilePath = path.resolve('data/scanner-state.json');
   let scannerState = {};
@@ -558,7 +558,7 @@ export async function scanRecentNewReleases(days = 30, batchSize = 15) {
     }));
 
     if (followedArtists.length === 0) {
-      throw new Error('Spotify 遭到 429 限制，且本地狀態庫沒有任何歷史藝人紀錄！無法啟動降級探索。');
+      throw new Error('Spotify 遭到 429 限制，且本地狀態庫沒有 any 歷史藝人紀錄！無法啟動降級探索。');
     }
     console.log(`[Spotify/Scanner] 💾 成功自本地狀態庫載入 ${followedArtists.length} 位歷史藝人進行降級掃描。`);
   }
@@ -572,12 +572,13 @@ export async function scanRecentNewReleases(days = 30, batchSize = 15) {
     return timeA - timeB;
   });
 
-  // 決定本次要掃描的藝人批次
-  const targetArtists = (batchSize && batchSize > 0) ? sortedArtists.slice(0, batchSize) : sortedArtists;
+  // 決定本次要掃描的藝人批次 (確保在 24 小時/8次排程內能完成一輪完整掃描，最少為 15 人)
+  const finalBatchSize = batchSize !== null ? batchSize : Math.max(15, Math.ceil(followedArtists.length / 8));
+  const targetArtists = sortedArtists.slice(0, finalBatchSize);
   const remainingCount = followedArtists.length - targetArtists.length;
 
   console.log(`[Spotify/Scanner] 📦 本次分批掃描藝人數量: ${targetArtists.length} 位。`);
-  if (batchSize && batchSize > 0) {
+  if (remainingCount > 0) {
     console.log(`[Spotify/Scanner] 🕒 剩餘未掃描或較早掃描藝人: ${remainingCount} 位，將於後續批次逐步推進。`);
   }
 
