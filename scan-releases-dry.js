@@ -59,6 +59,7 @@ async function ensureSandboxStructure() {
   await fs.mkdir(MOCK_GITBOOK_DIR, { recursive: true });
   await fs.mkdir(MOCK_RELEASES_DIR, { recursive: true });
 
+  // 1. 確保 README.md (沙箱首頁) 存在
   const readmePath = path.join(MOCK_GITBOOK_DIR, 'README.md');
   try {
     await fs.access(readmePath);
@@ -67,6 +68,16 @@ async function ensureSandboxStructure() {
     await fs.writeFile(readmePath, defaultReadme, 'utf-8');
   }
 
+  // 2. 確保 new-releases/README.md 存在，防範 SUMMARY.md 產生失效連結 (Broken Link)
+  const releasesReadmePath = path.join(MOCK_RELEASES_DIR, 'README.md');
+  try {
+    await fs.access(releasesReadmePath);
+  } catch {
+    const defaultReleasesReadme = `# 🎵 模擬 - 最新藝人新發行樂評\n\n這裡收錄了所有模擬產生的最新專輯與單曲樂評。`;
+    await fs.writeFile(releasesReadmePath, defaultReleasesReadme, 'utf-8');
+  }
+
+  // 3. 確保 SUMMARY.md 目錄大綱存在
   try {
     await fs.access(MOCK_SUMMARY_PATH);
   } catch {

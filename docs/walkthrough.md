@@ -54,6 +54,10 @@ npm run dev
 - **問題**：原先使用簡陋的正則表達式 `replace(/^\- (.*$)/gim, '<li>...</li>')` 來解析 AI 生成的無序列表，會產生孤立的 `<li>` 標籤（沒有被 `<ul>` 容器包裹）。且隨後的全域 `\n` 轉 `<br/>` 會在 `<ul>` 內部插入非法的 `<br/>`，違反 HTML5 標準。
 - **修正**：將 [AILyricsPanel.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/components/AILyricsPanel.jsx) 與 [App.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/App.jsx) 的 Markdown 解析器重構為**狀態化逐行解析器**（Stateful Line-by-Line Parser）。當偵測到 `- ` 開頭時自動補上 `<ul>` 容器，並在離開列表時自動關閉，且過濾掉結構標籤內的 `<br/>`，確保輸出完全符合 HTML 語意與瀏覽器渲染標準。
 
+### 3. 修復模擬沙箱中的失效連結 (Broken Link)
+- **問題**：在 [scan-releases-dry.js](file:///Users/pac/codes/interview/music-release-agent/scan-releases-dry.js) 的 `ensureSandboxStructure` 函式中，產生的 `SUMMARY.md` 目錄大綱包含了指向 `new-releases/README.md` 的連結，然而該函式本身並未建立此檔案，導致模擬沙箱中存在失效連結。
+- **修正**：在模擬初始結構時，補上 `new-releases/README.md` 的預設檔案建立邏輯，與生產發布器 [gitbook-publisher.js](file:///Users/pac/codes/interview/music-release-agent/src/gitbook-publisher.js) 保持行為一致。
+
 > [!TIP]
 > 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開 AI 翻譯面板，展現 loading 狀態的細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！
 
