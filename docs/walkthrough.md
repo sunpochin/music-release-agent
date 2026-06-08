@@ -42,5 +42,18 @@ npm run dev
 
 打開瀏覽器前往 `http://localhost:5173`，你就能享受剛出爐的 Music Release Agent Dashboard 了！
 
+## 代碼品質審計與可移植性修復 (Code Quality & Portability Fixes)
+
+為了符合高品質的代碼評審（Code Review）標準，我們針對系統的可移植性與 HTML 渲染語意進行了兩項重要修正：
+
+### 1. 消除硬編碼絕對路徑 (可移植性)
+- **問題**：在 [src/gitbook-publisher.js](file:///Users/pac/codes/interview/music-release-agent/src/gitbook-publisher.js) 中，原本使用本地絕對路徑 `/Users/pac/codes/interview/social-dancing-notes` 作為 GitBook 的預設位置，這會導致程式在其他開發者環境或 CI 中因找不到路徑而報錯。
+- **修正**：改用 `path.resolve(process.cwd(), '../social-dancing-notes')` 進行相對路徑解析，在保有環境變數（`GITBOOK_PATH`）優先級的同時，讓專案在任何本地環境解壓後均能開箱即用。
+
+### 2. 重構 Markdown 解析器以符合 HTML 語意化標準 (HTML Semantics)
+- **問題**：原先使用簡陋的正則表達式 `replace(/^\- (.*$)/gim, '<li>...</li>')` 來解析 AI 生成的無序列表，會產生孤立的 `<li>` 標籤（沒有被 `<ul>` 容器包裹）。且隨後的全域 `\n` 轉 `<br/>` 會在 `<ul>` 內部插入非法的 `<br/>`，違反 HTML5 標準。
+- **修正**：將 [AILyricsPanel.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/components/AILyricsPanel.jsx) 與 [App.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/App.jsx) 的 Markdown 解析器重構為**狀態化逐行解析器**（Stateful Line-by-Line Parser）。當偵測到 `- ` 開頭時自動補上 `<ul>` 容器，並在離開列表時自動關閉，且過濾掉結構標籤內的 `<br/>`，確保輸出完全符合 HTML 語意與瀏覽器渲染標準。
+
 > [!TIP]
 > 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開 AI 翻譯面板，展現 loading 狀態的細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！
+
