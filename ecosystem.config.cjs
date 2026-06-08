@@ -3,6 +3,7 @@ module.exports = {
     {
       name: 'music-release-agent-server',
       script: 'server.js',
+      exec_mode: 'fork',
       instances: 1,
       autorestart: true,
       watch: ['server.js', 'src'],
@@ -17,6 +18,7 @@ module.exports = {
     {
       name: 'spotify-release-scanner',
       script: 'scan-releases.js',
+      exec_mode: 'fork',
       instances: 1,
       autorestart: false,
       // 每 3 小時執行一次
@@ -31,6 +33,7 @@ module.exports = {
       script: 'npm',
       args: 'run dev',
       cwd: 'dashboard',
+      exec_mode: 'fork',
       instances: 1,
       autorestart: true,
       watch: false,
@@ -42,6 +45,7 @@ module.exports = {
       name: 'social-post-service',
       script: 'server.js',
       cwd: '../social-post-service',
+      exec_mode: 'fork',
       instances: 1,
       autorestart: true,
       watch: ['server.js', 'src'],
