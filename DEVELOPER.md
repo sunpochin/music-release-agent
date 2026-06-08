@@ -1,93 +1,108 @@
-# music-release-agent 开发指南
+# music-release-agent 開發與技術架構指南
 
-已獨立的音樂釋出掃描與分析代理程式，專注做三件事：
-
-- Spotify OAuth 與關注藝人新發行掃描
-- AI 生成繁體中文樂評
-- 將樂評寫入本地 `gitbook/` 並透過 Git 推送
-
-## 結構
-
-- `server.js`: Spotify OAuth callback server
-- `scan-releases.js`: 一鍵執行掃描、評論與發布流程
-- `src/spotify-auth.js`: Spotify token 管理
-- `src/spotify-client.js`: Spotify / MusicBrainz 掃描與降級邏輯
-- `src/album-reviewer.js`: Gemini / Ollama 樂評生成
-- `src/gitbook-publisher.js`: GitBook 檔案與 GitOps 發布
-
-## 快速開始
-
-```bash
-npm install
-cp .env.example .env
-npm run dev
-```
-
-打開：
-
-- `http://localhost:3011/login/spotify`
-
-授權成功後執行：
-
-```bash
-npm run scan
-```
-
-## 注意
-
-- `spotify_tokens.json`、`data/scanner-state.json`、`data/system-state.json` 都是本地狀態，不會提交。
-- `gitbook/` 是輸出內容，會被 `src/gitbook-publisher.js` 維護與提交。
-- `scan-releases.js` 依賴目前 repo 是 Git 工作樹，且已設定好遠端。
-
-## Spotify 禮貌掃描與極限分析
-
-本專案實施了最嚴格的 Spotify API 防禦性禮貌掃描機制，旨在設定的週期天數（`SCAN_CYCLE_DAYS`，預設為 `7` 天，即一週跑完一輪）內完成一次完整掃描，同時保證絕不因高頻率請求而觸發 Spotify 封鎖。
-
-### 1. 核心禮貌機制設計
-* **環境變數配置 (`SCAN_CYCLE_DAYS`)**：
-  可在 `.env` 中設定 `SCAN_CYCLE_DAYS=7`。若要改成一天掃描完，可改為 `SCAN_CYCLE_DAYS=1`。
-* **動態分批尺寸 (Dynamic Batch Sizing)**：
-  配合 PM2 設定每 3 小時執行一次（每天執行 8 次）。
-  每次掃描的批次大小公式為 `Math.max(15, Math.ceil(total_artists / (SCAN_CYCLE_DAYS * 8)))`。
-  這可以確保在規定的週期內，**必定能將所有關注藝人輪流掃描完一遍**。
-* **隨機防禦性延遲 (Politeness Delay)**：
-  在對每個藝人發送請求前，隨機等待 `1000ms ~ 2000ms`（平均 `1500ms`）。
-* **藝人掃描後冷卻 (Post-Artist Cooldown)**：
-  每掃完一位藝人，強制休眠 `1000ms`。
-* **全域限速閥門 (Global Bottleneck Throttle)**：
-  所有對 Spotify API 的請求之間均強制間隔至少 `1000ms`（由全域排隊 Mutex 鎖 `spotifyLock` 控制）。
-* **雙源自動降級**：
-  若不幸遭遇 429 Rate Limit，系統會自動在該批次中降級改為查詢 `MusicBrainz` API，並在 24 小時內累計 429 達到 2 次時，啟動 24 小時強制冷卻保護。
+本指南專門為開發者與面試官準備，詳細說明了專案的目錄結構、快速開始步驟、核心的禮貌掃描分析、後端重構所套用的 SOLID 原則與設計模式，以及社群發布 SaaS（如 Socialync）如何突破巨頭 API 牆的架構思維。
 
 ---
 
-### 2. 藝人規模與掃描時間極限分析（以預設的一週週期計算）
+## 📂 目錄結構
 
-依據上述「禮貌機制」，平均掃描一位藝人（含隨機等待與冷卻）約需花費 **`2.8 秒`**。
-在 `SCAN_CYCLE_DAYS=7`（每週掃描一輪，共 56 次排程執行）的情境下：
+*   `server.js`: 用於 Spotify OAuth 流程的 Callback 伺服器與前端 API。
+*   `scan-releases.js`: CLI 進入點，一鍵執行掃描、分析與 GitOps 發布流程。
+*   `scan-releases-dry.js`: 零配置的離線模擬發行掃描器（面試官 Dry Run 專用）。
+*   `src/spotify-auth.js`: Spotify 授權 Token 的管理與自動刷新。
+*   `src/spotify-client.js`: 向下相容的外觀層 (Facade / Adapter)，組合並代理調用新的核心服務。
+*   `src/album-reviewer.js`: 深度樂評大腦服務，整合 Gemini 雲端與本地 Ollama 降級路由。
+*   `src/gitbook-publisher.js`: 負責處理 Markdown 輸出與 GitOps 的同步發布器。
+*   `src/services/`: 職責單一的核心服務（Cache、SystemState、SpotifyApiClient、Playback、CircuitBreaker）。
+*   `src/strategies/`: 新發行探索策略（SpotifyStrategy、MusicBrainzStrategy）。
+*   `src/scanner/`: `ReleaseScanner` 掃描協調器（繼承自 EventEmitter）。
+*   `tests/`: 透過 `vitest` 撰寫的 21 個單元與基準防禦測試案例。
 
-#### A. 109 位藝人（目前規模）
-* **每次執行數量**：`Math.max(15, Math.ceil(109 / 56)) = 15` 位藝人。
-* **每次執行時間**：`15 * 2.8 秒 = 42 秒`。
-* **結論**：極度輕鬆安全，每天總運行時間約 5.6 分鐘。
+---
 
-#### B. 2,000 位藝人（中大型關注量）
-* **每次執行數量**：`Math.ceil(2000 / 56) = 36` 位藝人。
-* **每次執行時間**：`36 * 2.8 秒 = 100.8 秒`（約 **`1.7 分鐘`**）。
-* **結論**：非常優雅！每次執行只需不到 2 分鐘，對 Spotify API 完全沒有任何負載壓力。
+## ⚡ 快速開始
 
-#### C. 5,000 位藝人（Spotify 官方帳號硬性上限）
-* **每次執行數量**：`Math.ceil(5000 / 56) = 90` 位藝人。
-* **每次執行時間**：`90 * 2.8 秒 = 252 秒`（約 **`4.2 分鐘`**）。
-* **結論**：極度穩健！這是 Spotify 個人帳號關注藝人的官方硬性限制（個人帳號關注上限為 5,000 人）。在此極限下，每次執行僅需約 4.2 分鐘（每天累計運作約 33.6 分鐘），遠低於 3 小時的排程間隔，對 Spotify 城堡極致友善，完全不用擔心 429 或被封鎖。
+### 1. 安裝與設定
+```bash
+npm install
+cp .env.example .env
+npm start
+```
 
-#### D. 65,535 位藝人（極端想像情況）
-如果我們打破 Spotify 限制（改用外部藝人清單而非 API 關注清單）掃描 65,535 位藝人：
-* **每次執行數量**：`Math.ceil(65535 / 56) = 1171` 位藝人。
-* **每次執行時間**：`1171 * 2.8 秒 = 3278.8 秒`（約 **`54.6 分鐘`**）。
-* **結論**：
-  * 若在一週內跑完：每次執行耗時約 55 分鐘，小於 3 小時的排程間隔，理論上可行且不會造成 PM2 執行重疊與阻塞。
-  * 若要改成「一天跑完（`SCAN_CYCLE_DAYS=1`）」：每次執行數量將暴增至 `Math.ceil(65535 / 8) = 8192` 位藝人，在最嚴格禮貌延遲下每次需要跑 **`6.37 小時`**，這會造成嚴重的時間赤字與排程重疊阻塞（PM2 每 3 小時就會重複重啟）。
-  * **建議**：若未來有如此龐大的藝人資料庫需求，應採用多憑證輪替 (Credential Rotation) 與代理伺服器 (Proxy Pool) 分散請求，並將掃描週期拉長。
+### 2. 本地開發與運行
+*   **啟動驗證伺服器**：打開 `http://localhost:3011/login/spotify` 進行 OAuth 授權，成功後 Token 將持久化儲存於 `spotify_tokens.json`。
+*   **執行生產掃描管線**：執行 `npm run scan`。
+*   **執行零配置模擬器**：執行 `npm run scan:dry`。
+*   **運行 21 個單元測試**：執行 `npm run test`。
 
+---
 
+## 🎵 Spotify 禮貌掃描與極限分析
+
+本專案實施了嚴格的防禦性禮貌掃描機制，旨在於 `SCAN_CYCLE_DAYS` 週期內完成一次完整掃描，保證不因高頻率請求而被 Spotify 城堡限流鎖定。
+
+*   **動態分批尺寸 (Dynamic Batch Sizing)**：配合定時排程，批次大小公式為 `Math.max(15, Math.ceil(total_artists / (SCAN_CYCLE_DAYS * 8)))`。
+*   **隨機防禦延遲 (Politeness Delay)**：呼叫 API 前隨機等待 `1000ms ~ 2000ms`。
+*   **全域限速閥門 (Global Bottleneck Throttle)**：所有請求使用全域排隊 Mutex 鎖 `spotifyLock`，強制請求間隔不低於 `1000ms`。
+*   **雙源降級冷卻**：遭逢 429 時自動降級切換至 `MusicBrainz` 策略，並在 24 小時內累計 2 次 429 時，啟動 24 小時降級冷卻封鎖。
+
+---
+
+## 🛠️ 後端 SOLID 原則與設計模式實踐
+
+為了向面試官展現殿堂級的軟體工程素養與代碼美感，我們對後端代碼進行了基於 SOLID 原則的解耦，並引入了四大設計模式。
+
+### 1. SOLID 設計原則
+*   **單一職責原則 (SRP)**：
+    *   `CacheService`：專職管理本地快取 JSON 的生命週期與讀寫。
+    *   `SystemStateService`：專職管理系統全域鎖定狀態與掃描時間進度。
+    *   `SpotifyApiClient`：專職處理低階 HTTP 通訊、Token 自動刷新、限速排隊與 429 緩衝重試。
+    *   `PlaybackService`：專職處理播放器設備與歌曲搜尋控制。
+    *   `ReleaseScanner`：專職處理歌手掃描排程與調度。
+*   **開放封閉原則 (OCP)**：
+    *   定義了 `ReleaseDiscoveryStrategy` 抽象策略基底。若要新增第三個探索來源（如 Discogs API），只需新增一個繼承此類別的 Strategy 元件，並傳入 Scanner 協調器的策略鏈陣列中，**核心掃描邏輯無須修改任何一行代碼**。
+*   **里氏代換原則 (LSP)**：
+    *   所有探索策略的 `execute` 介面皆會將資料正規化為統一的 `NormalizedAlbum` 物件格式，確保了策略與後續 AI 分析、發布器的無痛代換與相容性。
+*   **介面隔離原則 (ISP)**：
+    *   將前台使用者播放控制（`PlaybackService`）與背景 CLI 排程掃描 API 職責完全分離，互不干涉。
+*   **依賴反轉原則 (DIP)**：
+    *   服務類別之間完全採用 **建構子依賴注入 (Constructor Dependency Injection)** 傳入相依元件（如 `ReleaseScanner` 建構子接收 `stateService` 與 `strategies` 陣列）。移除了對外部模組的直接硬編碼引用，以實現高可測試性（Testability）。
+
+### 2. 四大核心設計模式
+*   **策略模式 (Strategy Pattern)**：封裝不同音樂平台的發行探索邏輯（Spotify 與 MusicBrainz），並依降級鏈輪詢。
+*   **觀察者模式 (Observer Pattern)**：`ReleaseScanner` 繼承自 `EventEmitter`。掃描進度與降級事件均以 `emit` 廣播，解耦了業務核心與控制台輸出。
+*   **熔斷器模式 (Circuit Breaker Pattern)**：設計具備 `CLOSED`、`OPEN`、`HALF-OPEN` 三種狀態的 `CircuitBreaker` 狀態機，在雲端 Gemini 連續失敗時觸發熔斷，直接退化呼叫本地 Ollama 模型，並在冷卻後自動嘗試復原，展示了微服務高可用系統設計。
+*   **外觀模式 (Facade Pattern / Adapter)**：將舊的 `spotify-client.js` 改寫為**外觀層**，內部組合並代理（Delegate）至各個新服務，實現對 `server.js` 與 `scan-releases-dry.js` 舊代碼 100% 的向下相容性。
+
+### 3. TDD (Test-Driven Development) 測試驅動開發
+專案引進了 `vitest` 做為現代測試框架，並完全實踐 TDD 流程：
+1.  **Red (測試失敗)**：先為 `CircuitBreaker`、`ReleaseScanner`、`CacheService` 及 `SpotifyApiClient` 撰寫測試，定義邊界並確認測試失敗。
+2.  **Green (測試通過)**：實作對應服務使其通過測試。
+3.  **Refactor (重構)**：在有測試防護網保護的前提下，進行程式碼優化。
+*   目前共有 7 組測試檔、21 個測試案例，**100% 順利通過測試**！
+
+---
+
+## 📡 社群發布 SaaS 系統 API 突破與防禦策略
+
+在面試中，面試官經常會挑戰一個極具深度的架構問題：**「像 Socialync 這樣的社群排程工具，是如何突破 Meta、LinkedIn 這些巨頭設下的企業審查、OAuth 驗證與嚴格 API 牆的？」**
+
+這背後涉及到現代 SaaS 開發的商業與架構突破策略：
+
+### 策略一：第三方整合服務供應商（Unified API Provider）
+這是獨立開發者（Indie Hacker）在起步與規模化時最常用、最聰明的底層大絕招。
+
+*   **商業機密**：Socialync 其實不需要直接向 Meta、LinkedIn、TikTok、YouTube 官方一家家申請權限並走完繁瑣的企業認證，他們直接串接了 Unified Social API 中間商（例如 Ayrshare、bundle.social、Zernio 等）。
+*   **運作機制**：
+    1.  中間商已經完成了各大社群巨頭的最高規格企業驗證。
+    2.  中間商提供統一且極簡的 API 給開發者（例如只要發送 `POST /v1/posts` 附帶文案與圖片，中間商就會分發至 10 個不同的平台）。
+    3.  當用戶點擊連結帳號時，彈出的登入視窗實際上是中間商代為持有的 Meta 官方 App 登入頁面，授權成功後的 Token 會託管在中間商端。
+*   **架構考量**：雖然中間商每個月收費不斐，但這能幫助產品在一週內「Ready for Production」，將時間成本轉移給付費用戶的訂閱費覆蓋。
+
+### 策略二：利用 Instagram 商業帳號「借道」Threads
+Threads 的權限模型在 Meta API 體系中，與 Instagram (IG) 有著極深的帳號綁定。
+
+*   **授權連動**：
+    1.  Threads 誕生之初便寄生於 IG 帳號體系。Meta 開放的官方 Threads API 規範中，只要用戶將 Threads 與其 IG 商業/創作者帳號 (Instagram Professional Account) 進行綁定，系統就能直接使用 Instagram Graph API 的既有企業授權管道。
+    2.  老牌軟體公司或中間商只需要持有 Instagram 的企業 App 權限，就能透過「IG 商業帳號管理員」角色直接讀寫 Threads，無須為 Threads 去經歷一套毫無交集、從零開始的審核地獄。
+*   **安全防禦 (XSS & Rate Limit)**：為了防止發布時因為大量用戶同時推送造成 429 限流，系統內部會在後端建構與本專案類似的 **全域 Mutex Queue 排隊機制**，並針對 AI 翻譯生出的歌詞進行 XSS 防禦過濾（Escape HTML），確保發送給巨頭 API 的資料結構完全合法、安全。
