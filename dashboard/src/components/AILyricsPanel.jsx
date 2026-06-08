@@ -1,6 +1,36 @@
 import React from 'react'
 import { Sparkles, Download, AlertCircle } from 'lucide-react'
 
+// 輔助函式：將 Markdown 語法安全且簡潔地轉譯為具有 Tailwind 樣式的 HTML
+function parseMarkdownToHtml(markdown) {
+  if (!markdown) return '';
+  
+  // 轉義特殊 HTML 字元以防範 XSS 安全風險
+  let html = markdown
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // 解析 ### 標題為 Tailwind 綠色字體
+  html = html.replace(/^### (.*$)/gim, '<h3 class="text-spotify-green font-bold text-lg mt-6 mb-3">$1</h3>');
+  // 解析 ## 標題
+  html = html.replace(/^## (.*$)/gim, '<h2 class="text-spotify-green font-bold text-xl mt-8 mb-4">$1</h2>');
+  // 解析 # 標題
+  html = html.replace(/^# (.*$)/gim, '<h1 class="text-white font-black text-2xl mt-8 mb-4">$1</h1>');
+  
+  // 解析 **粗體** 標籤
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // 解析 *斜體* 標籤
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  // 解析無序列表項 -
+  html = html.replace(/^\- (.*$)/gim, '<li class="ml-4 list-disc my-1">$1</li>');
+
+  // 將其餘換行符轉換為 HTML 換行標籤
+  html = html.replace(/\n/g, '<br/>');
+  
+  return html;
+}
+
 // AI 歌詞控制面板元件：負責歌詞抓取、加載動態、雙語歌詞渲染，以及觸發導出/分享圖卡
 const AILyricsPanel = ({ 
   selectedAlbum, 
@@ -38,7 +68,8 @@ const AILyricsPanel = ({
           </div>
         ) : lyricsData ? (
           <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
-            <div dangerouslySetInnerHTML={{ __html: lyricsData.replace(/\n/g, '<br/>') }} />
+            {/* 使用自訂 Markdown 轉譯器安全且優美地顯示歌詞 */}
+            <div dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
           </div>
         ) : (
           <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">
