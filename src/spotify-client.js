@@ -18,10 +18,10 @@ import { getMusicBrainzArtistMBID, getMusicBrainzArtistAlbums } from './musicbra
 // [童趣] 伸個懶腰深呼吸：當我們走得太快或小精靈累了的時候，停下來休息一下下再出發！
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// [技術] 全域限速防禦（Global Bottleneck Throttle）：追蹤上一次 Spotify 請求時間，確保全域請求之間最少間隔 300ms
-// [童趣] 排排隊紅綠燈：悄悄記住上一次敲門的時間，確保每次敲門之間至少間隔 300 毫秒，不要催促小精靈，讓大家都安安穩穩！
+// [技術] 全域限速防禦（Global Bottleneck Throttle）：追蹤上一次 Spotify 請求時間，確保全域請求之間最少間隔 1000ms (嚴格限制)
+// [童趣] 排排隊紅綠燈：悄悄記住上一次敲門的時間，確保每次敲門之間至少間隔 1000 毫秒，不要催促小精靈，讓大家都安安穩穩！
 let lastSpotifyRequestTime = 0;
-const MIN_SPOTIFY_INTERVAL_MS = 300;
+const MIN_SPOTIFY_INTERVAL_MS = 1000;
 
 async function enforceSpotifyRateLimit() {
   const now = Date.now();
@@ -31,6 +31,34 @@ async function enforceSpotifyRateLimit() {
     await sleep(delay);
   }
   lastSpotifyRequestTime = Date.now();
+}
+
+// 本地快取設定與路徑 (避免開發/測試期間頻繁請求被 Spotify 鎖定)
+const CACHE_FILE = path.resolve('data/spotify-cache.json');
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24小時快取過期時間
+
+// 讀取本地快取檔
+async function readSpotifyCache() {
+  try {
+    const data = await fs.readFile(CACHE_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    // 若檔案不存在或損毀，回傳預設空白快取結構
+    return {
+      followed_artists: null,
+      artist_albums: {}
+    };
+  }
+}
+
+// 寫入本地快取檔
+async function writeSpotifyCache(cache) {
+  try {
+    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
+    await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2), 'utf8');
+  } catch (err) {
+    console.warn(`[Cache] ⚠️ 無法寫入 Spotify 快取檔:`, err.message || err);
+  }
 }
 
 // [技術] 載入系統狀態儲存路徑
@@ -149,7 +177,8 @@ async function spotifyRequestDirect(endpoint, method = 'GET', body = null, param
     method: method,
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'User-Agent': 'MusicReleaseAgent/1.0.0 (sunpochin@gmail.com)' // 增加自訂識別，遵守 API 友善規範
     }
   };
 
@@ -348,6 +377,16 @@ export async function setSpotifyPlaybackVolume(volumePercent, deviceId = null) {
  * @returns {Promise<Array<object>>} 藝人清單陣列
  */
 export async function getSpotifyFollowedArtists() {
+  const bypass = process.env.SPOTIFY_BYPASS_CACHE === 'true';
+  const cache = await readSpotifyCache();
+  const now = Date.now();
+
+  // 檢查快取是否存在且未過期（24 小時內）
+  if (!bypass && cache.followed_artists && (now - cache.followed_artists.timestamp < CACHE_TTL_MS)) {
+    console.log('[Spotify/Client] 💾 從本地快取載入關注藝人清單...');
+    return cache.followed_artists.data;
+  }
+
   let artists = [];
   let after = null;
   let hasMore = true;
@@ -374,14 +413,23 @@ export async function getSpotifyFollowedArtists() {
     }
   }
 
-  console.log(`[Spotify/Client] ✅ 成功獲取 ${artists.length} 位關注的藝人！`);
-  return artists.map(item => ({
+  const mappedArtists = artists.map(item => ({
     id: item.id,
     name: item.name,
     genres: item.genres || [],
     uri: item.uri,
     url: item.external_urls?.spotify || ''
   }));
+
+  // 將結果更新寫入本地快取
+  cache.followed_artists = {
+    timestamp: now,
+    data: mappedArtists
+  };
+  await writeSpotifyCache(cache);
+
+  console.log(`[Spotify/Client] ✅ 成功獲取 ${mappedArtists.length} 位關注的藝人！`);
+  return mappedArtists;
 }
 
 /**
@@ -392,6 +440,16 @@ export async function getSpotifyFollowedArtists() {
  * @returns {Promise<Array<object>>} 專輯清單陣列
  */
 export async function getSpotifyArtistAlbums(artistId, days = 30) {
+  const bypass = process.env.SPOTIFY_BYPASS_CACHE === 'true';
+  const cache = await readSpotifyCache();
+  const now = Date.now();
+
+  // 檢查特定藝人的專輯列表快取是否存在且未過期
+  if (!bypass && cache.artist_albums[artistId] && (now - cache.artist_albums[artistId].timestamp < CACHE_TTL_MS)) {
+    console.log(`[Spotify/Client] 💾 從本地快取載入藝人 [${artistId}] 的專輯清單...`);
+    return cache.artist_albums[artistId].data;
+  }
+
   let albums = [];
   let limit = 10; // Spotify 最新限制 artists/{id}/albums 上限為 10
   let offset = 0;
@@ -431,7 +489,7 @@ export async function getSpotifyArtistAlbums(artistId, days = 30) {
     }
   }
 
-  return albums.map(item => ({
+  const mappedAlbums = albums.map(item => ({
     id: item.id,
     name: item.name,
     release_date: item.release_date,
@@ -442,6 +500,15 @@ export async function getSpotifyArtistAlbums(artistId, days = 30) {
     url: item.external_urls?.spotify || '',
     image: item.images?.[0]?.url || ''
   }));
+
+  // 將結果更新寫入特定藝人的快取中
+  cache.artist_albums[artistId] = {
+    timestamp: now,
+    data: mappedAlbums
+  };
+  await writeSpotifyCache(cache);
+
+  return mappedAlbums;
 }
 
 /**
@@ -528,9 +595,9 @@ export async function scanRecentNewReleases(days = 30, batchSize = 15) {
     try {
       if (!useMusicBrainzForThisArtist) {
         console.log(`[Spotify/Scanner] 📡 正在透過 Spotify 掃描藝人: ${artist.name}...`);
-        // [技術] 溫和防禦延遲：每次呼叫 Spotify 前隨機等待 300ms ~ 500ms，以防高頻抓取觸發 429
-        // [童趣] 輕輕敲敲門：每次向 Spotify 發問前，都溫柔地等 300~500 毫秒，不要把小精靈吵醒，防範它對我們發出警告！
-        const politenessMs = Math.floor(Math.random() * 200) + 300;
+        // [技術] 溫和防禦延遲：每次呼叫 Spotify 前隨機等待 1000ms ~ 2000ms，以防高頻抓取觸發 429
+        // [童趣] 輕輕敲敲門：每次向 Spotify 發問前，都溫柔地等 1000~2000 毫秒，不要把小精靈吵醒，防範它對我們發出警告！
+        const politenessMs = Math.floor(Math.random() * 1000) + 1000;
         await sleep(politenessMs);
 
         albums = await getSpotifyArtistAlbums(artist.id, days);
@@ -600,8 +667,8 @@ export async function scanRecentNewReleases(days = 30, batchSize = 15) {
     }
     scannerState[artist.id].last_scanned_at = new Date().toISOString();
 
-    // 每次探索完一個藝人後，休息 300ms 緩衝
-    await sleep(300);
+    // 每次探索完一個藝人後，休息 1000ms 緩衝
+    await sleep(1000);
   }
 
   // 確保 data 目錄存在並保存最新狀態庫

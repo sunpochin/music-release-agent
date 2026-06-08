@@ -1,5 +1,5 @@
 {
-  "name": "nanoclaw-music-agent",
+  "name": "music-release-agent",
   "version": "1.0.0",
   "description": "Spotify release scanner, AI review generator, and GitBook publisher",
   "type": "module",

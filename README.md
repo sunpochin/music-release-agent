@@ -1,6 +1,6 @@
-# nanoclaw-music-agent
+# music-release-agent
 
-從 `nanoclaw-markdown-agent` 抽出的獨立音樂子專案，專注做三件事：
+已獨立的音樂釋出掃描與分析代理程式，專注做三件事：
 
 - Spotify OAuth 與關注藝人新發行掃描
 - AI 生成繁體中文樂評

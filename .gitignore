@@ -7,4 +7,5 @@ logs/
 spotify_tokens.json
 data/scanner-state.json
 data/system-state.json
+data/spotify-cache.json
 .npm-cache/
