@@ -29,6 +29,18 @@ npm run demo:verify
 - 驗證 `SUMMARY.md` 是否正確串接新發行頁面
 - 不需要 Spotify、Gemini 或 GitHub 憑證
 
+如果你要驗證 `music-release-agent` 和 `social-post-service` 的真實交握邊界，再執行：
+
+```bash
+npm run demo:verify:social
+```
+
+這個腳本會暫時拉起兩個本地服務，驗證：
+
+- `music-release-agent` 代理轉發 `POST /api/social/publish`
+- `social-post-service` 回傳 `202 Accepted`
+- 任務可透過 `GET /api/social/status/:jobId` 查到並完成
+
 若你只想單獨執行離線模擬，也可以直接跑：
 
 ```bash
@@ -82,6 +94,7 @@ npx pm2 start ecosystem.config.cjs
 - Dashboard 內「發佈到社群」按鈕
 - 端到端驗證非同步發文流程
 - PM2 啟動的完整雙服務演示
+- `npm run demo:verify:social`
 
 如果 `SOCIAL_SERVICE_URL` 指向的服務未啟動，核心 repo 的離線 dry-run 與大部分閱讀/展示流程仍然成立，但社群發佈路徑不成立。
 
