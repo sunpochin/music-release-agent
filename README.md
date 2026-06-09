@@ -149,3 +149,25 @@ npm start ➡️ 瀏覽器訪問 http://localhost:3011/login/spotify
 # 2. 執行真實掃描管線（分析新歌、AI起草、自動 Commit/Push 寫入 GitBook）
 npm run scan
 ```
+
+Environment template: [.env.example](./.env.example)
+
+---
+
+## Interview / Portfolio Docs
+
+- [DEMO_SCRIPT.md](./DEMO_SCRIPT.md): 3-minute demo flow
+- [INTERVIEW_GUIDE.md](./INTERVIEW_GUIDE.md): 60-second pitch and common questions
+- [PORTFOLIO_SUMMARY.md](./PORTFOLIO_SUMMARY.md): resume bullets, short blurb, PR summary
+- [DEVELOPER.md](./DEVELOPER.md): technical deep dive
+- [PM2_DAEMON_GUIDE.md](./PM2_DAEMON_GUIDE.md): runtime and process management notes
+
+---
+
+## Repo Signals
+
+- dry-run validation path
+- dashboard + backend split
+- rate-limit fallback design
+- tested service / strategy layer
+- companion posting microservice boundary
