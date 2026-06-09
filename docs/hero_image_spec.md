@@ -155,7 +155,7 @@ Place it:
 
 ## Asset File Plan
 
-When the real image is produced, store it here:
+The current hero image is stored here:
 
 - `docs/assets/music-release-agent-hero.png`
 

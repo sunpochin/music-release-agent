@@ -75,7 +75,6 @@ This gives the project three external reading modes:
 
 These are not required for the repo to be strong, but they would improve public presentation:
 
-- a real dashboard hero screenshot
 - a short demo GIF or video
 - a live deployment URL if you want portfolio visitors to click before they read
 
@@ -99,3 +98,4 @@ This candidate is now strong enough to present as a flagship repo because it com
 - system boundaries
 - runnable evaluator proof
 - operational reasoning
+- external showcase assets
