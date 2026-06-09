@@ -70,7 +70,7 @@ const MetadataPanel = ({
                 <Loader2 size={16} className="animate-spin text-spotify-green" />
                 <span className="text-xs">讀取歌曲中...</span>
               </div>
-            ) : tracks.length === 0 ? (
+            ) : (!Array.isArray(tracks) || tracks.length === 0) ? (
               <p className="text-xs text-gray-500 py-2">無曲目資料</p>
             ) : (
               <div className="overflow-y-auto space-y-1 pr-1 max-h-[220px]">

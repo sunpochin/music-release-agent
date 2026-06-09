@@ -62,9 +62,14 @@ function App() {
       fetch(`/api/albums/${selectedAlbum.id}/tracks`)
         .then(res => res.json())
         .then(data => {
-          setTracks(data)
-          if (data && data.length > 0) {
-            setSelectedTrack(data[0]) // 預設選中第一首歌曲
+          if (Array.isArray(data)) {
+            setTracks(data)
+            if (data.length > 0) {
+              setSelectedTrack(data[0]) // 預設選中第一首歌曲
+            }
+          } else {
+            setTracks([])
+            setSelectedTrack(null)
           }
         })
         .catch(err => console.error("Failed to fetch album tracks", err))
