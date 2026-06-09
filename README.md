@@ -41,6 +41,12 @@ npm run demo:verify:social
 - `social-post-service` 回傳 `202 Accepted`
 - 任務可透過 `GET /api/social/status/:jobId` 查到並完成
 
+如果你要驗證 failure mode，也就是 companion service 沒有啟動時核心服務是否會穩定回傳 `502`，再執行：
+
+```bash
+npm run demo:verify:social:down
+```
+
 若你只想單獨執行離線模擬，也可以直接跑：
 
 ```bash
@@ -95,6 +101,10 @@ npx pm2 start ecosystem.config.cjs
 - 端到端驗證非同步發文流程
 - PM2 啟動的完整雙服務演示
 - `npm run demo:verify:social`
+
+可在 `social-post-service` 未啟動時驗證的 failure-mode：
+
+- `npm run demo:verify:social:down`
 
 如果 `SOCIAL_SERVICE_URL` 指向的服務未啟動，核心 repo 的離線 dry-run 與大部分閱讀/展示流程仍然成立，但社群發佈路徑不成立。
 
