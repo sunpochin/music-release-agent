@@ -13,6 +13,47 @@ dotenv.config();
 const app = express();
 app.use(express.json({ limit: '10mb' })); // 解析 JSON body，允許較大的 base64 圖片
 const PORT = process.env.PORT || 3011;
+const dashboardIndexPath = path.join(process.cwd(), 'dashboard/dist/index.html');
+const mockDataPath = path.join(process.cwd(), 'data/mock-releases.json');
+const cacheDataPath = path.join(process.cwd(), 'data/spotify-cache.json');
+
+async function pathAccessible(targetPath) {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function buildReadinessReport() {
+  const [dashboardBuilt, mockDataAvailable, cacheAvailable, socialReachable] = await Promise.all([
+    pathAccessible(dashboardIndexPath),
+    pathAccessible(mockDataPath),
+    pathAccessible(cacheDataPath),
+    socialClient.isHealthy()
+  ]);
+
+  const coreReady = dashboardBuilt && mockDataAvailable;
+  const dependencyStatus = socialReachable ? 'reachable' : 'unreachable';
+  const status = coreReady ? (socialReachable ? 'ok' : 'degraded') : 'not_ready';
+
+  return {
+    status,
+    coreReady,
+    checks: {
+      dashboardBuilt,
+      mockDataAvailable,
+      cacheAvailable,
+      socialPostService: dependencyStatus
+    },
+    ports: {
+      app: Number(PORT),
+      socialServiceUrl: process.env.SOCIAL_SERVICE_URL || 'http://localhost:3012'
+    },
+    timestamp: new Date().toISOString()
+  };
+}
 
 // 提供 React 前端靜態檔案 (發布後)
 app.use(express.static(path.join(process.cwd(), 'dashboard/dist')));
@@ -24,7 +65,8 @@ app.get('/api', (_req, res) => {
     endpoints: {
       login: '/login/spotify',
       callback: '/callback/spotify',
-      healthz: '/healthz'
+      healthz: '/healthz',
+      readyz: '/readyz'
     }
   });
 });
@@ -221,6 +263,11 @@ app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.get('/readyz', async (_req, res) => {
+  const report = await buildReadinessReport();
+  res.status(report.coreReady ? 200 : 503).json(report);
+});
+
 app.get('/login/spotify', (_req, res) => {
   const url = getSpotifyAuthUrl();
   if (!url) {
@@ -264,5 +311,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🎵 nanoclaw-music-agent auth server running on http://localhost:${PORT}`);
+  console.log(`🎵 music-release-agent server running on http://localhost:${PORT}`);
+  console.log(`📍 health: http://localhost:${PORT}/healthz`);
+  console.log(`📍 ready:  http://localhost:${PORT}/readyz`);
 });

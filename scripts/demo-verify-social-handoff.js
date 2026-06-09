@@ -130,6 +130,18 @@ async function main() {
       validate: (json) => json.status === 'ok'
     });
 
+    const readyReport = await waitForJson(`${musicUrl}/readyz`, {
+      validate: (json) => json.coreReady === true
+    });
+
+    if (readyReport.status !== 'ok') {
+      throw new Error(`expected readyz status "ok", got "${readyReport.status}"`);
+    }
+
+    if (readyReport.checks.socialPostService !== 'reachable') {
+      throw new Error('expected readyz to report reachable social-post-service');
+    }
+
     const publishResponse = await fetch(`${musicUrl}/api/social/publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -163,6 +175,7 @@ async function main() {
 
     console.log('\nIntegration proof passed:');
     console.log('- social-post-service became healthy on a dedicated test port');
+    console.log('- readyz reported the app as fully ready with reachable dependency state');
     console.log('- music-release-agent forwarded publish requests to the companion service');
     console.log('- publish endpoint returned 202 Accepted with a jobId');
     console.log('- status polling through music-release-agent observed the job complete');
