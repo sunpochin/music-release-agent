@@ -4,6 +4,8 @@
 [![PM2 Process Guard](https://img.shields.io/badge/PM2-process%20guard-blueviolet)](./PM2_DAEMON_GUIDE.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![Music Release Agent Hero](./docs/assets/music-release-agent-hero.png)
+
 `music-release-agent` 是一個自動化音樂內容系統：追蹤新發行、生成 AI 樂評、輸出 GitBook 內容，並透過 companion service 處理非同步社群發文。
 
 這個 repo 的重點不是單一 UI 或單一 API，而是三件事一起成立：
@@ -16,6 +18,7 @@
 
 - [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
 - [Portfolio Case Study](./docs/portfolio_case_study.md)
+- [Portfolio Website Copy](./docs/portfolio_website_case_study.md)
 - [Release Showcase](./docs/release_showcase.md)
 - [Hero Image Brief](./docs/hero_image_brief.md)
 - [Hero Image Spec](./docs/hero_image_spec.md)
@@ -171,15 +174,17 @@ npm run scan:dry
 如果你是從 portfolio 或 GitHub 首頁進來，建議順序：
 
 1. [Portfolio Case Study](./docs/portfolio_case_study.md)
-2. [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
-3. [Release Showcase](./docs/release_showcase.md)
-4. [Hero Image Brief](./docs/hero_image_brief.md)
+2. [Portfolio Website Copy](./docs/portfolio_website_case_study.md)
+3. [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
+4. [Release Showcase](./docs/release_showcase.md)
+5. [Hero Image Brief](./docs/hero_image_brief.md)
 
 目前狀態：
 
 - repo-level evaluator proof: ready
 - runtime readiness story: ready
 - public case-study copy: ready
+- hero image asset: ready
 - hero image brief/spec: ready
 - live deployment URL: still optional, not bundled in this branch
 
