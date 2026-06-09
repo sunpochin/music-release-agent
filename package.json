@@ -10,6 +10,7 @@
     "scan": "node scan-releases.js",
     "scan:dry": "node scan-releases-dry.js",
     "demo:verify": "node scripts/demo-verify.js",
+    "demo:verify:social": "node scripts/demo-verify-social-handoff.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage && node generate-badge.js"
   },
