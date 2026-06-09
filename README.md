@@ -15,6 +15,8 @@
 快速導覽：
 
 - [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
+- [Portfolio Case Study](./docs/portfolio_case_study.md)
+- [Release Showcase](./docs/release_showcase.md)
 - [Readiness And Observability Guide](./docs/readiness_and_observability.md)
 
 ---
@@ -161,6 +163,21 @@ npm run scan:dry
   - 核心服務 ready，但 `social-post-service` 不可達
 - `status: not_ready`
   - 連核心靜態資產或必要 mock data 都不完整
+
+## External Showcase Surface
+
+如果你是從 portfolio 或 GitHub 首頁進來，建議順序：
+
+1. [Portfolio Case Study](./docs/portfolio_case_study.md)
+2. [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
+3. [Release Showcase](./docs/release_showcase.md)
+
+目前狀態：
+
+- repo-level evaluator proof: ready
+- runtime readiness story: ready
+- public case-study copy: ready
+- hero image / live deployment URL: still optional, not bundled in this branch
 
 ---
 
