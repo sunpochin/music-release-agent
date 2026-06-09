@@ -20,6 +20,11 @@
 - **原生分享整合 (Web Share API)**：在行動端裝置（如手機版 Safari/Chrome），系統會自動偵測並呼叫作業系統的 `navigator.share` 原生分享面版，使用者可**直接發送至 Instagram Stories、FB 或 Line**；在電腦端，則會自動降級為一般檔案下載，並跳出引導提示。
 - **面試加分**：這項功能不僅展示了複雜的畫布繪製能力，還融合了現代行動網頁 API (`navigator.share`) 的條件判定與優雅降級，完美展示了「如何從 Web App 打通社群行銷的最後一哩路」，是極佳的 User Growth (使用者成長) 案例。
 
+### 4. 路由與 URL 狀態管理 (React Router)
+- **深層連結與導航**：前端導入了 `react-router-dom`，將專輯選取狀態與 `/album/:albumId` 路徑雙向綁定。不僅支援網址分享、直接造訪指定專輯 (Deep Linking)，更能以瀏覽器「上一頁/下一頁」進行上一張與下一張專輯的切換。
+- **後端 Fallback 支援**：在後端 `server.js` 尾端設置 `app.get('*')` wildcard 路由攔截非 API 的前端頁面請求，自動轉發 `dashboard/dist/index.html`，以避免使用者在前端路由頁面重新整理 (F5) 時遭遇後端 Express 拋出 404 錯誤。
+- **Race Condition 守衛**：前端在處理 `:albumId` 時，會確保專輯列表非同步載入完成後 (`albums.length > 0`) 才進行路由匹配，防止因為載入順序所導致的空狀態錯誤。
+
 ## 如何測試與運行？
 
 因為我們使用了 Vite 的代理機制，開發階段前端（Port 5173）與後端（Port 3011）是分開運行的。如果您對為什麼要分成兩個連接埠感到困惑，請參考特別準備的 [連接埠原理解析與小朋友解說法](./port_architecture_explanation.md) 技術文件。

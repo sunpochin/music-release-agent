@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Disc3, Music, Sparkles, Share2, Download, AlertCircle, Info, Calendar, Layers, ExternalLink, Send } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import html2canvas from 'html2canvas'
 import ShareCard from './components/ShareCard'
 import Sidebar from './components/Sidebar'
@@ -31,12 +32,32 @@ function App() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishResult, setPublishResult] = useState(null)
 
+  const navigate = useNavigate()
+  const { albumId } = useParams()
+
   useEffect(() => {
     fetch('/api/albums')
       .then(res => res.json())
       .then(data => setAlbums(data))
       .catch(err => console.error("Failed to fetch albums", err))
   }, [])
+
+  // 根據 URL 中的 albumId 參數同步選取的專輯狀態
+  useEffect(() => {
+    if (albums.length > 0) {
+      if (albumId) {
+        const matchedAlbum = albums.find(a => a.id === albumId)
+        if (matchedAlbum) {
+          setSelectedAlbum(matchedAlbum)
+        } else {
+          // 如果找不到對應的專輯，重設為未選取狀態
+          setSelectedAlbum(null)
+        }
+      } else {
+        setSelectedAlbum(null)
+      }
+    }
+  }, [albumId, albums])
 
   // 當選取專輯時，自後端 API 取得本地 AI 樂評的介紹與總結
   useEffect(() => {
@@ -114,9 +135,13 @@ function App() {
     }
   }, [selectedAlbum, selectedTrack, lyricsData, analysisData, albumReview, activeTab, generateShareFile])
 
-  // 僅選取專輯並重設歌詞與載入狀態，不自動執行 AI 歌詞搜尋
+  // 僅選取專輯並重設歌詞與載入狀態，使用 react-router 的 navigate 進行 URL 轉換
   const handleSelectAlbum = (album) => {
-    setSelectedAlbum(album)
+    if (album) {
+      navigate(`/album/${album.id}`)
+    } else {
+      navigate('/')
+    }
     setLyricsData('')
     setIsLoading(false)
   }
@@ -292,7 +317,7 @@ function App() {
             {/* Header Banner 頂部專輯資訊橫幅 */}
             <HeaderBanner 
               selectedAlbum={selectedAlbum}
-              setSelectedAlbum={setSelectedAlbum}
+              setSelectedAlbum={() => handleSelectAlbum(null)}
             />
 
             {/* AI 面板與本地元數據 */}

@@ -132,3 +132,18 @@ Threads 的權限模型在 Meta API 體系中，與 Instagram (IG) 有著極深�
     1.  Threads 誕生之初便寄生於 IG 帳號體系。Meta 開放的官方 Threads API 規範中，只要用戶將 Threads 與其 IG 商業/創作者帳號 (Instagram Professional Account) 進行綁定，系統就能直接使用 Instagram Graph API 的既有企業授權管道。
     2.  老牌軟體公司或中間商只需要持有 Instagram 的企業 App 權限，就能透過「IG 商業帳號管理員」角色直接讀寫 Threads，無須為 Threads 去經歷一套毫無交集、從零開始的審核地獄。
 *   **安全防禦 (XSS & Rate Limit)**：為了防止發布時因為大量用戶同時推送造成 429 限流，系統內部會在後端建構與本專案類似的 **全域 Mutex Queue 排隊機制**，並針對 AI 翻譯生出的歌詞進行 XSS 防禦過濾（Escape HTML），確保發送給巨頭 API 的資料結構完全合法、安全。
+
+---
+
+## 🛣️ 前後端路由架構與 React Router 整合 (面試亮點)
+
+為了解決點選專輯後的狀態同步與 Deep Linking (深層連結) 問題，我們在前端導入了 `react-router-dom` 進行 URL 狀態管理：
+
+*   **狀態與路由同步**：
+    *   廢除以往僅保存在 React Component State 的手動專輯選取狀態，將其徹底與瀏覽器網址列 `/album/:albumId` 綁定。
+    *   透過 `useParams()` 動態獲取 `:albumId` 路由參數，並於 `albums` 資料載入完成後進行安全匹配與狀態同步。
+    *   在專輯選擇動作中，改用 `useNavigate()` 控制路徑跳轉，完美支援瀏覽器「上一頁/下一頁」的前後歷史紀錄導航。
+*   **後端 Express Wildcard Fallback 路由**：
+    *   在 `server.js` 尾端設置 `app.get('*')` 路由攔截非 API 的所有前端請求，自動發送 `dashboard/dist/index.html`，以避免使用者重新整理頁面 (F5) 或直接輸入網址列進入 `/album/:albumId` 時造成後端 Express 拋出 404 找不到路由的問題，這充分體現了單頁應用程式 (SPA) 的伺服器配合規範。
+*   **非同步資料載入與 Race Condition 防禦**：
+    *   前端載入專輯列表為非同步請求。為防 URL 解析時 `albums` 陣列尚未取回而將匹配判定為無效，增加了 `albums.length > 0` 的守衛閘門 (Guard)，唯有列表確實加載後才與路由參數進行同步。

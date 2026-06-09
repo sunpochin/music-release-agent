@@ -254,6 +254,15 @@ app.get('/callback/spotify', async (req, res) => {
   }
 });
 
+// 提供 React 前端靜態檔案 (發布後) 的 wildcard 路由以支援 React Router 前端路徑
+app.get('*', (req, res) => {
+  // 排除 API 請求，如果 API 未匹配則回傳 404
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(process.cwd(), 'dashboard/dist/index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`🎵 nanoclaw-music-agent auth server running on http://localhost:${PORT}`);
 });

@@ -20,6 +20,8 @@
   - `[x]` 執行完整流程測試 (讀取、翻譯、截圖)
   - `[x]` 撰寫 `walkthrough.md` 總結成果
 
-- `[ ]` 7. 優化與升級功能
-  - `[ ]` 實作 Web Share API 整合 (行動端喚起原生分享選單，直發 Instagram/TikTok)
-  - `[ ]` 優化前後端連接埠職責分離（開發環境改為純 API 模式）
+- `[x]` 7. 優化與升級功能
+  - `[x]` 實作 Web Share API 整合 (行動端喚起原生分享選單，直發 Instagram/TikTok)
+  - `[x]` 優化前後端連接埠職責分離（開發環境改為純 API 模式）
+  - `[x]` 整合 React Router 實作網址與專輯選取狀態雙向綁定，支援 F5 重新整理與 Deep Linking
+
