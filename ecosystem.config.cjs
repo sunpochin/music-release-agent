@@ -1,21 +1,62 @@
 module.exports = {
   apps: [
     {
+      name: 'music-release-agent-server',
+      script: 'server.js',
+      exec_mode: 'fork',
+      instances: 1,
+      autorestart: true,
+      watch: ['server.js', 'src'],
+      ignore_watch: ['node_modules', 'logs', '*.log', 'data', 'spotify_tokens.json'],
+      env: {
+        NODE_ENV: 'development'
+      },
+      error_file: 'logs/server-err.log',
+      out_file: 'logs/server-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss'
+    },
+    {
       name: 'spotify-release-scanner',
       script: 'scan-releases.js',
-      // 僅執行單個實例
+      exec_mode: 'fork',
       instances: 1,
-      // 執行完畢後不要自動重啟 (Traditional Chinese comment)
       autorestart: false,
-      // 每 3 小時觸發執行一次 (0 */3 * * *)
+      // 每 3 小時執行一次
       cron_restart: '0 */3 * * *',
-      // 關閉檔案變動監聽，避免開發時頻繁觸發
       watch: false,
-      // 設定日誌路徑
+      error_file: 'logs/scanner-err.log',
+      out_file: 'logs/scanner-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss'
+    },
+    {
+      name: 'music-release-agent-dashboard',
+      script: 'npm',
+      args: 'run dev',
+      cwd: 'dashboard',
+      exec_mode: 'fork',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      error_file: '../logs/dashboard-err.log',
+      out_file: '../logs/dashboard-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss'
+    },
+    {
+      name: 'social-post-service',
+      script: 'server.js',
+      cwd: '../social-post-service',
+      exec_mode: 'fork',
+      instances: 1,
+      autorestart: true,
+      watch: ['server.js', 'src'],
+      ignore_watch: ['node_modules', 'logs', '*.log'],
+      env: {
+        NODE_ENV: 'development'
+      },
       error_file: 'logs/pm2-err.log',
       out_file: 'logs/pm2-out.log',
-      // 日誌前綴加上時間戳記
       log_date_format: 'YYYY-MM-DD HH:mm:ss'
     }
   ]
 };
+

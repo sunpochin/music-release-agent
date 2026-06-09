@@ -1,5 +1,5 @@
 import React from 'react'
-import { Sparkles, Download, AlertCircle } from 'lucide-react'
+import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle } from 'lucide-react'
 
 // 輔助函式：將 Markdown 語法安全且語意化地轉譯為具有 Tailwind 樣式的 HTML
 function parseMarkdownToHtml(markdown) {
@@ -78,8 +78,11 @@ const AILyricsPanel = ({
   lyricsData, 
   isLoading, 
   isExporting, 
+  isPublishing,
+  publishResult,
   handleFetchLyrics, 
-  exportShareCard 
+  exportShareCard,
+  handlePublishToSocial
 }) => {
   if (!selectedAlbum) return null
 
@@ -99,7 +102,32 @@ const AILyricsPanel = ({
           {isExporting ? <AlertCircle size={16} className="animate-spin" /> : <Download size={16} />}
           匯出 IG/TikTok 限動卡
         </button>
+
+        {/* 自動發佈到社群平台（呼叫 social-post-service 微服務） */}
+        <button 
+          onClick={handlePublishToSocial}
+          disabled={isPublishing || isLoading}
+          className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-400 hover:to-purple-500 hover:scale-105 transition-all px-4 py-2 rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+        >
+          {isPublishing ? <AlertCircle size={16} className="animate-spin" /> : <Send size={16} />}
+          {isPublishing ? '發文中...' : '發佈到社群'}
+        </button>
       </div>
+
+      {/* 發文結果通知 */}
+      {publishResult && (
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+          publishResult.success 
+            ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+        }`}>
+          {publishResult.success ? (
+            <><CheckCircle size={16} /> 發文已排程成功！JobId: {publishResult.jobId?.slice(0, 8)}...</>
+          ) : (
+            <><XCircle size={16} /> 發文失敗: {publishResult.error}</>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col justify-center">
         {isLoading ? (

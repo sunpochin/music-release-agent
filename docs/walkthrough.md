@@ -22,20 +22,20 @@
 
 ## 如何測試與運行？
 
-因為我們使用了 Vite 的代理機制，開發階段前端（Port 5173）與後端（Port 3011）是分開運行的。如果您對為什麼要分成兩個連接埠感到困惑，請參考特別準備的 [連接埠原理解析與小朋友解說法](../port_architecture_explanation.md) 技術文件。
+因為我們使用了 Vite 的代理機制，開發階段前端（Port 5173）與後端（Port 3011）是分開運行的。如果您對為什麼要分成兩個連接埠感到困惑，請參考特別準備的 [連接埠原理解析與小朋友解說法](./port_architecture_explanation.md) 技術文件。
 
 請開啟 **兩個終端機 (Terminal)** 執行以下指令：
 
 **終端機 1 (啟動後端 Express API 與 AI 服務)**：
 ```bash
-cd /path/to/music-release-agent
+cd music-release-agent
 npm start
 ```
 *(後端會運行在 http://localhost:3011)*
 
 **終端機 2 (啟動前端 React 開發伺服器)**：
 ```bash
-cd /path/to/music-release-agent/dashboard
+cd music-release-agent/dashboard
 npm run dev
 ```
 *(前端會運行在 http://localhost:5173)*
@@ -47,16 +47,16 @@ npm run dev
 為了符合高品質的代碼評審（Code Review）標準，我們針對系統的可移植性與 HTML 渲染語意進行了兩項重要修正：
 
 ### 1. 消除硬編碼絕對路徑 (可移植性)
-- **問題**：在 `src/gitbook-publisher.js` 中，原本使用本地絕對路徑作為 GitBook 的預設位置，這會導致程式在其他開發者環境或 CI 中因找不到路徑而報錯。
+- **問題**：在 [src/gitbook-publisher.js](../src/gitbook-publisher.js) 中，原本使用本地絕對路徑 `/Users/pac/codes/interview/social-dancing-notes` 作為 GitBook 的預設位置，這會導致程式在其他開發者環境或 CI 中因找不到路徑而報錯。
 - **修正**：改用 `path.resolve(process.cwd(), '../social-dancing-notes')` 進行相對路徑解析，在保有環境變數（`GITBOOK_PATH`）優先級的同時，讓專案在任何本地環境解壓後均能開箱即用。
 
 ### 2. 重構 Markdown 解析器以符合 HTML 語意化標準 (HTML Semantics)
 - **問題**：原先使用簡陋的正則表達式 `replace(/^\- (.*$)/gim, '<li>...</li>')` 來解析 AI 生成的無序列表，會產生孤立的 `<li>` 標籤（沒有被 `<ul>` 容器包裹）。且隨後的全域 `\n` 轉 `<br/>` 會在 `<ul>` 內部插入非法的 `<br/>`，違反 HTML5 標準。
-- **修正**：將 `dashboard/src/components/AILyricsPanel.jsx` 與 `dashboard/src/App.jsx` 的 Markdown 解析器重構為**狀態化逐行解析器**（Stateful Line-by-Line Parser）。當偵測到 `- ` 開頭時自動補上 `<ul>` 容器，並在離開列表時自動關閉，且過濾掉結構標籤內的 `<br/>`，確保輸出完全符合 HTML 語意與瀏覽器渲染標準。
+- **修正**：將 [AILyricsPanel.jsx](../dashboard/src/components/AILyricsPanel.jsx) 與 [App.jsx](../dashboard/src/App.jsx) 的 Markdown 解析器重構為**狀態化逐行解析器**（Stateful Line-by-Line Parser）。當偵測到 `- ` 開頭時自動補上 `<ul>` 容器，並在離開列表時自動關閉，且過濾掉結構標籤內的 `<br/>`，確保輸出完全符合 HTML 語意與瀏覽器渲染標準。
 
 ### 3. 修復模擬沙箱中的失效連結 (Broken Link)
-- **問題**：在 `scan-releases-dry.js` 的 `ensureSandboxStructure` 函式中，產生的 `SUMMARY.md` 目錄大綱包含了指向 `new-releases/README.md` 的連結，然而該函式本身並未建立此檔案，導致模擬沙箱中存在失效連結。
-- **修正**：在模擬初始結構時，補上 `new-releases/README.md` 的預設檔案建立邏輯，與生產發布器 `src/gitbook-publisher.js` 保持行為一致。
+- **問題**：在 [scan-releases-dry.js](../scan-releases-dry.js) 的 `ensureSandboxStructure` 函式中，產生的 `SUMMARY.md` 目錄大綱包含了指向 `new-releases/README.md` 的連結，然而該函式本身並未建立此檔案，導致模擬沙箱中存在失效連結。
+- **修正**：在模擬初始結構時，補上 `new-releases/README.md` 的預設檔案建立邏輯，與生產發布器 [gitbook-publisher.js](../src/gitbook-publisher.js) 保持行為一致。
 
 > [!TIP]
 > 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開 AI 翻譯面板，展現 loading 狀態的細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！
