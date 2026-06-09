@@ -13,7 +13,38 @@
 
 為了方便面試官在**不準備任何 Spotify/Gemini API 金鑰與授權**的情況下，能立即、完整地驗證整個系統，專案內建了完整的 **Dry Run 離線模擬沙箱**。
 
+### Evaluator Quickstart
+
+如果你只想快速驗證這個 repo，請走這條單一路徑：
+
+```bash
+npm install
+npm run demo:verify
+```
+
+`demo:verify` 會：
+
+- 使用內建 `data/mock-releases.json` 執行離線掃描
+- 驗證 `data/mock-gitbook/` 內的關鍵 Markdown 產物
+- 驗證 `SUMMARY.md` 是否正確串接新發行頁面
+- 不需要 Spotify、Gemini 或 GitHub 憑證
+
+若你只想單獨執行離線模擬，也可以直接跑：
+
+```bash
+npm run scan:dry
+```
+
+**預期結果：**
+
+- console 會顯示 `demo:verify passed`
+- `data/mock-gitbook/SUMMARY.md` 會包含 3 份模擬樂評
+- `data/mock-gitbook/new-releases/` 會包含對應的 Markdown 檔案
+
 ### 1. 安裝與依賴準備
+
+如果你要展示完整雙服務體驗，請再安裝 companion service 與 dashboard 依賴：
+
 ```bash
 # 安裝後端與發文微服務依賴
 npm install
@@ -23,25 +54,36 @@ cd ../social-post-service && npm install && cd ../music-release-agent
 cd dashboard && npm install && cd ..
 ```
 
-### 2. 執行離線沙箱模擬
-執行以下指令，系統會自動使用內建的模擬歌手發行資料，模擬執行新歌掃描、AI 樂評起草、GitBook 目錄更新與 GitOps 發布流：
-```bash
-npm run scan:dry
-```
-*模擬產出的 Markdown 樂評文件與大綱目錄將寫入 `data/mock-gitbook/` 下，您可以直接開箱檢視。*
-
-### 3. 一鍵啟動雙服務環境（PM2 背景守護）
+### 2. 一鍵啟動雙服務環境（PM2 背景守護）
 我們提供了一鍵管理的 PM2 配置檔案。啟動後，Express API 後端、Vite 開發伺服器、Cron 定時掃描器與發文微服務將在背景同步拉起：
 ```bash
 npx pm2 start ecosystem.config.cjs
 ```
 *(詳細指令與除錯方式請參考：[🐶 PM2 守護進程指南](./PM2_DAEMON_GUIDE.md))*
 
-### 4. 前往 Dashboard 體驗
+### 3. 前往 Dashboard 體驗
 打開瀏覽器訪問 [http://localhost:5173](http://localhost:5173) 即可立即開始體驗：
 - 🌟 **音樂庫瀏覽**：流暢的毛玻璃卡片式導覽與最新發行清單。
 - 🔮 **AI 雙語歌詞**：點選任一曲目，即時獲取 Gemini 翻譯與賞析對照。
 - 🚀 **社群自動發佈**：點擊「發佈到社群」一鍵觸發非同步多平台發佈流。
+
+### `social-post-service` 何時必須存在？
+
+`social-post-service` **不是**離線驗證必需品。
+
+不需要 `social-post-service` 的功能：
+
+- `npm run demo:verify`
+- `npm run scan:dry`
+- 本地檢查 GitBook mock 輸出
+
+需要 `social-post-service` 的功能：
+
+- Dashboard 內「發佈到社群」按鈕
+- 端到端驗證非同步發文流程
+- PM2 啟動的完整雙服務演示
+
+如果 `SOCIAL_SERVICE_URL` 指向的服務未啟動，核心 repo 的離線 dry-run 與大部分閱讀/展示流程仍然成立，但社群發佈路徑不成立。
 
 ---
 
