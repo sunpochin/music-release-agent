@@ -12,6 +12,11 @@
 - 明確的核心服務 / 發文服務邊界
 - 對外部依賴失敗的可驗證降級行為
 
+快速導覽：
+
+- [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
+- [Readiness And Observability Guide](./docs/readiness_and_observability.md)
+
 ---
 
 ## Evaluator Quickstart
@@ -68,6 +73,7 @@ npm run demo:verify:social:down
 
 - `/api/social/health` 會回報 `reachable: false`
 - `/api/social/publish` 會穩定回 `502`
+- `/readyz` 會顯示 `degraded`
 - 核心服務不會崩掉
 
 ---
@@ -133,6 +139,28 @@ npm run scan:dry
 - `npm run demo:verify:social:down`
 
 如果 `SOCIAL_SERVICE_URL` 指向的服務未啟動，核心 repo 的離線 dry-run 與大部分閱讀/展示流程仍然成立，但社群發佈路徑不成立。
+
+## Runtime Signals
+
+對外可用的 runtime 端點：
+
+- `GET /healthz`
+  - liveness probe
+  - 只回答服務是否活著
+- `GET /readyz`
+  - readiness probe
+  - 回傳 core readiness 與 dependency state
+- `GET /api/social/health`
+  - companion service reachability
+
+`/readyz` 的設計原則：
+
+- `status: ok`
+  - 核心服務 ready，companion service 可達
+- `status: degraded`
+  - 核心服務 ready，但 `social-post-service` 不可達
+- `status: not_ready`
+  - 連核心靜態資產或必要 mock data 都不完整
 
 ---
 

@@ -90,6 +90,14 @@ async function main() {
       throw new Error(`health endpoint returned unexpected social URL: ${health.url}`);
     }
 
+    const readyReport = await waitForJson(`${musicUrl}/readyz`, {
+      validate: (json) => json.coreReady === true && json.checks.socialPostService === 'unreachable'
+    });
+
+    if (readyReport.status !== 'degraded') {
+      throw new Error(`expected degraded readyz status when social service is down, got "${readyReport.status}"`);
+    }
+
     const publishResponse = await fetch(`${musicUrl}/api/social/publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -111,6 +119,7 @@ async function main() {
 
     console.log('\nFailure-mode proof passed:');
     console.log('- health endpoint reported the companion service as unreachable');
+    console.log('- readyz reported the app as core-ready but dependency-degraded');
     console.log('- publish proxy returned 502 instead of hanging or crashing');
     console.log('- error payload clearly explained that social-post-service was unavailable');
     console.log('\ndemo:verify:social:down passed');
