@@ -17,6 +17,8 @@
 - [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
 - [Portfolio Case Study](./docs/portfolio_case_study.md)
 - [Release Showcase](./docs/release_showcase.md)
+- [Hero Image Brief](./docs/hero_image_brief.md)
+- [Hero Image Spec](./docs/hero_image_spec.md)
 - [Readiness And Observability Guide](./docs/readiness_and_observability.md)
 
 ---
@@ -171,13 +173,15 @@ npm run scan:dry
 1. [Portfolio Case Study](./docs/portfolio_case_study.md)
 2. [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
 3. [Release Showcase](./docs/release_showcase.md)
+4. [Hero Image Brief](./docs/hero_image_brief.md)
 
 目前狀態：
 
 - repo-level evaluator proof: ready
 - runtime readiness story: ready
 - public case-study copy: ready
-- hero image / live deployment URL: still optional, not bundled in this branch
+- hero image brief/spec: ready
+- live deployment URL: still optional, not bundled in this branch
 
 ---
 
