@@ -1,8 +1,24 @@
 import React from 'react'
-import { Info, Calendar, Layers, ExternalLink } from 'lucide-react'
+import { Info, Calendar, Layers, ExternalLink, Music4, Loader2 } from 'lucide-react'
 
-// 本地資料面板元件：展示專輯發行屬性、AI 介紹，並內嵌系統診斷小工具與 Spotify 外部播放連結
-const MetadataPanel = ({ selectedAlbum, albumReview, shareFile }) => {
+// 格式化歌曲長度（毫秒轉為分:秒）
+const formatDuration = (ms) => {
+  if (!ms) return '0:00';
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+};
+
+// 本地資料面板元件：展示專輯發行屬性、AI 介紹、專輯歌曲清單，並內嵌系統診斷小工具與 Spotify 外部播放連結
+const MetadataPanel = ({ 
+  selectedAlbum, 
+  albumReview, 
+  shareFile,
+  tracks = [],
+  selectedTrack,
+  setSelectedTrack,
+  tracksLoading
+}) => {
   if (!selectedAlbum) return null
 
   return (
@@ -41,6 +57,50 @@ const MetadataPanel = ({ selectedAlbum, albumReview, shareFile }) => {
                 </>
               )}
             </p>
+          </div>
+
+          {/* 專輯曲目清單 */}
+          <div className="bg-white/5 p-4 rounded-xl space-y-3 flex flex-col max-h-[300px]">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
+              <Music4 size={14} className="text-spotify-green" /> 專輯曲目清單
+            </p>
+            
+            {tracksLoading ? (
+              <div className="flex items-center justify-center py-6 text-gray-400 gap-2">
+                <Loader2 size={16} className="animate-spin text-spotify-green" />
+                <span className="text-xs">讀取歌曲中...</span>
+              </div>
+            ) : (!Array.isArray(tracks) || tracks.length === 0) ? (
+              <p className="text-xs text-gray-500 py-2">無曲目資料</p>
+            ) : (
+              <div className="overflow-y-auto space-y-1 pr-1 max-h-[220px]">
+                {tracks.map((track) => (
+                  <button
+                    key={track.id}
+                    onClick={() => setSelectedTrack(track)}
+                    className={`w-full text-left p-2 rounded-lg transition-all text-xs flex items-center justify-between gap-3 group ${
+                      selectedTrack?.id === track.id
+                        ? 'bg-spotify-green/20 text-white font-bold'
+                        : 'hover:bg-white/5 text-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className={`w-4 text-center font-mono ${
+                        selectedTrack?.id === track.id ? 'text-spotify-green' : 'text-gray-500'
+                      }`}>
+                        {track.track_number}
+                      </span>
+                      <span className="truncate group-hover:text-white transition-colors">
+                        {track.name}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-gray-500 font-mono">
+                      {formatDuration(track.duration_ms)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'fs/promises';
+import path from 'path';
 
 // 模擬 fs/promises 模組以避免寫入真實的快取檔案
 vi.mock('fs/promises', () => {
@@ -57,11 +59,14 @@ vi.mock('undici', () => ({
 }));
 
 // 載入待測模組
-import { scanRecentNewReleases } from '../src/spotify-client.js';
+import { scanRecentNewReleases, getSpotifyAlbumTracks } from '../src/spotify-client.js';
 
 describe('scanRecentNewReleases 基準測試', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // 重設 mockState 狀態，避免上一個測試的 429 降級冷卻狀態殘留影響後續測試
+    await fs.writeFile(path.resolve('data/system-state.json'), JSON.stringify({}));
+    await fs.writeFile(path.resolve('data/scanner-state.json'), JSON.stringify({}));
     // 設定環境變數避免快取影響測試
     process.env.SPOTIFY_BYPASS_CACHE = 'true';
     process.env.SCAN_CYCLE_DAYS = '7';
@@ -120,6 +125,11 @@ describe('scanRecentNewReleases 基準測試', () => {
   });
 
   it('防禦路徑：當 Spotify 發生 429 時，自動降級至 MusicBrainz 進行掃描', async () => {
+    // 預先寫入歷史藝人快取以利降級掃描進行
+    await fs.writeFile(path.resolve('data/scanner-state.json'), JSON.stringify({
+      'artist-1': { name: 'Salsa King', genres: [], uri: 'spotify:artist:artist-1', url: 'https://open.spotify.com/artist/artist-1' }
+    }));
+
     // 模擬 Spotify 回傳 429 限流，並隨後成功由 MusicBrainz 提供資料
     mockFetch.mockImplementation(async (url) => {
       if (url.includes('me/following')) {
@@ -143,5 +153,38 @@ describe('scanRecentNewReleases 基準測試', () => {
     expect(result.length).toBe(1);
     expect(result[0].name).toBe('MusicBrainz Album');
     expect(result[0].uri).toContain('musicbrainz:');
+  });
+
+  describe('getSpotifyAlbumTracks 測試', () => {
+    it('應能正確獲取並格式化專輯的曲目列表', async () => {
+      mockFetch.mockImplementation(async (url) => {
+        if (url.includes('albums/album-1/tracks')) {
+          return {
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify({
+              items: [
+                {
+                  id: 'track-1',
+                  name: 'Song One',
+                  track_number: 1,
+                  duration_ms: 180000,
+                  uri: 'spotify:track:track-1',
+                  external_urls: { spotify: 'track-url' }
+                }
+              ]
+            })
+          };
+        }
+        return { ok: true, status: 200, text: async () => '{}' };
+      });
+
+      const result = await getSpotifyAlbumTracks('album-1');
+      expect(result.length).toBe(1);
+      expect(result[0].name).toBe('Song One');
+      expect(result[0].track_number).toBe(1);
+      expect(result[0].duration_ms).toBe(180000);
+      expect(result[0].url).toBe('track-url');
+    });
   });
 });

@@ -143,6 +143,43 @@ export async function getSpotifyArtistAlbums(artistId, days = 30) {
   return mappedAlbums;
 }
 
+/**
+ * 獲取特定專輯的所有歌曲，具備本地快取機制以防止 429 頻率限制
+ * @param {string} albumId - Spotify 專輯 ID
+ * @returns {Promise<Array<object>>} 曲目清單
+ */
+export async function getSpotifyAlbumTracks(albumId) {
+  const bypass = process.env.SPOTIFY_BYPASS_CACHE === 'true';
+  const cache = await cacheService.read();
+  // 初始化專輯歌曲快取結構
+  cache.album_tracks = cache.album_tracks || {};
+  const now = Date.now();
+
+  if (!bypass && cache.album_tracks[albumId] && cacheService.isValid(cache.album_tracks[albumId].timestamp)) {
+    console.log(`[Spotify/Client] 💾 從本地快取載入專輯 [${albumId}] 的歌曲清單...`);
+    return cache.album_tracks[albumId].data;
+  }
+
+  console.log(`[Spotify/Client] 📡 正在透過 Spotify API 獲取專輯 [${albumId}] 的歌曲清單...`);
+  const data = await apiClient.request(`albums/${albumId}/tracks`, 'GET', null, { limit: 50 });
+  const items = data.items || [];
+
+  const mappedTracks = items.map(item => ({
+    id: item.id,
+    name: item.name,
+    track_number: item.track_number,
+    duration_ms: item.duration_ms,
+    uri: item.uri,
+    url: item.external_urls?.spotify || ''
+  }));
+
+  cache.album_tracks[albumId] = { timestamp: now, data: mappedTracks };
+  await cacheService.write(cache);
+
+  console.log(`[Spotify/Client] ✅ 成功獲取專輯 [${albumId}] 的 ${mappedTracks.length} 首歌曲！`);
+  return mappedTracks;
+}
+
 // === 協調器掃描相關向下相容導出 ===
 export async function scanRecentNewReleases(days = 30, batchSize = null) {
   let followedArtists = [];
