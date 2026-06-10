@@ -154,6 +154,29 @@
 ### 🛠️ 修正實作
 請參閱 [demo-verify-social-handoff.js](file:///Users/pac/codes/interview/music-release-agent/scripts/demo-verify-social-handoff.js)。
 
+---
+
+## 7. 單曲變更時狀態自動清空防護
+
+### 🚨 PR 審查回饋
+當使用者在同一個專輯中切換不同的單曲（`selectedTrack` 改變）時，`lyricsData` 與 `analysisData` 並不會被重設。這會導致 UI 在載入新單曲的 AI 歌詞或賞析之前，仍然顯示上一首單曲的內容，造成嚴重的資料不一致與不良的用戶體驗。建議新增一個 `useEffect` 監聽 `selectedTrack`，並在單曲改變時自動清空歌詞與分析狀態。
+
+### 👶 小朋友解釋法
+> 想像你（瀏覽器）是一個多功能電視螢幕。當小明（使用者）從「歌曲 A」換到「歌曲 B」時，在新的「歌曲 B」的歌詞和分析還沒載入好之前，電視螢幕上如果還停留在「歌曲 A」的歌詞和分析畫面，就會讓人非常困惑（看著 B 歌的標題，底下卻播 A 歌的歌詞）。
+> 
+> 所以我們的解決辦法是：在電視機裝上一個「自動清空感應器」(`useEffect` 監聽 `selectedTrack`)。一旦小明按鈕換歌（`selectedTrack` 改變了），我們就立刻命令螢幕「先把黑板擦乾淨」(`setLyricsData('')` 和 `setAnalysisData('')`)，呈現一片乾淨的空白或載入狀態，這樣等新歌的歌詞和分析跑完送上來時，就不會跟舊歌的內容打架了！
+
+### 📝 程式碼註解
+```javascript
+// 【小朋友解釋法】：
+// 當換歌曲時，為了不讓螢幕上還殘留著上一首歌的歌詞或分析，
+// 我們一感應到換歌，就立刻「擦黑板」把舊內容擦乾淨，讓畫面呈現空白等待新內容！
+```
+
+### 🛠️ 修正實作
+請參閱 [App.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/App.jsx)。
+
+
 
 
 
