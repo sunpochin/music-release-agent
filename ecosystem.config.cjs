@@ -3,11 +3,13 @@ module.exports = {
   apps: [
     {
       // 音樂新歌代理 Express 後端
+      // 【小朋友解釋法】：
+      // 不要讓 PM2 呼叫 NPM 經理 (npm run dev) 去叫小兵 (server.js)，因為 NPM 經理下班時會忘記叫小兵回家，導致 Port 埠被佔用。
+      // 我們讓 PM2 直接管小兵 (server.js)，並用 watch 隨時注意小兵有沒有改寫，自動幫他重新開機！
       name: 'music-release-agent-server',
-      script: 'npm',
-      args: 'run dev',
+      script: 'server.js',
+      watch: ['server.js', 'src'],
       exec_mode: 'fork',
-      watch: false,
       error_file: 'logs/server-err.log',
       out_file: 'logs/server-out.log'
     },

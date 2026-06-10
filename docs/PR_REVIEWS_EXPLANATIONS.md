@@ -106,4 +106,30 @@
 ### 🛠️ 修正實作
 請參閱 [server.js](file:///Users/pac/codes/interview/music-release-agent/server.js)。
 
+---
+
+## 5. PM2 進程孤兒化防護與熱重載設定
+
+### 🚨 PR 審查回饋
+在 PM2 中使用 `npm` 作為 script 並傳入 `run dev` 作為參數，在停止或重啟應用程式時，極易導致 Node 進程孤兒化（Orphaned Processes）。PM2 發送關閉訊號給 npm 進程時，npm 往往無法將其轉發給子 Node 進程，導致 Port 被佔用而使下一次啟動失敗。直接執行 `server.js` 並由 PM2 處理 watch 機制會更安全。
+
+### 👶 小朋友解釋法
+> 想像你（PM2）是一個安檢主管，底下僱用了一個叫做「NPM 經理（`npm run dev`）」的外包負責人，由他再去把真正的「伺服器小兵（`server.js`）」叫起來工作。
+> 當你想下班把大家叫回家（重啟或關閉服務）時，你對 NPM 經理喊一聲：「下班了，收工！」
+> 
+> 但這個 NPM 經理很健忘，他拍拍屁股自己走了，卻忘記通知底下的「伺服器小兵」。結果伺服器小兵還在辦公室一直佔著電腦（佔用 Port 埠），下次當你想要重新開工時，新來的小兵就會因為位置被佔走而沒辦法工作。
+> 
+> 所以我們的解決辦法是：不要僱用中間這個 NPM 經理，讓安檢主管（PM2）直接管理並盯著「伺服器小兵（`server.js`）」。同時，我們給主管一個望遠鏡（`watch: ['server.js', 'src']`），只要看到小兵的工作檔案有修改（程式碼更新），主管就會自己去幫他重啟，這樣既安全又不會發生小兵偷偷留在辦公室佔位置的問題！
+
+### 📝 程式碼註解
+```javascript
+// 【小朋友解釋法】：
+// 不要讓 PM2 呼叫 NPM 經理 (npm run dev) 去叫小兵 (server.js)，因為 NPM 經理下班時會忘記叫小兵回家，導致 Port 埠被佔用。
+// 我們讓 PM2 直接管小兵 (server.js)，並用 watch 隨時注意小兵有沒有改寫，自動幫他重新開機！
+```
+
+### 🛠️ 修正實作
+請參閱 [ecosystem.config.cjs](file:///Users/pac/codes/interview/music-release-agent/ecosystem.config.cjs)。
+
+
 
