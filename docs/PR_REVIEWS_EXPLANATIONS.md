@@ -245,6 +245,26 @@
 ### 🛠️ 修正實作
 請參閱 [server.js](file:///Users/pac/codes/interview/music-release-agent/server.js)。
 
+---
+
+## 11. E2E 測試中對專輯列表（/api/albums）API 的模擬（Mocking）
+
+### 🚨 PR 審查回饋
+在 GitHub Actions 測試環境中，Playwright E2E 測試因為找不到 `aside button` (第一個專輯按鈕) 或等待引導文字時逾時而宣告失敗。
+
+這是因為 E2E 測試在 CI 環境中執行時，後端 `/api/albums` 路由需要讀取 `data/spotify-cache.json` 快取檔案，然而該檔案已在 `.gitignore` 中被排除，導致 GitHub Actions 上的實體檔案不存在、API 返回 500 錯誤，進而使頁面無法渲染任何專輯。建議在 E2E 測試腳本中對 `/api/albums` 進行 Mock 攔截，以確保測試不依賴本地快取檔案，從而在 CI 中能百分之百穩定通過。
+
+### 👶 小朋友解釋法
+> 想像你要對一間超市的安全通道（自動測試）進行演練。你的演練步驟有一步是「走到糖果櫃前（選擇第一個專輯卡片）」。
+> 
+> 在你的本地辦公室（本地開發環境），糖果櫃上真的擺滿了糖果（`data/spotify-cache.json` 快取檔案存在），所以演練順利通過。但是在 GitHub 雲端測試中心時，因為那是個全新的空房間，櫃子是空的（快取檔案被 `.gitignore` 排除，所以沒有上傳）。快遞員（API）回傳「沒貨了」的錯誤，演練的小人找不到糖果櫃（`aside button`），於是演練就當場卡住並宣告失敗了！
+> 
+> 所以我們的解決辦法是：在演練的腳本裡，裝上一個「虛擬糖果櫃模擬器」(`page.route('**/api/albums')`)。這樣不論在什麼空房間（即使沒有實體快取檔案），演練一開始就會用模擬的虛擬糖果櫃（Mock Albums）代替，小人就能順利看到專輯並點擊，演練就能順利通過了！
+
+### 🛠️ 修正實作
+請參閱 [dashboard.spec.js](file:///Users/pac/codes/interview/music-release-agent/tests/e2e/dashboard.spec.js)。
+
+
 
 
 
