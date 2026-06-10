@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js';
 import { translateLyrics } from './src/lyrics-translator.js';
+import { getSpotifyAlbumTracks } from './src/spotify-client.js';
+import { generateTrackAnalysis } from './src/album-reviewer.js';
 import { socialClient } from './src/services/social-client.js';
 
 dotenv.config();
@@ -11,6 +13,50 @@ dotenv.config();
 const app = express();
 app.use(express.json({ limit: '10mb' })); // 解析 JSON body，允許較大的 base64 圖片
 const PORT = process.env.PORT || 3011;
+const dashboardIndexPath = path.join(process.cwd(), 'dashboard/dist/index.html');
+const mockDataPath = path.join(process.cwd(), 'data/mock-releases.json');
+const cacheDataPath = path.join(process.cwd(), 'data/spotify-cache.json');
+
+async function pathAccessible(targetPath) {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function buildReadinessReport() {
+  const [dashboardBuilt, mockDataAvailable, cacheAvailable, socialReachable] = await Promise.all([
+    pathAccessible(dashboardIndexPath),
+    pathAccessible(mockDataPath),
+    pathAccessible(cacheDataPath),
+    // 【小朋友解釋法】：
+    // 打電話給特別嘉賓確認健康狀態時，如果電話線斷了（請求報錯），不要讓整個派對取消（Promise.all 崩潰回傳 500）。
+    // 我們加上保險絲 (.catch(() => false))，打不通就當他無法出席 (false) 就好，派對照常開門！
+    socialClient.isHealthy().catch(() => false)
+  ]);
+
+  const coreReady = dashboardBuilt && mockDataAvailable;
+  const dependencyStatus = socialReachable ? 'reachable' : 'unreachable';
+  const status = coreReady ? (socialReachable ? 'ok' : 'degraded') : 'not_ready';
+
+  return {
+    status,
+    coreReady,
+    checks: {
+      dashboardBuilt,
+      mockDataAvailable,
+      cacheAvailable,
+      socialPostService: dependencyStatus
+    },
+    ports: {
+      app: Number(PORT),
+      socialServiceUrl: process.env.SOCIAL_SERVICE_URL || 'http://localhost:3012'
+    },
+    timestamp: new Date().toISOString()
+  };
+}
 
 // 提供 React 前端靜態檔案 (發布後)
 app.use(express.static(path.join(process.cwd(), 'dashboard/dist')));
@@ -22,7 +68,8 @@ app.get('/api', (_req, res) => {
     endpoints: {
       login: '/login/spotify',
       callback: '/callback/spotify',
-      healthz: '/healthz'
+      healthz: '/healthz',
+      readyz: '/readyz'
     }
   });
 });
@@ -146,6 +193,34 @@ app.post('/api/lyrics', async (req, res) => {
   }
 });
 
+// 獲取專輯曲目 API (動態隨選載入)
+app.get('/api/albums/:id/tracks', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const tracks = await getSpotifyAlbumTracks(id);
+    res.json(tracks);
+  } catch (err) {
+    console.error(`Failed to get tracks for album ${id}:`, err);
+    res.status(500).json({ error: 'Failed to load tracks' });
+  }
+});
+
+// 歌曲級別 AI 分析 API (動態隨選生成)
+app.post('/api/tracks/analyze', async (req, res) => {
+  const { artistName, trackName, albumName } = req.body;
+  if (!artistName || !trackName) {
+    return res.status(400).json({ error: 'Missing artistName or trackName' });
+  }
+  
+  try {
+    const analysis = await generateTrackAnalysis(artistName, trackName, albumName);
+    res.json({ text: analysis });
+  } catch (err) {
+    console.error(`Failed to analyze track ${trackName}:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 社群自動發文代理端點 — 轉發請求至 social-post-service 微服務
 app.post('/api/social/publish', async (req, res) => {
   const { caption, platforms, imageBase64 } = req.body;
@@ -187,9 +262,13 @@ app.get('/api/social/health', async (_req, res) => {
     url: process.env.SOCIAL_SERVICE_URL || 'http://localhost:3012'
   });
 });
-
 app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/readyz', async (_req, res) => {
+  const report = await buildReadinessReport();
+  res.status(report.coreReady ? 200 : 503).json(report);
 });
 
 app.get('/login/spotify', (_req, res) => {
@@ -225,6 +304,17 @@ app.get('/callback/spotify', async (req, res) => {
   }
 });
 
+// 提供 React 前端靜態檔案 (發布後) 的 wildcard 路由以支援 React Router 前端路徑
+app.get('*', (req, res) => {
+  // 排除 API 請求，如果 API 未匹配則回傳 404
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(process.cwd(), 'dashboard/dist/index.html'));
+});
+
 app.listen(PORT, () => {
-  console.log(`🎵 nanoclaw-music-agent auth server running on http://localhost:${PORT}`);
+  console.log(`🎵 music-release-agent server running on http://localhost:${PORT}`);
+  console.log(`📍 health: http://localhost:${PORT}/healthz`);
+  console.log(`📍 ready:  http://localhost:${PORT}/readyz`);
 });

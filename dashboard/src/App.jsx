@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Disc3, Music, Sparkles, Share2, Download, AlertCircle, Info, Calendar, Layers, ExternalLink, Send } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import html2canvas from 'html2canvas'
 import ShareCard from './components/ShareCard'
 import Sidebar from './components/Sidebar'
@@ -18,10 +19,27 @@ function App() {
   // 儲存本地 AI 樂評之介紹與總結
   const [albumReview, setAlbumReview] = useState({ introduction: '', summary: '' })
   
+  // 專輯曲目與單曲 AI 分析狀態
+  const [tracks, setTracks] = useState([])
+  const [selectedTrack, setSelectedTrack] = useState(null)
+  const [tracksLoading, setTracksLoading] = useState(false)
+  const [analysisData, setAnalysisData] = useState('')
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('lyrics') // 'lyrics' | 'analysis'
+  
   const shareCardRef = useRef(null)
+  // 隨時追蹤當前選中的單曲，以防異步請求結束時選取已改變
+  const selectedTrackRef = useRef(selectedTrack)
+  useEffect(() => {
+    selectedTrackRef.current = selectedTrack
+  }, [selectedTrack])
+
   // 社群自動發文狀態
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishResult, setPublishResult] = useState(null)
+
+  const navigate = useNavigate()
+  const { albumId } = useParams()
 
   useEffect(() => {
     fetch('/api/albums')
@@ -29,6 +47,23 @@ function App() {
       .then(data => setAlbums(data))
       .catch(err => console.error("Failed to fetch albums", err))
   }, [])
+
+  // 根據 URL 中的 albumId 參數同步選取的專輯狀態
+  useEffect(() => {
+    if (albums.length > 0) {
+      if (albumId) {
+        const matchedAlbum = albums.find(a => a.id === albumId)
+        if (matchedAlbum) {
+          setSelectedAlbum(matchedAlbum)
+        } else {
+          // 如果找不到對應的專輯，重設為未選取狀態
+          setSelectedAlbum(null)
+        }
+      } else {
+        setSelectedAlbum(null)
+      }
+    }
+  }, [albumId, albums])
 
   // 當選取專輯時，自後端 API 取得本地 AI 樂評的介紹與總結
   useEffect(() => {
@@ -40,6 +75,50 @@ function App() {
         .catch(err => console.error("Failed to fetch album review", err))
     } else {
       setAlbumReview({ introduction: '', summary: '' })
+    }
+  }, [selectedAlbum])
+
+  // 當選取專輯時，自後端 API 取得專輯歌曲清單 (動態隨選載入)
+  // 【小朋友解釋法】：
+  // 當快速切換專輯時，舊的送貨員（舊的異步請求）可能會比較慢把歌單送來，不小心蓋掉最新點的歌單。
+  // 我們加一個「有效標記」(active)。每當切換專輯時，就把上一次的標記設成失效 (false)；
+  // 這樣就算舊的歌單送到了，我們也會因為它失效而直接丟掉，只留最新點的歌單！
+  useEffect(() => {
+    let active = true
+    if (selectedAlbum) {
+      setTracks([])
+      setSelectedTrack(null)
+      setLyricsData('')
+      setAnalysisData('')
+      setTracksLoading(true)
+      fetch(`/api/albums/${selectedAlbum.id}/tracks`)
+        .then(res => res.json())
+        .then(data => {
+          if (!active) return
+          if (Array.isArray(data)) {
+            setTracks(data)
+            if (data.length > 0) {
+              setSelectedTrack(data[0]) // 預設選中第一首歌曲
+            }
+          } else {
+            setTracks([])
+            setSelectedTrack(null)
+          }
+        })
+        .catch(err => {
+          if (active) console.error("Failed to fetch album tracks", err)
+        })
+        .finally(() => {
+          if (active) setTracksLoading(false)
+        })
+    } else {
+      setTracks([])
+      setSelectedTrack(null)
+      setLyricsData('')
+      setAnalysisData('')
+    }
+    return () => {
+      active = false
     }
   }, [selectedAlbum])
 
@@ -55,14 +134,14 @@ function App() {
       // 優化：直接使用 HTML5 Canvas toBlob API，避免 Base64 序列化的記憶體與 CPU 開銷
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
       if (!blob) throw new Error('Canvas to Blob conversion failed')
-      const file = new File([blob], `share-${selectedAlbum.name}.png`, { type: 'image/png' })
+      const file = new File([blob], `share-${selectedTrack ? selectedTrack.name : selectedAlbum.name}.png`, { type: 'image/png' })
       setShareFile(file)
     } catch (err) {
       console.error("Failed to pre-generate share file", err)
     }
-  }, [selectedAlbum])
+  }, [selectedAlbum, selectedTrack])
 
-  // 當選取專輯、歌詞或本地樂評更新時，在背景非同步預先產生圖卡檔案
+  // 當選取專輯、歌曲、歌詞、歌曲分析或頁籤更新時，在背景非同步預先產生圖卡檔案
   useEffect(() => {
     if (selectedAlbum) {
       setShareFile(null) // 先清空舊檔案
@@ -73,18 +152,28 @@ function App() {
     } else {
       setShareFile(null)
     }
-  }, [selectedAlbum, lyricsData, albumReview, generateShareFile])
+  }, [selectedAlbum, selectedTrack, lyricsData, analysisData, albumReview, activeTab, generateShareFile])
 
-  // 僅選取專輯並重設歌詞與載入狀態，不自動執行 AI 歌詞搜尋
+  // 僅選取專輯並重設歌詞與載入狀態，使用 react-router 的 navigate 進行 URL 轉換
   const handleSelectAlbum = (album) => {
-    setSelectedAlbum(album)
+    if (album) {
+      navigate(`/album/${album.id}`)
+    } else {
+      navigate('/')
+    }
     setLyricsData('')
     setIsLoading(false)
   }
 
-  // 手動觸發 AI 歌詞搜尋與翻譯
+// 手動觸發 AI 歌詞搜尋與翻譯 (綁定選中的單曲)
+  // 【小朋友解釋法】：
+  // 當我們去搜尋並翻譯歌詞時，如果翻譯期間使用者換了歌，
+  // 歌詞送來後就會不小心蓋掉新歌的歌詞！
+  // 所以我們在開始時用小紙條記下歌曲編號 (trackIdAtStart)，
+  // 翻譯送達後比對「監視器」(selectedTrackRef) 是否還是同一首，一樣才更新畫面！
   const handleFetchLyrics = async () => {
-    if (!selectedAlbum) return
+    if (!selectedAlbum || !selectedTrack) return
+    const trackIdAtStart = selectedTrack.id
     setIsLoading(true)
     setLyricsData('')
     
@@ -94,19 +183,66 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           artistName: selectedAlbum.artistName || 'Unknown Artist', 
-          trackName: selectedAlbum.name 
+          trackName: selectedTrack.name 
         })
       })
       const result = await res.json()
-      if (result.text) {
-        setLyricsData(result.text)
-      } else {
-        setLyricsData("無法取得歌詞翻譯。")
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        if (result.text) {
+          setLyricsData(result.text)
+        } else {
+          setLyricsData("無法取得歌詞翻譯。")
+        }
       }
     } catch (err) {
-      setLyricsData("翻譯過程發生錯誤。")
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setLyricsData("翻譯過程發生錯誤。")
+      }
     } finally {
-      setIsLoading(false)
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setIsLoading(false)
+      }
+    }
+  }
+
+  // 手動觸發單曲 AI 賞析與分析
+  // 【小朋友解釋法】：
+  // 當我們叫倉庫（API）去寫某一首歌的分析時，如果寫報告期間使用者換了歌，
+  // 報告送來後就會不小心蓋掉新歌的分析內容！
+  // 所以我們要在開始時拿小紙條記下開始時的歌曲編號 (trackIdAtStart)，
+  // 報告送達後看一下「監視器」(selectedTrackRef) 當前顯示的歌是不是同一首，一模一樣才更新畫面！
+  const handleAnalyzeTrack = async () => {
+    if (!selectedAlbum || !selectedTrack) return
+    const trackIdAtStart = selectedTrack.id
+    setAnalysisLoading(true)
+    setAnalysisData('')
+    
+    try {
+      const res = await fetch('/api/tracks/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          artistName: selectedAlbum.artistName || 'Unknown Artist', 
+          trackName: selectedTrack.name,
+          albumName: selectedAlbum.name
+        })
+      })
+      const result = await res.json()
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        if (result.text) {
+          setAnalysisData(result.text)
+        } else {
+          setAnalysisData("無法取得歌曲分析。")
+        }
+      }
+    } catch (err) {
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setAnalysisData("分析過程發生錯誤。")
+      }
+    } finally {
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setAnalysisLoading(false)
+      }
     }
   }
 
@@ -224,30 +360,40 @@ function App() {
             {/* Header Banner 頂部專輯資訊橫幅 */}
             <HeaderBanner 
               selectedAlbum={selectedAlbum}
-              setSelectedAlbum={setSelectedAlbum}
+              setSelectedAlbum={() => handleSelectAlbum(null)}
             />
 
             {/* AI 面板與本地元數據 */}
             <div className="flex-1 overflow-y-auto p-4 lg:p-8 lg:pt-4">
               <div className="max-w-6xl flex flex-col lg:flex-row gap-6">
                 
-                {/* 專輯與系統診斷資訊面板 */}
+                {/* 專輯、曲目列表與系統診斷資訊面板 */}
                 <MetadataPanel 
                   selectedAlbum={selectedAlbum}
                   albumReview={albumReview}
                   shareFile={shareFile}
+                  tracks={tracks}
+                  selectedTrack={selectedTrack}
+                  setSelectedTrack={setSelectedTrack}
+                  tracksLoading={tracksLoading}
                 />
 
                 {/* AI 雙語歌詞與圖卡導出面板 */}
                 <AILyricsPanel 
                   selectedAlbum={selectedAlbum}
+                  selectedTrack={selectedTrack}
                   lyricsData={lyricsData}
                   isLoading={isLoading}
                   isExporting={isExporting}
                   isPublishing={isPublishing}
                   publishResult={publishResult}
-                  handleFetchLyrics={handleFetchLyrics}
+                                    handleFetchLyrics={handleFetchLyrics}
                   exportShareCard={exportShareCard}
+                  analysisData={analysisData}
+                  analysisLoading={analysisLoading}
+                  handleAnalyzeTrack={handleAnalyzeTrack}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
                   handlePublishToSocial={handlePublishToSocial}
                 />
 
@@ -268,8 +414,9 @@ function App() {
          <ShareCard 
             ref={shareCardRef} 
             album={selectedAlbum} 
+            track={selectedTrack}
             artistName={selectedAlbum?.artistName || 'Featured Artist'} 
-            lyrics={lyricsData} 
+            lyrics={activeTab === 'lyrics' ? lyricsData : analysisData} 
             introduction={albumReview?.introduction}
          />
       </div>

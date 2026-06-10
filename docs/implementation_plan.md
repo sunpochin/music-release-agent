@@ -49,6 +49,11 @@
 - 內部排版包含：專輯封面、歌曲名稱、最經典的一段翻譯歌詞。
 - 點擊「分享至 IG/TikTok」時，將此元件渲染成圖片提供下載。
 
+#### [MODIFY] React Router 整合 (前端路由與狀態管理)
+- **進入點**：修改 `dashboard/src/main.jsx` 使用 `BrowserRouter` 與 `Routes`/`Route` 包裹主要 App。
+- **狀態管理**：重構 `dashboard/src/App.jsx` 利用 `useParams` 讀取網址的專輯 ID (`/album/:albumId`)，實現與路由同步之狀態機制；利用 `useNavigate` 做路徑切換。
+- **後端 Fallback**：在 `server.js` 尾端設置 `app.get('*')` 路由以支援網頁重新整理與深層連結 (Deep Linking)。
+
 ## Verification Plan
 
 ### Manual Verification
@@ -56,3 +61,4 @@
 2. 畫面是否能成功載入過去抓取到的藝人專輯與歌曲。
 3. 點選任一首歌曲後，AI 面板是否能出現載入動畫，並正確顯示雙語歌詞。
 4. 點選「產生分享卡 (Story/Reel)」，是否能成功下載一張比例為 9:16 的精美圖片，且版面未跑版。
+5. 點擊專輯時網址列是否改變為 `/album/:albumId`；直接輸入該網址或於該路徑重新整理頁面，系統應能正確解析並呈現該專輯頁面且不觸發後端 404 錯誤。

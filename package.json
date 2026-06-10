@@ -9,6 +9,9 @@
     "dev": "node --watch server.js",
     "scan": "node scan-releases.js",
     "scan:dry": "node scan-releases-dry.js",
+    "demo:verify": "node scripts/demo-verify.js",
+    "demo:verify:social": "node scripts/demo-verify-social-handoff.js",
+    "demo:verify:social:down": "node scripts/demo-verify-social-down.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage && node generate-badge.js"
   },

@@ -4,16 +4,84 @@
 [![PM2 Process Guard](https://img.shields.io/badge/PM2-process%20guard-blueviolet)](./PM2_DAEMON_GUIDE.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`music-release-agent` 是一個結合 **Spotify API**、**Gemini AI** 與 **GitOps 自動化發布**的音樂掃描與樂評推播系統。
-專案具備採用 **Vite + React (TailwindCSS)** 打造的 Glassmorphism 音樂儀表板，支援非同步預渲染 9:16 社群分享卡（Instagram Stories / TikTok Reels），並透過伴生微服務 `social-post-service` 提供非同步多平台自動發文能力。
+`music-release-agent` 是一個自動化音樂內容系統：追蹤新發行、生成 AI 樂評、輸出 GitBook 內容，並透過 companion service 處理非同步社群發文。
+
+這個 repo 的重點不是單一 UI 或單一 API，而是三件事一起成立：
+
+- 可重現的 dry-run 驗證路徑
+- 明確的核心服務 / 發文服務邊界
+- 對外部依賴失敗的可驗證降級行為
+
+快速導覽：
+
+- [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
+- [Readiness And Observability Guide](./docs/readiness_and_observability.md)
 
 ---
 
-## ⚡️ 3 分鐘零配置快速驗證（面試官專屬，免 API Key）
+## Evaluator Quickstart
 
-為了方便面試官在**不準備任何 Spotify/Gemini API 金鑰與授權**的情況下，能立即、完整地驗證整個系統，專案內建了完整的 **Dry Run 離線模擬沙箱**。
+如果你只想在 3 分鐘內確認這個 repo 值不值得繼續深看，先跑：
 
-### 1. 安裝與依賴準備
+```bash
+npm install
+npm run demo:verify
+```
+
+這條路徑：
+
+- 使用內建 `data/mock-releases.json` 執行離線掃描
+- 驗證 `data/mock-gitbook/` 內的關鍵 Markdown 產物
+- 驗證 `SUMMARY.md` 是否正確串接新發行頁面
+- 不需要 Spotify、Gemini 或 GitHub 憑證
+
+**預期結果：**
+
+- console 顯示 `demo:verify passed`
+- `data/mock-gitbook/SUMMARY.md` 包含 3 份模擬樂評
+- `data/mock-gitbook/new-releases/` 包含對應 Markdown 檔案
+
+## Verification Modes
+
+### 1. Repo-only proof
+
+```bash
+npm run demo:verify
+```
+
+驗證離線掃描、內容生成與 mock GitBook 輸出。
+
+### 2. Cross-service proof
+
+```bash
+npm run demo:verify:social
+```
+
+暫時拉起 `music-release-agent` 與 `social-post-service`，驗證：
+
+- `music-release-agent` 代理轉發 `POST /api/social/publish`
+- `social-post-service` 回傳 `202 Accepted`
+- 任務可透過 `GET /api/social/status/:jobId` 查到並完成
+
+### 3. Failure-mode proof
+
+```bash
+npm run demo:verify:social:down
+```
+
+驗證 `social-post-service` 不可達時：
+
+- `/api/social/health` 會回報 `reachable: false`
+- `/api/social/publish` 會穩定回 `502`
+- `/readyz` 會顯示 `degraded`
+- 核心服務不會崩掉
+
+---
+
+## Full Demo Path
+
+如果你要展示完整雙服務體驗，再安裝 companion service 與 dashboard：
+
 ```bash
 # 安裝後端與發文微服務依賴
 npm install
@@ -23,25 +91,76 @@ cd ../social-post-service && npm install && cd ../music-release-agent
 cd dashboard && npm install && cd ..
 ```
 
-### 2. 執行離線沙箱模擬
-執行以下指令，系統會自動使用內建的模擬歌手發行資料，模擬執行新歌掃描、AI 樂評起草、GitBook 目錄更新與 GitOps 發布流：
-```bash
-npm run scan:dry
-```
-*模擬產出的 Markdown 樂評文件與大綱目錄將寫入 `data/mock-gitbook/` 下，您可以直接開箱檢視。*
+然後啟動：
 
-### 3. 一鍵啟動雙服務環境（PM2 背景守護）
-我們提供了一鍵管理的 PM2 配置檔案。啟動後，Express API 後端、Vite 開發伺服器、Cron 定時掃描器與發文微服務將在背景同步拉起：
 ```bash
 npx pm2 start ecosystem.config.cjs
 ```
+
 *(詳細指令與除錯方式請參考：[🐶 PM2 守護進程指南](./PM2_DAEMON_GUIDE.md))*
 
-### 4. 前往 Dashboard 體驗
+打開 [http://localhost:5173](http://localhost:5173)：
+
+- 音樂庫瀏覽
+- AI 雙語歌詞
+- 社群自動發佈
+
+若你只想單獨執行離線模擬，也可以跑：
+
+```bash
+npm run scan:dry
+```
+
+### Dashboard 體驗
 打開瀏覽器訪問 [http://localhost:5173](http://localhost:5173) 即可立即開始體驗：
 - 🌟 **音樂庫瀏覽**：流暢的毛玻璃卡片式導覽與最新發行清單。
 - 🔮 **AI 雙語歌詞**：點選任一曲目，即時獲取 Gemini 翻譯與賞析對照。
 - 🚀 **社群自動發佈**：點擊「發佈到社群」一鍵觸發非同步多平台發佈流。
+
+### `social-post-service` 何時必須存在？
+
+`social-post-service` **不是**離線驗證必需品。
+
+不需要 `social-post-service` 的功能：
+
+- `npm run demo:verify`
+- `npm run scan:dry`
+- 本地檢查 GitBook mock 輸出
+
+需要 `social-post-service` 的功能：
+
+- Dashboard 內「發佈到社群」按鈕
+- 端到端驗證非同步發文流程
+- PM2 啟動的完整雙服務演示
+- `npm run demo:verify:social`
+
+可在 `social-post-service` 未啟動時驗證的 failure-mode：
+
+- `npm run demo:verify:social:down`
+
+如果 `SOCIAL_SERVICE_URL` 指向的服務未啟動，核心 repo 的離線 dry-run 與大部分閱讀/展示流程仍然成立，但社群發佈路徑不成立。
+
+## Runtime Signals
+
+對外可用的 runtime 端點：
+
+- `GET /healthz`
+  - liveness probe
+  - 只回答服務是否活著
+- `GET /readyz`
+  - readiness probe
+  - 回傳 core readiness 與 dependency state
+- `GET /api/social/health`
+  - companion service reachability
+
+`/readyz` 的設計原則：
+
+- `status: ok`
+  - 核心服務 ready，companion service 可達
+- `status: degraded`
+  - 核心服務 ready，但 `social-post-service` 不可達
+- `status: not_ready`
+  - 連核心靜態資產或必要 mock data 都不完整
 
 ---
 
