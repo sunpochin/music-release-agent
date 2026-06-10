@@ -39,6 +39,19 @@ test.describe('Music Release Dashboard E2E Tests', () => {
       });
     });
 
+    // 攔截封面圖片請求，返回 1x1 像素透明 PNG，避免 html2canvas 載入懸掛或跨域失敗
+    await page.route('https://example.com/cover.png', async (route) => {
+      const transparentPng = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+        'base64'
+      );
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: transparentPng,
+      });
+    });
+
     // 1. 攔截 AI 歌詞 API 請求，返回模擬的雙語歌詞 Markdown 內容
     await page.route('**/api/lyrics', async (route) => {
       await route.fulfill({
@@ -106,23 +119,32 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // 6. 驗證 URL 是否更新為帶有 /album/ 的路徑
     await expect(page).toHaveURL(/\/album\//);
 
-    // 7. 驗證專輯明細面板已載入，且顯示「尋找歌詞與 AI 翻譯」按鈕
+    // 7. 驗證專輯明細面板已載入，且右側顯示「探索單曲的 AI 靈魂」引導卡
+    await expect(page.locator('text=探索單曲的 AI 靈魂')).toBeVisible();
+
+    // 8. 點擊曲目清單的第一首歌曲以跳轉至單曲專屬路由
+    const firstTrackBtn = page.locator('button:has-text("Test Track 1")');
+    await expect(firstTrackBtn).toBeVisible();
+    await firstTrackBtn.click();
+
+    // 8.5 驗證 URL 是否更新為帶有 /song/ 的路徑
+    await expect(page).toHaveURL(/\/song\//);
+
+    // 9. 驗證「尋找歌詞與 AI 翻譯」按鈕已在右側面板顯示並點擊
     const fetchLyricsBtn = page.locator('text=尋找歌詞與 AI 翻譯');
     await expect(fetchLyricsBtn).toBeVisible();
-
-    // 8. 點擊「尋找歌詞與 AI 翻譯」
     await fetchLyricsBtn.click();
 
-    // 9. 驗證模擬的雙語歌詞內容是否渲染出來
+    // 10. 驗證模擬的雙語歌詞內容是否渲染出來
     await expect(page.locator('text=這是一首測試歌曲的意境').first()).toBeVisible();
     await expect(page.locator('text=你好，世界').first()).toBeVisible();
 
-    // 10. 點擊「發佈到社群」按鈕
+    // 11. 點擊「發佈到社群」按鈕
     const publishBtn = page.locator('text=發佈到社群');
     await expect(publishBtn).toBeVisible();
     await publishBtn.click();
 
-    // 11. 驗證發佈成功 Toast 訊息是否包含模擬的 JobId
+    // 12. 驗證發佈成功 Toast 訊息是否包含模擬的 JobId
     await expect(page.locator('text=發文已排程成功！JobId: mock-job').first()).toBeVisible();
   });
 });

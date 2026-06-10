@@ -11,6 +11,8 @@ createRoot(document.getElementById('root')).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/album/:albumId" element={<App />} />
+        {/* 新增獨立單曲頁面路由，保留專輯上下文 */}
+        <Route path="/album/:albumId/song/:trackId" element={<App />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

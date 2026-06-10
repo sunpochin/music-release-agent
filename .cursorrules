@@ -1,0 +1,13 @@
+# AI Coding Guidelines & Rules (.cursorrules)
+
+# 【繁體中文註解與文件規範】
+# 1. 任何時候生成代碼時，必須在代碼中加入簡潔的繁體中文註解。
+# 2. 實作重大功能前，必須撰寫實作計畫（Implementation Plan）並保存在 `docs/` 目錄中。
+# 3. 所有架構說明、PR 審查修正與演練文件必須完整保存在 repository 的 `docs/` 目錄中以供備忘。
+
+# Rules for AI Coding Assistants (Gemini, Claude, Cursor, Copilot)
+
+- **Documentation Preservation**: Always maintain, update, and persist technical documentation (such as architecture guides, implementation plans, and walkthroughs) in the `docs/` directory of the repository. Never delete them.
+- **Traditional Chinese Comments**: When generating or modifying code, write concise comments in Traditional Chinese (繁體中文).
+- **Clean Architecture & SOLID**: Respect clean code principles, single responsibility, and robust error handling.
+- **XSS & Race Condition Prevention**: Ensure any dangerouslySetInnerHTML calls are sanitized with escapeHtml, and all async actions are guarded against race conditions using active flags or refs.
