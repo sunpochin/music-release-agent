@@ -348,6 +348,12 @@ app.get('*', (req, res) => {
   if (req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'API route not found' });
   }
+  // 【小朋友解釋法】：
+  // 當別人來找零件（.js 或 .css 靜態檔案）時如果找不到，不要硬給他「導覽圖」(index.html)，否則瀏覽器會裝不進去而報錯。
+  // 我們檢查只要路徑裡有「.」而且不是「.html」，就直接說沒貨 (404)，只有網頁導航才給導覽圖！
+  if (req.path.includes('.') && !req.path.endsWith('.html')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(process.cwd(), 'dashboard/dist/index.html'));
 });
 
