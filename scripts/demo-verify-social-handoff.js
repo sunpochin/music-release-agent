@@ -54,17 +54,25 @@ async function waitForJobCompletion(jobId, { timeoutMs = 20000, intervalMs = 500
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const response = await fetch(`${musicUrl}/api/social/status/${jobId}`);
-    if (!response.ok) {
-      throw new Error(`status endpoint returned ${response.status}`);
-    }
-
-    const job = await response.json();
-    if (job.status === 'completed') {
-      return job;
-    }
-    if (job.status === 'failed') {
-      throw new Error('social job ended in failed status');
+    try {
+      // 【小朋友解釋法】：
+      // 輪詢狀態打電話 (fetch) 時，如果遇到短暫的收訊不好（網路瞬斷），不要直接大哭崩潰（腳本當機）。
+      // 我們加上防摔保護殼 (try-catch)，這次沒問成功就等一下下再打，直到時間超時為止！
+      const response = await fetch(`${musicUrl}/api/social/status/${jobId}`);
+      if (response.ok) {
+        const job = await response.json();
+        if (job.status === 'completed') {
+          return job;
+        }
+        if (job.status === 'failed') {
+          throw new Error('social job ended in failed status');
+        }
+      }
+    } catch (err) {
+      // 忽略輪詢期間的暫時性網路錯誤或伺服器回應異常，等待下一次輪詢
+      if (err.message === 'social job ended in failed status') {
+        throw err;
+      }
     }
 
     await sleep(intervalMs);
