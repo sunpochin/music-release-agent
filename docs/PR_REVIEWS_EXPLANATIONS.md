@@ -200,6 +200,26 @@
 ### 🛠️ 修正實作
 請參閱 [server.js](file:///Users/pac/codes/interview/music-release-agent/server.js)。
 
+---
+
+## 9. GitHub Actions 測試環境中的 Node.js 版本升級
+
+### 🚨 PR 審查回饋
+在 GitHub Actions 的 CI 流程中，測試遭遇了 `TypeError: webidl.util.markAsUncloneable is not a function` 的錯誤，導致 `tests/strategies.test.js` 測試套件執行失敗。
+
+這是因為專案內依賴的 `undici`（`^8.3.0`）套件，在新版本中呼叫了 Node.js v21+ 才支援的 `worker_threads.markAsUncloneable` 原生 API。而 CI 中設定的 Node.js 版本為 `20.x`，不包含此功能，因此引發相容性錯誤。建議將 CI 運行的 Node 升級至支援此 API 的 `22.x`（LTS 版本）。
+
+### 👶 小朋友解釋法
+> 想像你要開一輛新買的跑車（`undici` 8.3.0+ 套件），這台跑車需要加一種特殊的進階燃料（`markAsUncloneable` 函數）。
+> 
+> 在你的電腦上，你安裝的是最新型的加油站（Node.js v23），所以跑車開得很順。但是在 GitHub Actions 的測試工廠裡，他們用的是舊款的加油站（Node.js v20），裡面沒有這種新燃料。結果跑車開到一半就發不動，整個測試就壞掉（Failed）了。
+> 
+> 所以我們的解決辦法是：把 GitHub Actions 的加油站升級到最新的穩定版（Node.js v22.x），這樣它就有提供新燃料，跑車就可以順利跑完測試，不會再壞在半路了！
+
+### 🛠️ 修正實作
+請參閱 [.github/workflows/ci.yml](file:///Users/pac/codes/interview/music-release-agent/.github/workflows/ci.yml)。
+
+
 
 
 
