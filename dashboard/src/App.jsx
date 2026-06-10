@@ -96,7 +96,7 @@ function App() {
       prevAlbumIdRef.current = selectedAlbum.id
       
       setTracks([])
-      setSelectedTrack(null)
+      // 避免在此處將 selectedTrack 重設為 null，交給 trackId 同步機制決定，以防直接進入單曲 URL 時狀態衝突
       setLyricsData('')
       setAnalysisData('')
       setTracksLoading(true)
