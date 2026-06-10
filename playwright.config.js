@@ -21,7 +21,7 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'PORT=3011 npm start',
+      command: 'NODE_ENV=test PORT=3011 npm start',
       url: 'http://localhost:3011/readyz',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,

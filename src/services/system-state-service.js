@@ -10,8 +10,10 @@ export class SystemStateService {
    * @param {string} scannerStatePath - 掃描器狀態路徑 (如 scanner-state.json)
    */
   constructor(systemStatePath, scannerStatePath) {
-    this.systemStatePath = path.resolve(systemStatePath);
-    this.scannerStatePath = path.resolve(scannerStatePath);
+    const isTest = process.env.NODE_ENV === 'test';
+    // 若為測試環境，自動將存檔重新導向至 .test.json 避免污染開發環境實體資料
+    this.systemStatePath = path.resolve(isTest ? systemStatePath.replace(/\.json$/, '.test.json') : systemStatePath);
+    this.scannerStatePath = path.resolve(isTest ? scannerStatePath.replace(/\.json$/, '.test.json') : scannerStatePath);
   }
 
   /**

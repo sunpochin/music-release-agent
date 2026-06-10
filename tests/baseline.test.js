@@ -8,7 +8,7 @@ vi.mock('fs/promises', () => {
   return {
     default: {
       readFile: vi.fn().mockImplementation(async (filePath) => {
-        if (filePath.includes('scanner-state.json') || filePath.includes('system-state.json')) {
+        if (filePath.includes('scanner-state.test.json') || filePath.includes('system-state.test.json')) {
           return JSON.stringify(mockState[filePath] || {});
         }
         if (filePath.includes('spotify-cache.json')) {
@@ -64,9 +64,9 @@ import { scanRecentNewReleases, getSpotifyAlbumTracks } from '../src/spotify-cli
 describe('scanRecentNewReleases 基準測試', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    // 重設 mockState 狀態，避免上一個測試的 429 降級冷卻狀態殘留影響後續測試
-    await fs.writeFile(path.resolve('data/system-state.json'), JSON.stringify({}));
-    await fs.writeFile(path.resolve('data/scanner-state.json'), JSON.stringify({}));
+    // 重設 mockState 狀態，避免上一個測試的 429 降級冷卻狀態殘留影響後續測試 (在測試環境中使用 .test.json 檔)
+    await fs.writeFile(path.resolve('data/system-state.test.json'), JSON.stringify({}));
+    await fs.writeFile(path.resolve('data/scanner-state.test.json'), JSON.stringify({}));
     // 設定環境變數避免快取影響測試
     process.env.SPOTIFY_BYPASS_CACHE = 'true';
     process.env.SCAN_CYCLE_DAYS = '7';
@@ -125,8 +125,8 @@ describe('scanRecentNewReleases 基準測試', () => {
   });
 
   it('防禦路徑：當 Spotify 發生 429 時，自動降級至 MusicBrainz 進行掃描', async () => {
-    // 預先寫入歷史藝人快取以利降級掃描進行
-    await fs.writeFile(path.resolve('data/scanner-state.json'), JSON.stringify({
+    // 預先寫入歷史藝人快取以利降級掃描進行 (在測試環境中使用 .test.json 檔)
+    await fs.writeFile(path.resolve('data/scanner-state.test.json'), JSON.stringify({
       'artist-1': { name: 'Salsa King', genres: [], uri: 'spotify:artist:artist-1', url: 'https://open.spotify.com/artist/artist-1' }
     }));
 

@@ -5,6 +5,10 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/tests/e2e/**', '**/cypress/**'],
     // 使用 forks 執行池以避免 CI 環境中 Node 20 與 undici 的相容性錯誤 (webidl.util.markAsUncloneable)
     pool: 'forks',
+    // 設定全域測試環境變數
+    env: {
+      NODE_ENV: 'test'
+    },
     // 設置測試覆蓋率配置
     coverage: {
       provider: 'v8',
