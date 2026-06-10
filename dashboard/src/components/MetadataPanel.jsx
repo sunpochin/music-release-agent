@@ -1,5 +1,6 @@
 import React from 'react'
 import { Info, Calendar, Layers, ExternalLink, Music4, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 // 格式化歌曲長度（毫秒轉為分:秒）
 const formatDuration = (ms) => {
@@ -19,6 +20,7 @@ const MetadataPanel = ({
   setSelectedTrack,
   tracksLoading
 }) => {
+  const navigate = useNavigate()
   if (!selectedAlbum) return null
 
   return (
@@ -62,7 +64,7 @@ const MetadataPanel = ({
           {/* 專輯曲目清單 */}
           <div className="bg-white/5 p-4 rounded-xl space-y-3 flex flex-col max-h-[300px]">
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
-              <Music4 size={14} className="text-spotify-green" /> 專輯曲目清單
+               <Music4 size={14} className="text-spotify-green" /> 專輯曲目清單
             </p>
             
             {tracksLoading ? (
@@ -77,7 +79,10 @@ const MetadataPanel = ({
                 {tracks.map((track) => (
                   <button
                     key={track.id}
-                    onClick={() => setSelectedTrack(track)}
+                    onClick={() => {
+                      // 使用 React Router navigate 跳轉，避免整頁重新整理
+                      navigate(`/album/${selectedAlbum.id}/song/${track.id}`);
+                    }}
                     className={`w-full text-left p-2 rounded-lg transition-all text-xs flex items-center justify-between gap-3 group ${
                       selectedTrack?.id === track.id
                         ? 'bg-spotify-green/20 text-white font-bold'
@@ -106,14 +111,16 @@ const MetadataPanel = ({
       </div>
 
       <div className="mt-6 pt-4 border-t border-white/10 space-y-4">
-        {/* 偵錯小工具，方便實機測試排查 */}
-        <div className="bg-white/5 p-3 rounded-xl text-[11px] text-gray-400 font-mono space-y-1">
-          <p className="text-spotify-green font-bold text-[10px] uppercase tracking-wider mb-1">系統偵錯資訊</p>
-          <p>HTTPS 安全連線: {window.location.protocol === 'https:' ? '🟢 是' : '🔴 否 (不支援原生分享)'}</p>
-          <p>原生分享 API: {navigator.share ? '🟢 支援' : '🔴 否'}</p>
-          <p>原生檔案分享: {navigator.canShare && navigator.canShare({ files: [new File([], 'test.png', { type: 'image/png' })] }) ? '🟢 支援' : '🔴 否'}</p>
-          <p>分享圖卡狀態: {shareFile ? '🟢 已就緒' : '⏳ 生成中/失敗'}</p>
-        </div>
+        {/* 僅在開發環境 (npm run dev) 渲染系統偵錯資訊 */}
+        {import.meta.env.DEV && (
+          <div className="bg-white/5 p-3 rounded-xl text-[11px] text-gray-400 font-mono space-y-1">
+            <p className="text-spotify-green font-bold text-[10px] uppercase tracking-wider mb-1">系統偵錯資訊</p>
+            <p>HTTPS 安全連線: {window.location.protocol === 'https:' ? '🟢 是' : '🔴 否 (不支援原生分享)'}</p>
+            <p>原生分享 API: {navigator.share ? '🟢 支援' : '🔴 否'}</p>
+            <p>原生檔案分享: {navigator.canShare && navigator.canShare({ files: [new File([], 'test.png', { type: 'image/png' })] }) ? '🟢 支援' : '🔴 否'}</p>
+            <p>分享圖卡狀態: {shareFile ? '🟢 已就緒' : '⏳ 生成中/失敗'}</p>
+          </div>
+        )}
 
         <a 
           href={selectedAlbum.url} 

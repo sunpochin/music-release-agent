@@ -39,7 +39,7 @@ function App() {
   const [publishResult, setPublishResult] = useState(null)
 
   const navigate = useNavigate()
-  const { albumId } = useParams()
+  const { albumId, trackId } = useParams()
 
   useEffect(() => {
     fetch('/api/albums')
@@ -97,12 +97,8 @@ function App() {
           if (!active) return
           if (Array.isArray(data)) {
             setTracks(data)
-            if (data.length > 0) {
-              setSelectedTrack(data[0]) // 預設選中第一首歌曲
-            }
           } else {
             setTracks([])
-            setSelectedTrack(null)
           }
         })
         .catch(err => {
@@ -122,6 +118,23 @@ function App() {
     }
   }, [selectedAlbum])
 
+  // 根據 URL 中的 trackId 參數同步選取的單曲狀態
+  // 【小朋友解釋法】：
+  // 我們裝了一個「導航監聽器」(useEffect 監聽 trackId 與 tracks)。
+  // 每當網址列的單曲 ID 改變，或是歌單剛好載入完成時，我們就從歌單中找到對應的歌，並把它設定為選中狀態！
+  useEffect(() => {
+    if (trackId && tracks.length > 0) {
+      const matchedTrack = tracks.find(t => t.id === trackId)
+      if (matchedTrack) {
+        setSelectedTrack(matchedTrack)
+      } else {
+        setSelectedTrack(null)
+      }
+    } else if (!trackId) {
+      setSelectedTrack(null)
+    }
+  }, [trackId, tracks])
+
   // 當選取單曲改變時，重設歌詞與分析狀態以防顯示舊單曲的資料
   // 【小朋友解釋法】：
   // 當換歌曲時，為了不讓螢幕上還殘留著上一首歌的歌詞或分析，
@@ -129,6 +142,7 @@ function App() {
   useEffect(() => {
     setLyricsData('')
     setAnalysisData('')
+    setPublishResult(null) // 切換歌曲時一併重設社群發佈狀態
   }, [selectedTrack])
 
   // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
@@ -387,24 +401,40 @@ function App() {
                   tracksLoading={tracksLoading}
                 />
 
-                {/* AI 雙語歌詞與圖卡導出面板 */}
-                <AILyricsPanel 
-                  selectedAlbum={selectedAlbum}
-                  selectedTrack={selectedTrack}
-                  lyricsData={lyricsData}
-                  isLoading={isLoading}
-                  isExporting={isExporting}
-                  isPublishing={isPublishing}
-                  publishResult={publishResult}
-                                    handleFetchLyrics={handleFetchLyrics}
-                  exportShareCard={exportShareCard}
-                  analysisData={analysisData}
-                  analysisLoading={analysisLoading}
-                  handleAnalyzeTrack={handleAnalyzeTrack}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  handlePublishToSocial={handlePublishToSocial}
-                />
+                {/* 當有選中歌曲時，顯示 AI 雙語歌詞與圖卡導出面板；否則顯示導引選擇歌曲的精緻佔位卡 */}
+                {selectedTrack ? (
+                  <AILyricsPanel 
+                    selectedAlbum={selectedAlbum}
+                    selectedTrack={selectedTrack}
+                    lyricsData={lyricsData}
+                    isLoading={isLoading}
+                    isExporting={isExporting}
+                    isPublishing={isPublishing}
+                    publishResult={publishResult}
+                    handleFetchLyrics={handleFetchLyrics}
+                    exportShareCard={exportShareCard}
+                    analysisData={analysisData}
+                    analysisLoading={analysisLoading}
+                    handleAnalyzeTrack={handleAnalyzeTrack}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    handlePublishToSocial={handlePublishToSocial}
+                  />
+                ) : (
+                  <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px] hover:border-white/20 transition-all duration-300">
+                    <div className="w-16 h-16 rounded-full bg-spotify-green/10 flex items-center justify-center mb-6 text-spotify-green animate-pulse">
+                      <Music size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2">探索單曲的 AI 靈魂</h3>
+                    <p className="text-xs text-gray-400 max-w-sm leading-relaxed mb-6">
+                      請從左側曲目清單中點選任何一首歌曲。AI 將即時為您尋找原文歌詞、編寫優雅的雙語翻譯，並提供深度的音樂風格與意境剖析。
+                    </p>
+                    <div className="flex items-center gap-2 text-[11px] text-gray-500 bg-white/5 px-3 py-1.5 rounded-full font-mono">
+                      <Sparkles size={12} className="text-spotify-green" />
+                      <span>Gemini 1.5 Pro AI Engine Active</span>
+                    </div>
+                  </div>
+                )}
 
               </div>
             </div>
