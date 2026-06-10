@@ -61,6 +61,7 @@ async function pathAccessible(targetPath) {
 }
 
 async function buildReadinessReport() {
+  const isDev = process.env.NODE_ENV === 'development';
   const [dashboardBuilt, mockDataAvailable, cacheAvailable, socialReachable] = await Promise.all([
     pathAccessible(dashboardIndexPath),
     pathAccessible(mockDataPath),
@@ -71,7 +72,10 @@ async function buildReadinessReport() {
     socialClient.isHealthy().catch(() => false)
   ]);
 
-  const coreReady = dashboardBuilt && mockDataAvailable;
+  // 【小朋友解釋法】：
+  // 在排練（開發環境）時，我們不需要真的把海報印好裝框（不需 npm run build 產生 index.html），
+  // 所以如果是開發環境（isDev），我們就放寬限制，海報沒印好也算準備就緒，方便我們本地測試！
+  const coreReady = (isDev || dashboardBuilt) && mockDataAvailable;
   const dependencyStatus = socialReachable ? 'reachable' : 'unreachable';
   const status = coreReady ? (socialReachable ? 'ok' : 'degraded') : 'not_ready';
 

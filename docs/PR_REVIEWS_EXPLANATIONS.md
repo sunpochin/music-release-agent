@@ -176,6 +176,31 @@
 ### 🛠️ 修正實作
 請參閱 [App.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/App.jsx)。
 
+---
+
+## 8. 本地開發模式下放寬就緒檢查（Readyz）限制
+
+### 🚨 PR 審查回饋
+在 `/readyz` 的就緒檢查中，系統要求 `dashboard/dist/index.html` 必須存在（`dashboardBuilt`）才回傳 200 OK。然而在本地開發模式下，前端通常是由 Vite 開發伺服器（Port 5173）動態託管，並不需要事先執行 `npm run build`。這項限制會導致開發者在本地執行 Playwright E2E 測試或進行就緒檢查時，因為沒有建置前端而遭遇 503 錯誤或測試逾時。建議在 `process.env.NODE_ENV === 'development'` 時，放寬或跳過 `dashboardBuilt` 的檢查。
+
+### 👶 小朋友解釋法
+> 想像你要舉辦一場派對，主管（就緒檢查 `/readyz`）要求在開門迎客（200 OK）之前，必須確認「宣傳海報已經印好裝框了」（`dashboard/dist/index.html` 存在）。
+> 這在正式營業（生產環境）時是合理的。但在我們自己在家排練（開發環境 `development`）時，我們其實是直接在電腦上畫草稿給自己看，根本不需要先花時間去列印和裝框。
+> 如果主管一直堅持「沒看到裝框的海報就不准開門」，我們就沒辦法在排練時測試流程了。
+> 
+> 所以我們的解決辦法是：跟主管說，如果現在是在「排練時間（開發模式）」，即使海報還沒印出來，也請准許我們開門進行測試。這樣大家在本地開發或跑自動測試時，就不會因為沒先執行打包而一直吃閉門羹（503 錯誤）了！
+
+### 📝 程式碼註解
+```javascript
+// 【小朋友解釋法】：
+// 在排練（開發環境）時，我們不需要真的把海報印好裝框（不需 npm run build 產生 index.html），
+// 所以如果是開發環境（isDev），我們就放寬限制，海報沒印好也算準備就緒，方便我們本地測試！
+```
+
+### 🛠️ 修正實作
+請參閱 [server.js](file:///Users/pac/codes/interview/music-release-agent/server.js)。
+
+
 
 
 
