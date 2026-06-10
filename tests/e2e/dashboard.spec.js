@@ -2,6 +2,43 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Music Release Dashboard E2E Tests', () => {
   test('should load albums, fetch lyrics, and publish to social', async ({ page }) => {
+    // 攔截獲取所有專輯的 API 請求，避免依賴本地 spotify-cache.json 導致 CI 環境失敗
+    // 【小朋友解釋法】：
+    // 在 GitHub 雲端測試中心是沒有這個快取檔案的，所以我們會製造一個「虛擬糖果櫃」(Mock Albums)，
+    // 讓測試小人能順利看到專輯並點擊，測試就不會卡住當機囉！
+    await page.route('**/api/api/albums', async (route) => {
+      // 確保匹配正確的路徑
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'mock-album-1',
+            name: 'Mock Album 1',
+            artistName: 'Mock Artist 1',
+            release_date: '2026-06-01',
+            image: 'https://example.com/cover.png'
+          }
+        ]),
+      });
+    });
+    // 相容並包 /api/albums 的攔截
+    await page.route('**/api/albums', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'mock-album-1',
+            name: 'Mock Album 1',
+            artistName: 'Mock Artist 1',
+            release_date: '2026-06-01',
+            image: 'https://example.com/cover.png'
+          }
+        ]),
+      });
+    });
+
     // 1. 攔截 AI 歌詞 API 請求，返回模擬的雙語歌詞 Markdown 內容
     await page.route('**/api/lyrics', async (route) => {
       await route.fulfill({
