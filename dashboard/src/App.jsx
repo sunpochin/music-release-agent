@@ -122,6 +122,15 @@ function App() {
     }
   }, [selectedAlbum])
 
+  // 當選取單曲改變時，重設歌詞與分析狀態以防顯示舊單曲的資料
+  // 【小朋友解釋法】：
+  // 當換歌曲時，為了不讓螢幕上還殘留著上一首歌的歌詞或分析，
+  // 我們一感應到換歌，就立刻「擦黑板」把舊內容擦乾淨，讓畫面呈現空白等待新內容！
+  useEffect(() => {
+    setLyricsData('')
+    setAnalysisData('')
+  }, [selectedTrack])
+
   // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
   const generateShareFile = useCallback(async () => {
     if (!shareCardRef.current || !selectedAlbum) return
