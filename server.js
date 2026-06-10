@@ -2,15 +2,49 @@ import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs/promises';
+import crypto from 'crypto';
+import pinoHttp from 'pino-http';
 import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js';
 import { translateLyrics } from './src/lyrics-translator.js';
 import { getSpotifyAlbumTracks } from './src/spotify-client.js';
 import { generateTrackAnalysis } from './src/album-reviewer.js';
 import { socialClient } from './src/services/social-client.js';
+import { logger, log, requestStore } from './src/services/logger.js';
 
 dotenv.config();
 
 const app = express();
+
+// 1. 關聯識別碼 (Correlation ID) 與 AsyncLocalStorage 中介軟體
+app.use((req, res, next) => {
+  const requestId = req.headers['x-request-id'] || crypto.randomUUID();
+  req.id = requestId;
+  res.setHeader('x-request-id', requestId);
+  
+  // 在非同步生命週期中執行，後續所有操作皆可共享此 ID
+  requestStore.run({ requestId }, () => {
+    next();
+  });
+});
+
+// 2. 整合 pinoHttp 自動日誌
+app.use(pinoHttp({
+  logger,
+  genReqId: (req) => req.id,
+  serializers: {
+    req: (req) => ({
+      id: req.id,
+      method: req.method,
+      url: req.url,
+      headers: {
+        host: req.headers.host,
+        'user-agent': req.headers['user-agent'],
+        'x-request-id': req.headers['x-request-id']
+      }
+    })
+  }
+}));
+
 app.use(express.json({ limit: '10mb' })); // 解析 JSON body，允許較大的 base64 圖片
 const PORT = process.env.PORT || 3011;
 const dashboardIndexPath = path.join(process.cwd(), 'dashboard/dist/index.html');
@@ -107,7 +141,7 @@ app.get('/api/albums', async (_req, res) => {
     
     res.json(allAlbums);
   } catch (err) {
-    console.error('Failed to read albums cache:', err);
+    log.error('Failed to read albums cache', { error: err.message });
     res.status(500).json({ error: 'Failed to load albums' });
   }
 });
@@ -197,7 +231,7 @@ app.get('/api/albums/:id/tracks', async (req, res) => {
     const tracks = await getSpotifyAlbumTracks(id);
     res.json(tracks);
   } catch (err) {
-    console.error(`Failed to get tracks for album ${id}:`, err);
+    log.error('Failed to get tracks for album', { albumId: id, error: err.message });
     res.status(500).json({ error: 'Failed to load tracks' });
   }
 });
@@ -213,7 +247,7 @@ app.post('/api/tracks/analyze', async (req, res) => {
     const analysis = await generateTrackAnalysis(artistName, trackName, albumName);
     res.json({ text: analysis });
   } catch (err) {
-    console.error(`Failed to analyze track ${trackName}:`, err);
+    log.error('Failed to analyze track', { trackName, error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -235,7 +269,7 @@ app.post('/api/social/publish', async (req, res) => {
     // 回傳 202 Accepted 與 jobId 供前端輪詢狀態
     res.status(202).json(result);
   } catch (err) {
-    console.error('[Server] ❌ 社群發文服務不可達:', err.message);
+    log.error('社群發文服務不可達', { error: err.message });
     res.status(502).json({ error: `社群發文服務不可達: ${err.message}` });
   }
 });
@@ -311,7 +345,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🎵 music-release-agent server running on http://localhost:${PORT}`);
-  console.log(`📍 health: http://localhost:${PORT}/healthz`);
-  console.log(`📍 ready:  http://localhost:${PORT}/readyz`);
+  logger.info(`🎵 music-release-agent server running on http://localhost:${PORT}`);
+  logger.info(`📍 health: http://localhost:${PORT}/healthz`);
+  logger.info(`📍 ready:  http://localhost:${PORT}/readyz`);
 });

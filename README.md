@@ -106,6 +106,16 @@ npx pm2 start ecosystem.config.cjs
 
 *(詳細指令與除錯方式請參考：[🐶 PM2 守護進程指南](./PM2_DAEMON_GUIDE.md))*
 
+### 🐳 Containerized Demo Path (Docker)
+
+如果你想用更現代的雲原生方式啟動，我們也提供了完整的 Docker Compose 支持。這會一次打包並拉起後端 API 與 Nginx 託管的前端 Dashboard：
+
+```bash
+# 確保你位於 music-release-agent 根目錄
+docker-compose up --build
+```
+*註：Dashboard 預設會映射到本機的 port 5173，後端為 3011。*
+
 打開 [http://localhost:5173](http://localhost:5173)：
 
 - 音樂庫瀏覽
