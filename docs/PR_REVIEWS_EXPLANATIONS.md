@@ -154,6 +154,121 @@
 ### 🛠️ 修正實作
 請參閱 [demo-verify-social-handoff.js](file:///Users/pac/codes/interview/music-release-agent/scripts/demo-verify-social-handoff.js)。
 
+---
+
+## 7. 單曲變更時狀態自動清空防護
+
+### 🚨 PR 審查回饋
+當使用者在同一個專輯中切換不同的單曲（`selectedTrack` 改變）時，`lyricsData` 與 `analysisData` 並不會被重設。這會導致 UI 在載入新單曲的 AI 歌詞或賞析之前，仍然顯示上一首單曲的內容，造成嚴重的資料不一致與不良的用戶體驗。建議新增一個 `useEffect` 監聽 `selectedTrack`，並在單曲改變時自動清空歌詞與分析狀態。
+
+### 👶 小朋友解釋法
+> 想像你（瀏覽器）是一個多功能電視螢幕。當小明（使用者）從「歌曲 A」換到「歌曲 B」時，在新的「歌曲 B」的歌詞和分析還沒載入好之前，電視螢幕上如果還停留在「歌曲 A」的歌詞和分析畫面，就會讓人非常困惑（看著 B 歌的標題，底下卻播 A 歌的歌詞）。
+> 
+> 所以我們的解決辦法是：在電視機裝上一個「自動清空感應器」(`useEffect` 監聽 `selectedTrack`)。一旦小明按鈕換歌（`selectedTrack` 改變了），我們就立刻命令螢幕「先把黑板擦乾淨」(`setLyricsData('')` 和 `setAnalysisData('')`)，呈現一片乾淨的空白或載入狀態，這樣等新歌的歌詞和分析跑完送上來時，就不會跟舊歌的內容打架了！
+
+### 📝 程式碼註解
+```javascript
+// 【小朋友解釋法】：
+// 當換歌曲時，為了不讓螢幕上還殘留著上一首歌的歌詞或分析，
+// 我們一感應到換歌，就立刻「擦黑板」把舊內容擦乾淨，讓畫面呈現空白等待新內容！
+```
+
+### 🛠️ 修正實作
+請參閱 [App.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/App.jsx)。
+
+---
+
+## 8. 本地開發模式下放寬就緒檢查（Readyz）限制
+
+### 🚨 PR 審查回饋
+在 `/readyz` 的就緒檢查中，系統要求 `dashboard/dist/index.html` 必須存在（`dashboardBuilt`）才回傳 200 OK。然而在本地開發模式下，前端通常是由 Vite 開發伺服器（Port 5173）動態託管，並不需要事先執行 `npm run build`。這項限制會導致開發者在本地執行 Playwright E2E 測試或進行就緒檢查時，因為沒有建置前端而遭遇 503 錯誤或測試逾時。建議在 `process.env.NODE_ENV === 'development'` 時，放寬或跳過 `dashboardBuilt` 的檢查。
+
+### 👶 小朋友解釋法
+> 想像你要舉辦一場派對，主管（就緒檢查 `/readyz`）要求在開門迎客（200 OK）之前，必須確認「宣傳海報已經印好裝框了」（`dashboard/dist/index.html` 存在）。
+> 這在正式營業（生產環境）時是合理的。但在我們自己在家排練（開發環境 `development`）時，我們其實是直接在電腦上畫草稿給自己看，根本不需要先花時間去列印和裝框。
+> 如果主管一直堅持「沒看到裝框的海報就不准開門」，我們就沒辦法在排練時測試流程了。
+> 
+> 所以我們的解決辦法是：跟主管說，如果現在是在「排練時間（開發模式）」，即使海報還沒印出來，也請准許我們開門進行測試。這樣大家在本地開發或跑自動測試時，就不會因為沒先執行打包而一直吃閉門羹（503 錯誤）了！
+
+### 📝 程式碼註解
+```javascript
+// 【小朋友解釋法】：
+// 在排練（開發環境）時，我們不需要真的把海報印好裝框（不需 npm run build 產生 index.html），
+// 所以如果是開發環境（isDev），我們就放寬限制，海報沒印好也算準備就緒，方便我們本地測試！
+```
+
+### 🛠️ 修正實作
+請參閱 [server.js](file:///Users/pac/codes/interview/music-release-agent/server.js)。
+
+---
+
+## 9. GitHub Actions 測試環境中的 Node.js 版本升級
+
+### 🚨 PR 審查回饋
+在 GitHub Actions 的 CI 流程中，測試遭遇了 `TypeError: webidl.util.markAsUncloneable is not a function` 的錯誤，導致 `tests/strategies.test.js` 測試套件執行失敗。
+
+這是因為專案內依賴的 `undici`（`^8.3.0`）套件，在新版本中呼叫了 Node.js v21+ 才支援的 `worker_threads.markAsUncloneable` 原生 API。而 CI 中設定的 Node.js 版本為 `20.x`，不包含此功能，因此引發相容性錯誤。建議將 CI 運行的 Node 升級至支援此 API 的 `22.x`（LTS 版本）。
+
+### 👶 小朋友解釋法
+> 想像你要開一輛新買的跑車（`undici` 8.3.0+ 套件），這台跑車需要加一種特殊的進階燃料（`markAsUncloneable` 函數）。
+> 
+> 在你的電腦上，你安裝的是最新型的加油站（Node.js v23），所以跑車開得很順。但是在 GitHub Actions 的測試工廠裡，他們用的是舊款的加油站（Node.js v20），裡面沒有這種新燃料。結果跑車開到一半就發不動，整個測試就壞掉（Failed）了。
+> 
+> 所以我們的解決辦法是：把 GitHub Actions 的加油站升級到最新的穩定版（Node.js v22.x），這樣它就有提供新燃料，跑車就可以順利跑完測試，不會再壞在半路了！
+
+### 🛠️ 修正實作
+請參閱 [.github/workflows/ci.yml](file:///Users/pac/codes/interview/music-release-agent/.github/workflows/ci.yml)。
+
+---
+
+## 10. 萬用字元（Wildcard）路由排除靜態資源防範 MIME 錯誤
+
+### 🚨 PR 審查回饋
+萬用字元（wildcard）路由 `app.get('*')` 會攔截所有未匹配的請求並回傳 `index.html`。如果瀏覽器請求一個不存在的靜態資源（例如已過期或路徑錯誤的 `.js`、`.css` 或圖片檔案），此路由仍會回傳 `index.html` 並帶有 200 OK 狀態。這會導致瀏覽器嘗試將 HTML 解析為 JavaScript/CSS，從而在主控台拋出混淆的 MIME 類型錯誤（例如 `Uncaught SyntaxError: Unexpected token '<'`）。建議限制此萬用路由，僅對不包含副檔名（或僅限 `.html`）的頁面導航請求回傳 `index.html`，而對其他靜態資源請求回傳 404。
+
+### 👶 小朋友解釋法
+> 想像你開了一家大型超市（Vite 前端應用），大門口有一張導覽圖（`index.html`）。有一位「包裹處理員」(`app.get('*')` 萬用字元路由)，只要看到有人來找任何不存在的地方（例如打錯的網址），他一律把大門口導覽圖給對方。
+> 
+> 在尋找普通網頁時這很貼心。但是！如果對方要的是一個「特定的燈泡零件」或「特定的螺絲頭」（例如不存在的 `.js` 或 `.css` 檔案），處理員卻也給了他們一張「紙質導覽圖（HTML）」。
+> 
+> 當電腦收到這張導覽圖（HTML）時，會試圖把它裝進燈座裡當燈泡用（瀏覽器把 HTML 當作 JS/CSS 載入），結果就會拋出「格式不對」的紅字錯誤（MIME 類型錯誤）。
+> 
+> 所以我們的解決辦法是：給處理員增加一條規則。只要發現對方要找的是「有特定的規格副檔名」（像是包含 `.` 且不是 `.html` 的請求），就直接跟對方說「沒有這件貨」(404 Not Found)；只有當對方是要找一般的網頁路徑時，才把導覽圖給他，這樣電腦就不會拿錯零件而報錯了！
+
+### 📝 程式碼註解
+```javascript
+// 【小朋友解釋法】：
+// 當別人來找零件（.js 或 .css 靜態檔案）時如果找不到，不要硬給他「導覽圖」(index.html)，否則瀏覽器會裝不進去而報錯。
+// 我們檢查只要路徑裡有「.」而且不是「.html」，就直接說沒貨 (404)，只有網頁導航才給導覽圖！
+```
+
+### 🛠️ 修正實作
+請參閱 [server.js](file:///Users/pac/codes/interview/music-release-agent/server.js)。
+
+---
+
+## 11. E2E 測試中對專輯列表（/api/albums）API 的模擬（Mocking）
+
+### 🚨 PR 審查回饋
+在 GitHub Actions 測試環境中，Playwright E2E 測試因為找不到 `aside button` (第一個專輯按鈕) 或等待引導文字時逾時而宣告失敗。
+
+這是因為 E2E 測試在 CI 環境中執行時，後端 `/api/albums` 路由需要讀取 `data/spotify-cache.json` 快取檔案，然而該檔案已在 `.gitignore` 中被排除，導致 GitHub Actions 上的實體檔案不存在、API 返回 500 錯誤，進而使頁面無法渲染任何專輯。建議在 E2E 測試腳本中對 `/api/albums` 進行 Mock 攔截，以確保測試不依賴本地快取檔案，從而在 CI 中能百分之百穩定通過。
+
+### 👶 小朋友解釋法
+> 想像你要對一間超市的安全通道（自動測試）進行演練。你的演練步驟有一步是「走到糖果櫃前（選擇第一個專輯卡片）」。
+> 
+> 在你的本地辦公室（本地開發環境），糖果櫃上真的擺滿了糖果（`data/spotify-cache.json` 快取檔案存在），所以演練順利通過。但是在 GitHub 雲端測試中心時，因為那是個全新的空房間，櫃子是空的（快取檔案被 `.gitignore` 排除，所以沒有上傳）。快遞員（API）回傳「沒貨了」的錯誤，演練的小人找不到糖果櫃（`aside button`），於是演練就當場卡住並宣告失敗了！
+> 
+> 所以我們的解決辦法是：在演練的腳本裡，裝上一個「虛擬糖果櫃模擬器」(`page.route('**/api/albums')`)。這樣不論在什麼空房間（即使沒有實體快取檔案），演練一開始就會用模擬的虛擬糖果櫃（Mock Albums）代替，小人就能順利看到專輯並點擊，演練就能順利通過了！
+
+### 🛠️ 修正實作
+請參閱 [dashboard.spec.js](file:///Users/pac/codes/interview/music-release-agent/tests/e2e/dashboard.spec.js)。
+
+
+
+
+
+
 
 
 

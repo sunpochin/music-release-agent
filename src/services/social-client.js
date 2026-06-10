@@ -5,6 +5,8 @@
  * 將發文請求轉發到社群平台（Facebook / X / Threads / Bluesky）。
  */
 
+import { requestStore } from './logger.js';
+
 // 社群發文服務的 URL（預設為本地開發環境）
 const SOCIAL_SERVICE_URL = process.env.SOCIAL_SERVICE_URL || 'http://localhost:3012';
 
@@ -22,9 +24,18 @@ export class SocialClient {
    * @returns {Promise<{jobId: string, status: string}>}
    */
   async publishPost({ imageBase64, caption, platforms = ['threads'] }) {
+    // 自非同步本地儲存空間讀取當前的 Request ID (Correlation ID)
+    const store = requestStore.getStore();
+    const requestId = store?.requestId;
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (requestId) {
+      headers['x-request-id'] = requestId;
+    }
+
     const response = await fetch(`${this.baseUrl}/api/posts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         image: imageBase64 || null,
         caption,
