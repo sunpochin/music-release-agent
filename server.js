@@ -96,8 +96,31 @@ async function buildReadinessReport() {
   };
 }
 
-// 提供 React 前端靜態檔案 (發布後)
-app.use(express.static(path.join(process.cwd(), 'dashboard/dist')));
+import { createProxyMiddleware } from 'http-proxy-middleware';
+
+// 判斷當前環境是否為開發模式
+const isDev = process.env.NODE_ENV === 'development';
+
+// 提供 React 前端資源
+if (isDev) {
+  // 在開發模式下，將前端資源請求反向代理至 Vite 開發伺服器 (Port 5173)
+  // 這樣透過 Cloudflare Tunnel 連結後端時，依然能享受 Vite 的熱更新與動態載入
+  app.use((req, res, next) => {
+    // 排除後端 API、登入及健康檢查路由，其餘皆代理至 Vite
+    const excludes = ['/api', '/login', '/callback', '/healthz', '/readyz'];
+    if (excludes.some(path => req.path.startsWith(path))) {
+      return next();
+    }
+    createProxyMiddleware({
+      target: 'http://localhost:5173',
+      changeOrigin: true,
+      ws: true // 支援 WebSocket 進行 Vite HMR 熱更新
+    })(req, res, next);
+  });
+} else {
+  // 在生產模式下，直接提供編譯後的靜態檔案
+  app.use(express.static(path.join(process.cwd(), 'dashboard/dist')));
+}
 
 app.get('/api', (_req, res) => {
   res.json({
@@ -343,11 +366,20 @@ app.get('/callback/spotify', async (req, res) => {
 });
 
 // 提供 React 前端靜態檔案 (發布後) 的 wildcard 路由以支援 React Router 前端路徑
-app.get('*', (req, res) => {
+app.get('*', (req, res, next) => {
   // 排除 API 請求，如果 API 未匹配則回傳 404
   if (req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'API route not found' });
   }
+
+  if (isDev) {
+    // 開發模式下，交由 Vite 開發伺服器處理單頁應用路由 (SPA Fallback)
+    return createProxyMiddleware({
+      target: 'http://localhost:5173',
+      changeOrigin: true
+    })(req, res, next);
+  }
+
   // 【小朋友解釋法】：
   // 當別人來找零件（.js 或 .css 靜態檔案）時如果找不到，不要硬給他「導覽圖」(index.html)，否則瀏覽器會裝不進去而報錯。
   // 我們檢查只要路徑裡有「.」而且不是「.html」，就直接說沒貨 (404)，只有網頁導航才給導覽圖！
