@@ -11,7 +11,10 @@ module.exports = {
       watch: ['server.js', 'src'],
       exec_mode: 'fork',
       error_file: 'logs/server-err.log',
-      out_file: 'logs/server-out.log'
+      out_file: 'logs/server-out.log',
+      env: {
+        NODE_ENV: 'development'
+      }
     },
     {
       // 前端 Vite Dashboard 介面
@@ -22,7 +25,10 @@ module.exports = {
       exec_mode: 'fork',
       watch: false,
       error_file: '../logs/dashboard-err.log',
-      out_file: '../logs/dashboard-out.log'
+      out_file: '../logs/dashboard-out.log',
+      env: {
+        NODE_ENV: 'development'
+      }
     },
     {
       // 社群貼文自動發布微服務

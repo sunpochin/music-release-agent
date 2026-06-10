@@ -49,6 +49,16 @@ vi.mock('../src/musicbrainz-client.js', () => ({
       url: 'https://musicbrainz.org/release-group/mb-album-1',
       image: ''
     }
+  ]),
+  getMusicBrainzAlbumTracks: vi.fn().mockResolvedValue([
+    {
+      id: 'mb-track-1',
+      name: 'MusicBrainz Song',
+      track_number: 1,
+      duration_ms: 200000,
+      uri: 'musicbrainz:track:mb-track-1',
+      url: 'mb-track-url'
+    }
   ])
 }));
 
@@ -185,6 +195,70 @@ describe('scanRecentNewReleases 基準測試', () => {
       expect(result[0].track_number).toBe(1);
       expect(result[0].duration_ms).toBe(180000);
       expect(result[0].url).toBe('track-url');
+    });
+
+    it('當 Spotify 失敗時，應嘗試自 MusicBrainz 載入曲目', async () => {
+      // 模擬快取中有該專輯
+      fs.readFile.mockImplementation(async (filePath) => {
+        if (filePath.includes('spotify-cache.json')) {
+          return JSON.stringify({
+            followed_artists: {
+              data: [{ id: 'artist-1', name: 'Poncho Sanchez' }]
+            },
+            artist_albums: {
+              'artist-1': {
+                data: [{
+                  id: 'album-failed',
+                  name: 'Conga Caliente',
+                  total_tracks: 2
+                }]
+              }
+            },
+            album_tracks: {}
+          });
+        }
+        return '{}';
+      });
+
+      // 模擬 Spotify 失敗
+      mockFetch.mockImplementation(async (url) => {
+        if (url.includes('albums/album-failed/tracks')) {
+          return {
+            ok: false,
+            status: 429,
+            text: async () => 'Too Many Requests'
+          };
+        }
+        return { ok: true, status: 200, text: async () => '{}' };
+      });
+
+      const result = await getSpotifyAlbumTracks('album-failed');
+      expect(result.length).toBe(1);
+      expect(result[0].name).toBe('MusicBrainz Song');
+      expect(result[0].uri).toContain('musicbrainz:');
+    });
+
+    it('當 Spotify 與 MusicBrainz 皆失敗/無快取時，應回傳 mock 預設曲目', async () => {
+      // 模擬快取中無該專輯
+      fs.readFile.mockImplementation(async (filePath) => {
+        if (filePath.includes('spotify-cache.json')) {
+          return JSON.stringify({
+            followed_artists: null,
+            artist_albums: {}
+          });
+        }
+        return '{}';
+      });
+
+      // 模擬 Spotify 失敗
+      mockFetch.mockImplementation(async (url) => {
+        return { ok: false, status: 500, text: async () => 'Error' };
+      });
+
+      const result = await getSpotifyAlbumTracks('album-unknown');
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('fallback-album-unknown-1');
+      expect(result[0].name).toBe('Demo Track 1 (降級保護)');
     });
   });
 });

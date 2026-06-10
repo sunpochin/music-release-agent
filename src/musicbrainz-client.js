@@ -190,3 +190,61 @@ export async function getMusicBrainzArtistAlbums(mbid, days = 30) {
 
   return newReleases;
 }
+
+/**
+ * 透過藝人與專輯名稱搜尋 MusicBrainz 中的專輯曲目
+ * @param {string} artistName - 藝人名稱
+ * @param {string} albumName - 專輯名稱
+ * @returns {Promise<Array<object>>} 曲目列表
+ */
+export async function getMusicBrainzAlbumTracks(artistName, albumName) {
+  console.log(`[MusicBrainz/Client] 🔍 正在搜尋專輯曲目：「\${albumName}」 (藝人: \${artistName})...`);
+  try {
+    // 搜尋發行版本
+    const searchResults = await musicbrainzRequest('release', {
+      query: `release:"\${albumName}" AND artist:"\${artistName}"`,
+      limit: 5
+    });
+
+    const releases = searchResults.releases || [];
+    if (releases.length === 0) {
+      console.warn(`[MusicBrainz/Client] ⚠️ 找不到專輯 「\${albumName}」 的發行資料。`);
+      return [];
+    }
+
+    // 優先選取名稱完全一致或搜尋相關度最高的發行版本
+    const bestRelease = releases.find(r => r.title.toLowerCase() === albumName.toLowerCase()) || releases[0];
+    console.log(`[MusicBrainz/Client] ✅ 找到最佳匹配發行: \${bestRelease.title} (ID: \${bestRelease.id})`);
+
+    // 取得該發行版本的詳細資料（含錄音軌道）
+    const releaseDetails = await musicbrainzRequest(`release/\${bestRelease.id}`, {
+      inc: 'recordings'
+    });
+
+    const tracks = [];
+    let trackIndex = 1;
+    if (releaseDetails.media) {
+      for (const medium of releaseDetails.media) {
+        if (medium.tracks) {
+          for (const track of medium.tracks) {
+            tracks.push({
+              id: track.id || `mb-\${trackIndex}`,
+              name: track.title,
+              track_number: trackIndex++,
+              duration_ms: track.length || 0,
+              uri: `musicbrainz:track:\${track.id || trackIndex}`,
+              url: `https://musicbrainz.org/recording/\${track.recording?.id || track.id || ''}`
+            });
+          }
+        }
+      }
+    }
+
+    console.log(`[MusicBrainz/Client] 💾 成功載入 \${tracks.length} 首曲目。`);
+    return tracks;
+  } catch (err) {
+    console.error(`[MusicBrainz/Client] ❌ 搜尋 MusicBrainz 專輯曲目出錯:`, err.message || err);
+    return [];
+  }
+}
+

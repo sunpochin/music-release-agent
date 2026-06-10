@@ -1,8 +1,14 @@
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
 const musicRepoDir = path.resolve('.');
 const socialRepoDir = path.resolve('..', 'social-post-service');
+const bundledMockScript = path.join(musicRepoDir, 'tests', 'fixtures', 'mock-social-service.js');
+
+// 優先使用真實的姊妹 repo；不存在時退回內建 mock，讓本 repo 可以獨立驗證 handoff 契約
+const externalSocialServer = path.join(socialRepoDir, 'server.js');
+const useExternalSocialService = fs.existsSync(externalSocialServer);
 const musicPort = 3411;
 const socialPort = 3412;
 const socialUrl = `http://127.0.0.1:${socialPort}`;
@@ -108,16 +114,22 @@ async function main() {
 
   try {
     console.log('== demo:verify:social ==');
+    if (useExternalSocialService) {
+      console.log(`Using external companion repo: ${socialRepoDir}`);
+    } else {
+      console.log('External ../social-post-service not found — falling back to bundled mock');
+      console.log(`(${path.relative(musicRepoDir, bundledMockScript)} implements the same handoff contract)`);
+    }
     console.log('Spawning social-post-service and music-release-agent for handoff verification...\n');
 
     socialServer = spawnServer({
-      cwd: socialRepoDir,
-      script: 'server.js',
+      cwd: useExternalSocialService ? socialRepoDir : musicRepoDir,
+      script: useExternalSocialService ? 'server.js' : bundledMockScript,
       env: {
         PORT: String(socialPort),
         STRATEGY: 'mock'
       },
-      name: 'social-post-service'
+      name: useExternalSocialService ? 'social-post-service' : 'social-post-service(mock)'
     });
 
     await waitForJson(`${socialUrl}/healthz`, {

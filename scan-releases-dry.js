@@ -10,49 +10,20 @@
  */
 import fs from 'fs/promises';
 import path from 'path';
+import { releaseSlug, getMockReview, validateReleases } from './src/dry-run/pipeline-core.js';
 
 // 定義本地模擬 GitBook 的沙箱目錄
-const MOCK_GITBOOK_DIR = path.resolve('data/mock-gitbook');
+// 測試可透過環境變數覆寫輸出與資料路徑，導向暫存目錄
+const MOCK_GITBOOK_DIR = path.resolve(process.env.DRY_RUN_OUTPUT_DIR || 'data/mock-gitbook');
 const MOCK_RELEASES_DIR = path.join(MOCK_GITBOOK_DIR, 'new-releases');
 const MOCK_SUMMARY_PATH = path.join(MOCK_GITBOOK_DIR, 'SUMMARY.md');
-const MOCK_DATA_PATH = path.resolve('data/mock-releases.json');
+const MOCK_DATA_PATH = path.resolve(process.env.DRY_RUN_DATA_PATH || 'data/mock-releases.json');
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// DRY_RUN_FAST=1 時跳過模擬延遲（給測試與 CI 用，輸出內容完全相同）
+const FAST_MODE = process.env.DRY_RUN_FAST === '1';
+const sleep = (ms) => (FAST_MODE ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms)));
 
-// 輔助函式：將字串轉為 URL 友善的 Slug 格式，需與 GitBook 發布器一致
-function generateSlug(text) {
-  return text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w\-\u4e00-\u9fa5]+/g, '')
-    .replace(/\-\-+/g, '-');
-}
-
-// 模擬生成 AI 深度樂評
-function getMockReview(album) {
-  return `![專輯封面](${album.image})
-
-### 音樂靈魂的深度共振：${album.primary_artist}《${album.name}》模擬樂評
-
-這是一篇由離線模擬器生成的樂評。針對 ${album.primary_artist} 的最新作品《${album.name}》進行音樂風格剖析。
-本作品發行類型為 ${album.type === 'single' ? '單曲 (Single)' : '完整專輯 (Album)'}，共包含 ${album.total_tracks} 首曲目。
-流派風格定位為：${album.artist_genres.join(', ') || '綜合拉丁風格'}。
-
-#### 音樂性與風格剖析：模擬導聽
-- **節奏編排**：傳統打擊樂與現代爵士和聲完美交融。
-- **人聲展現**：歌手極富磁性的嗓音在變幻莫測的節奏中展現出高超的控制力。
-
-#### 綜合總結與評分
-情感評分：**9.2 / 10**
-
-**《${album.name}》是一首充滿生命力的傑作。${album.primary_artist} 再次證明了他在該領域無可撼動的藝術地位。這不僅僅是聽覺的享受，更是心靈的洗禮！**
-
-🎧 立即聆聽《${album.name}》：
-[${album.url}](${album.url})
-`;
-}
+// slug 與模擬樂評模板已抽至 src/dry-run/pipeline-core.js（與 demo:verify、golden tests 共用同一份規則）
 
 // 確保沙箱目錄存在
 async function ensureSandboxStructure() {
@@ -119,7 +90,7 @@ async function main() {
     await sleep(1000);
 
     const mockContent = await fs.readFile(MOCK_DATA_PATH, 'utf-8');
-    const releases = JSON.parse(mockContent);
+    const releases = validateReleases(JSON.parse(mockContent));
 
     console.log(`\n🎉 [Spotify/Scanner] 本批次模擬掃描完成！尋獲 \x1b[32m${releases.length}\x1b[0m 個近 30 天內的新發行！\n`);
     await sleep(500);
@@ -133,7 +104,7 @@ async function main() {
     for (let i = 0; i < releases.length; i++) {
       const album = releases[i];
       const title = `${album.primary_artist} - ${album.name}`;
-      const slug = generateSlug(`${album.primary_artist}-${album.name}`) || album.id;
+      const slug = releaseSlug(album);
       
       console.log(`─────────────────────────────────────────────`);
       console.log(`📦 [${i + 1}/${releases.length}] 正在模擬處理: \x1b[33m${title}\x1b[0m`);

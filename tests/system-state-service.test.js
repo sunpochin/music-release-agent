@@ -2,23 +2,41 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SystemStateService } from '../src/services/system-state-service.js';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 
-const TEST_SYS_FILE = path.resolve('data/test-system-state.json');
-const TEST_SCAN_FILE = path.resolve('data/test-scanner-state.json');
+// 使用每次執行唯一的暫存路徑，避免測試殘留檔案造成順序相依（order-dependent）失敗，
+// 也避免污染 repo 的 data/ 目錄
+const uniqueSuffix = `${process.pid}-${Date.now()}`;
+const TEST_SYS_FILE = path.join(os.tmpdir(), `test-system-state-${uniqueSuffix}.json`);
+const TEST_SCAN_FILE = path.join(os.tmpdir(), `test-scanner-state-${uniqueSuffix}.json`);
 
 describe('SystemStateService 單元測試', () => {
   let stateService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     stateService = new SystemStateService(TEST_SYS_FILE, TEST_SCAN_FILE);
+    // 清除舊的測試殘留檔案
+    try {
+      await fs.unlink(TEST_SYS_FILE.replace(/\.json$/, '.test.json'));
+    } catch (e) {}
+    try {
+      await fs.unlink(TEST_SCAN_FILE.replace(/\.json$/, '.test.json'));
+    } catch (e) {}
   });
 
   afterEach(async () => {
+    // 確保清除產生的測試檔案
     try {
       await fs.unlink(TEST_SYS_FILE);
     } catch (e) {}
     try {
       await fs.unlink(TEST_SCAN_FILE);
+    } catch (e) {}
+    try {
+      await fs.unlink(TEST_SYS_FILE.replace(/\.json$/, '.test.json'));
+    } catch (e) {}
+    try {
+      await fs.unlink(TEST_SCAN_FILE.replace(/\.json$/, '.test.json'));
     } catch (e) {}
   });
 

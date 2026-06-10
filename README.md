@@ -16,6 +16,7 @@
 
 快速導覽：
 
+- [系統架構：資料流、服務邊界、交接格式、失敗模式](./docs/architecture.md)
 - [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
 - [Portfolio Case Study](./docs/portfolio_case_study.md)
 - [Portfolio Website Copy](./docs/portfolio_website_case_study.md)
@@ -37,9 +38,10 @@ npm run demo:verify
 
 這條路徑：
 
-- 使用內建 `data/mock-releases.json` 執行離線掃描
-- 驗證 `data/mock-gitbook/` 內的關鍵 Markdown 產物
-- 驗證 `SUMMARY.md` 是否正確串接新發行頁面
+- 先以 schema 驗證 `data/mock-releases.json`（壞資料會在執行管線前就大聲失敗）
+- 使用內建 mock 資料執行離線掃描
+- 驗證 `data/mock-gitbook/` 內的 Markdown 產物「內容完整性」（封面圖、樂評標題、評分、聆聽連結缺一即 fail）
+- 驗證 `SUMMARY.md` 結構正確、且每個發行連結恰好出現一次（偵測重複連結）
 - 不需要 Spotify、Gemini 或 GitHub 憑證
 
 **預期結果：**
@@ -64,7 +66,7 @@ npm run demo:verify
 npm run demo:verify:social
 ```
 
-暫時拉起 `music-release-agent` 與 `social-post-service`，驗證：
+暫時拉起 `music-release-agent` 與 `social-post-service`。**不需要姊妹 repo**：若 `../social-post-service` 不存在，會自動退回內建的 `tests/fixtures/mock-social-service.js`（零依賴、實作同一份 handoff 契約），因此單獨 clone 本 repo 也能完整驗證：
 
 - `music-release-agent` 代理轉發 `POST /api/social/publish`
 - `social-post-service` 回傳 `202 Accepted`
@@ -142,14 +144,14 @@ npm run scan:dry
 
 - `npm run demo:verify`
 - `npm run scan:dry`
+- `npm run demo:verify:social`（無姊妹 repo 時自動使用內建 mock 驗證同一份契約）
 - 本地檢查 GitBook mock 輸出
 
-需要 `social-post-service` 的功能：
+需要真實 `social-post-service` 的功能：
 
 - Dashboard 內「發佈到社群」按鈕
-- 端到端驗證非同步發文流程
 - PM2 啟動的完整雙服務演示
-- `npm run demo:verify:social`
+- 以真實 companion service（而非內建 mock）跑 `npm run demo:verify:social`
 
 可在 `social-post-service` 未啟動時驗證的 failure-mode：
 
@@ -265,7 +267,7 @@ flowchart TD
 
 1. **背景非同步預渲染 (iOS Web Share API)**：iOS (WebKit) 的 `navigator.share` 要求必須在用戶點擊的瞬間**同步呼叫**。任何非同步的 `await` 畫布轉換都會導致 user gesture 失效。Dashboard 在用戶點選歌曲的當下，即於背景非同步將分享卡片渲染為 File 物件，確保用戶按下的瞬間能 100% 同步觸發 iOS 原生分享對話框。
 2. **`canvas.toBlob` 記憶體優化**：捨棄傳統將畫布轉成巨大 Base64 字串再 fetch 轉 Blob 的做法，直接使用原生的 `canvas.toBlob` Promise 包裝，在瀏覽器底層輸出二進位圖片檔，降低了 **33% 的記憶體空間佔用**，防止行動端瀏覽器因 OOM (記憶體溢出) 卡頓或重啟。
-3. **安全的輕量 Markdown 轉譯器**：在將 AI 歌詞（包含 Markdown 語法）渲染至前端時，先對特殊 HTML 字元進行轉義（Escape），杜絕 XSS（跨網站指令碼）腳本注入安全風險，再藉由狀態化逐行解析器輸出符合標準語意的 HTML。
+3. **安全的輕量 Markdown 轉譯器**：在將 AI 歌詞（包含 Markdown 語法）渲染至前端時，先對特殊 HTML 字元進行轉義（Escape），杜絕 XSS（跨網站指令碼）腳本注入安全風險，再藉由狀態化逐行解析器輸出符合標準語意的 HTML。此宣稱有可執行證明：轉譯器抽為純模組 [`dashboard/src/utils/markdown.js`](./dashboard/src/utils/markdown.js)，由 [`tests/markdown-renderer.test.js`](./tests/markdown-renderer.test.js) 以惡意 payload（`<script>`、`<img onerror>`、`<svg onload>`）驗證輸出僅含白名單標籤。
 
 ---
 
@@ -273,8 +275,14 @@ flowchart TD
 
 本專案實施嚴格的防禦性測試，後端核心模組（服務類別、策略模式實作與掃描協調器）之語句覆蓋率均達到 **80% - 100%**。
 
+測試分三類：
+
+- **單元 / 防禦測試**（`tests/*.test.js`）：服務類別、熔斷器、策略降級
+- **Golden 測試**（`tests/golden/`）：dry-run 管線的確定性驗收 — 正常情境（輸出與 golden 檔案逐字比對）、模糊輸入（slug 退化、重音字元、空 genres）、失敗情境（malformed fixture 必須以非零 exit code 大聲失敗）
+- **前端安全測試**（`tests/markdown-renderer.test.js`）：Markdown 轉譯器的 XSS 防護證明 — 惡意輸入（`<script>`、`onerror` 注入必須被轉義）、正常轉譯、模糊輸入
+
 ```bash
-# 執行所有 21 個單元與基準防禦測試
+# 執行所有單元、防禦、golden 與前端安全測試
 npm run test
 
 # 執行測試並產生覆蓋率報告，同時動態更新 Coverage Badge
