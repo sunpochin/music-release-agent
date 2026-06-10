@@ -1,0 +1,13 @@
+{
+  "id": "1AbCdEfGhIjKlMnOpQrStU",
+  "name": "Golden Hour",
+  "release_date": "2026-05-20",
+  "release_date_precision": "day",
+  "total_tracks": 8,
+  "type": "album",
+  "uri": "spotify:album:1AbCdEfGhIjKlMnOpQrStU",
+  "url": "https://open.spotify.com/album/1AbCdEfGhIjKlMnOpQrStU",
+  "image": "https://i.scdn.co/image/golden-hour-cover",
+  "primary_artist": "Test Artist",
+  "artist_genres": ["salsa", "latin-jazz"]
+}

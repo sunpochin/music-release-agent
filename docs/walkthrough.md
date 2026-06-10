@@ -69,5 +69,18 @@ npm run dev
 - **問題**：在 [scan-releases-dry.js](../scan-releases-dry.js) 的 `ensureSandboxStructure` 函式中，產生的 `SUMMARY.md` 目錄大綱包含了指向 `new-releases/README.md` 的連結，然而該函式本身並未建立此檔案，導致模擬沙箱中存在失效連結。
 - **修正**：在模擬初始結構時，補上 `new-releases/README.md` 的預設檔案建立邏輯，與生產發布器 [gitbook-publisher.js](../src/gitbook-publisher.js) 保持行為一致。
 
+## 最新更新：MusicBrainz 降級與 PM2 本地開發優化
+
+### 1. Spotify 專輯曲目下載失敗/降級保護 (MusicBrainz 備用路由 & Mock 最後防線)
+- **問題**：先前若 Spotify API 觸發 24 小時冷卻降級，或查詢未快取的經典舊專輯時，後端 `/api/albums/:id/tracks` 將直接失敗，導致前端曲目清單呈現「無曲目資料」。
+- **修正**：
+  1. 重構 `src/spotify-client.js` 中的 `getSpotifyAlbumTracks`。
+  2. 若 Spotify 呼叫失敗，自動從快取尋找該專輯與藝人名稱，改向 **MusicBrainz API** 進行關聯查詢，下載 Release 曲目列表並快取。
+  3. 若連 MusicBrainz 查詢也失敗，則啟用**最後防線 (Fallback)**，根據專輯原定的曲目數回傳優雅的 Mock 預設曲目，保證前端介面永遠不崩潰。
+
+### 2. PM2 開發環境環境變數對齊 (`NODE_ENV`)
+- **問題**：原本 PM2 啟動服務時，未在 `ecosystem.config.cjs` 中為 `server` 與 `dashboard` 注入 `NODE_ENV: 'development'`，導致後端 Express 預設以生產模式運行並嘗試讀取 `dist/` 目錄的舊靜態檔。當強制開啟開發代理時又會因為連接埠衝突而陷入無限迴圈，造成修改前端 React 程式碼時無法即時熱重載（HMR），必須每次手動 `npm run build`。
+- **修正**：在 `ecosystem.config.cjs` 內明確為這兩個服務加上 `env: { NODE_ENV: 'development' }`。現在修改完程式碼，PM2 將會自動啟用 Vite 開發伺服器代理，所有前端 React 變更都無需再次手動編譯，即時生效。
+
 > [!TIP]
 > 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開曲目清單選擇歌曲，此時網址將會更新為獨立的單曲路由，並展現右側的歌詞翻譯 loading 細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！

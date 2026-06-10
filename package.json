@@ -13,6 +13,7 @@
     "demo:verify:social": "node scripts/demo-verify-social-handoff.js",
     "demo:verify:social:down": "node scripts/demo-verify-social-down.js",
     "test": "vitest run",
+    "test:golden": "vitest run tests/golden",
     "test:coverage": "vitest run --coverage && node generate-badge.js",
     "test:e2e": "playwright test"
   },

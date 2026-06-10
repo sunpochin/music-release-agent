@@ -1,27 +1,10 @@
-# Music Release Agent Dashboard Tasks
-
-- `[x]` 1. 初始化環境與工具
-  - `[x]` 建立 Vite + React 前端專案 (`dashboard`)
-  - `[x]` 建立 `task.md` 追蹤進度
-- `[x]` 2. 後端 API 與 AI 服務擴充
-  - `[x]` 實作 `src/lyrics-translator.js` (Gemini 歌詞翻譯)
-  - `[x]` 更新 `server.js` 新增 `/api/albums` 與 `/api/lyrics` endpoints
-  - `[x]` 配置 Express 靜態路由服務 React Build 檔案
-- `[x]` 3. 前端架構與樣式 (Tailwind CSS)
-  - `[x]` 配置 Tailwind CSS (Glassmorphism, 深色模式, 現代化排版)
-  - `[x]` 實作基礎 Layout (側邊欄與主要內容區塊)
-- `[x]` 4. 核心功能實作
-  - `[x]` 串接 `/api/albums` 並實作專輯/歌曲列表
-  - `[x]` 串接 `/api/lyrics` 並實作 AI 歌詞與翻譯面板
-- `[x]` 5. 社群分享功能
-  - `[x]` 實作 `ShareCard.jsx` 隱藏/預覽元件 (9:16 比例)
-  - `[x]` 整合 `html2canvas` 下載圖片功能
-- `[x]` 6. 整合測試與驗證
-  - `[x]` 執行完整流程測試 (讀取、翻譯、截圖)
-  - `[x]` 撰寫 `walkthrough.md` 總結成果
-
-- `[x]` 7. 優化與升級功能
-  - `[x]` 實作 Web Share API 整合 (行動端喚起原生分享選單，直發 Instagram/TikTok)
-  - `[x]` 優化前後端連接埠職責分離（開發環境改為純 API 模式）
-  - `[x]` 整合 React Router 實作網址與專輯選取狀態雙向綁定，支援 F5 重新整理與 Deep Linking
-
+- `[x]` 建立 `.cursorrules` 通用 AI 規則檔案於 repo 根目錄
+- `[x]` 複製/備份實現計劃與文件至 repo 的 `docs/` 目錄
+- `[x]` 重構前端路由與 App.jsx 元件，支援 `/album/:albumId/song/:trackId` 頁面與選單跳轉
+- `[x]` 重構 MetadataPanel.jsx 元件，串接路由跳轉並只在開發模式下渲染偵錯資訊
+- `[x]` 新增 `/album/:albumId` 模式下的右側引導卡（Placeholder）元件
+- `[x]` 替換預設 Favicon.svg 為自訂的音樂音符設計
+- `[x]` 更新後端與 E2E 測試腳本以驗證新路由，並確保所有測試通過
+- `[x]` 建立/更新 walkthrough.md 紀錄變更
+- `[x]` 實作 MusicBrainz 專輯曲目備用探索路由與 Mock 最後防線
+- `[x]` 修復 PM2 `NODE_ENV: 'development'` 開發模式配置，啟用 Vite HMR 即時熱重載

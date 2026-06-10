@@ -14,6 +14,7 @@ import { PlaybackService } from './services/playback-service.js';
 import { SpotifyDiscoveryStrategy } from './strategies/spotify-strategy.js';
 import { MusicBrainzDiscoveryStrategy } from './strategies/musicbrainz-strategy.js';
 import { ReleaseScanner } from './scanner/release-scanner.js';
+import { getMusicBrainzAlbumTracks } from './musicbrainz-client.js';
 
 // 初始化預設儲存路徑
 const CACHE_FILE = 'data/spotify-cache.json';
@@ -143,8 +144,35 @@ export async function getSpotifyArtistAlbums(artistId, days = 30) {
   return mappedAlbums;
 }
 
+// 輔助函式：從快取中尋找專輯名稱與藝人名稱
+async function findAlbumMetadataFromCache(albumId, cache) {
+  for (const artistId in cache.artist_albums) {
+    const albums = cache.artist_albums[artistId]?.data || [];
+    const album = albums.find(a => a.id === albumId);
+    if (album) {
+      let artistName = '';
+      if (cache.followed_artists && cache.followed_artists.data) {
+        const artist = cache.followed_artists.data.find(a => a.id === artistId);
+        if (artist) artistName = artist.name;
+      }
+      if (!artistName) {
+        const scannerState = await stateService.readScannerState();
+        if (scannerState[artistId]) {
+          artistName = scannerState[artistId].name;
+        }
+      }
+      return {
+        albumName: album.name,
+        artistName: artistName || 'Unknown Artist',
+        totalTracks: album.total_tracks || 1
+      };
+    }
+  }
+  return null;
+}
+
 /**
- * 獲取特定專輯的所有歌曲，具備本地快取機制以防止 429 頻率限制
+ * 獲取特定專輯的所有歌曲，具備本地快取機制以防止 429 頻率限制，並在失敗時降級使用 MusicBrainz
  * @param {string} albumId - Spotify 專輯 ID
  * @returns {Promise<Array<object>>} 曲目清單
  */
@@ -160,24 +188,54 @@ export async function getSpotifyAlbumTracks(albumId) {
     return cache.album_tracks[albumId].data;
   }
 
-  console.log(`[Spotify/Client] 📡 正在透過 Spotify API 獲取專輯 [${albumId}] 的歌曲清單...`);
-  const data = await apiClient.request(`albums/${albumId}/tracks`, 'GET', null, { limit: 50 });
-  const items = data.items || [];
+  try {
+    console.log(`[Spotify/Client] 📡 正在透過 Spotify API 獲取專輯 [${albumId}] 的歌曲清單...`);
+    const data = await apiClient.request(`albums/${albumId}/tracks`, 'GET', null, { limit: 50 });
+    const items = data.items || [];
 
-  const mappedTracks = items.map(item => ({
-    id: item.id,
-    name: item.name,
-    track_number: item.track_number,
-    duration_ms: item.duration_ms,
-    uri: item.uri,
-    url: item.external_urls?.spotify || ''
-  }));
+    const mappedTracks = items.map(item => ({
+      id: item.id,
+      name: item.name,
+      track_number: item.track_number,
+      duration_ms: item.duration_ms,
+      uri: item.uri,
+      url: item.external_urls?.spotify || ''
+    }));
 
-  cache.album_tracks[albumId] = { timestamp: now, data: mappedTracks };
-  await cacheService.write(cache);
+    cache.album_tracks[albumId] = { timestamp: now, data: mappedTracks };
+    await cacheService.write(cache);
 
-  console.log(`[Spotify/Client] ✅ 成功獲取專輯 [${albumId}] 的 ${mappedTracks.length} 首歌曲！`);
-  return mappedTracks;
+    console.log(`[Spotify/Client] ✅ 成功獲取專輯 [${albumId}] 的 ${mappedTracks.length} 首歌曲！`);
+    return mappedTracks;
+  } catch (err) {
+    console.warn(`[Spotify/Client] 🚨 無法透過 Spotify API 獲取專輯 [${albumId}] 的曲目: ${err.message}。嘗試使用 MusicBrainz 降級保護...`);
+
+    // 尋找快取中的專輯與藝人名稱
+    const meta = await findAlbumMetadataFromCache(albumId, cache);
+    if (meta) {
+      const mbTracks = await getMusicBrainzAlbumTracks(meta.artistName, meta.albumName);
+      if (mbTracks && mbTracks.length > 0) {
+        cache.album_tracks[albumId] = { timestamp: now, data: mbTracks };
+        await cacheService.write(cache);
+        console.log(`[Spotify/Client] ✅ 成功透過 MusicBrainz 載入並快取專輯 [${albumId}] 的 ${mbTracks.length} 首歌曲。`);
+        return mbTracks;
+      }
+    }
+
+    // 最後防線：回傳優雅的 mock 預設曲目列表，避免前端崩潰
+    const totalTracksCount = meta?.totalTracks || 1;
+    const fallbackTracks = Array.from({ length: totalTracksCount }, (_, i) => ({
+      id: `fallback-${albumId}-${i + 1}`,
+      name: `Demo Track ${i + 1} (降級保護)`,
+      track_number: i + 1,
+      duration_ms: 180000,
+      uri: `spotify:track:fallback-${albumId}-${i + 1}`,
+      url: ''
+    }));
+
+    console.warn(`[Spotify/Client] ⚠️ MusicBrainz 降級也失敗，啟用最後防線：回傳 ${fallbackTracks.length} 首 Mock 曲目。`);
+    return fallbackTracks;
+  }
 }
 
 // === 協調器掃描相關向下相容導出 ===

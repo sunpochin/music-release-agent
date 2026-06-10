@@ -1,0 +1,23 @@
+[
+  {
+    "id": "ok-release-000000000001",
+    "name": "Valid One",
+    "release_date": "2026-06-01",
+    "total_tracks": 5,
+    "type": "album",
+    "url": "https://open.spotify.com/album/ok",
+    "image": "https://i.scdn.co/image/ok",
+    "primary_artist": "Fine Artist",
+    "artist_genres": []
+  },
+  {
+    "id": "broken-release-00000001",
+    "name": "",
+    "release_date": "someday soon",
+    "total_tracks": "ten",
+    "type": "mixtape",
+    "url": "ftp://not-a-web-link",
+    "image": "https://i.scdn.co/image/broken",
+    "artist_genres": "salsa"
+  }
+]

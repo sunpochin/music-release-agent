@@ -2,8 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CacheService } from '../src/services/cache-service.js';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 
-const TEST_CACHE_FILE = path.resolve('data/test-spotify-cache.json');
+// 使用每次執行唯一的暫存路徑，避免測試殘留檔案造成順序相依（order-dependent）失敗，
+// 也避免污染 repo 的 data/ 目錄
+const TEST_CACHE_FILE = path.join(
+  os.tmpdir(),
+  `test-spotify-cache-${process.pid}-${Date.now()}.json`
+);
 
 describe('CacheService 單元測試', () => {
   let cacheService;
