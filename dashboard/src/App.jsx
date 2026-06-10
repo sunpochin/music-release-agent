@@ -83,9 +83,18 @@ function App() {
   // 當快速切換專輯時，舊的送貨員（舊的異步請求）可能會比較慢把歌單送來，不小心蓋掉最新點的歌單。
   // 我們加一個「有效標記」(active)。每當切換專輯時，就把上一次的標記設成失效 (false)；
   // 這樣就算舊的歌單送到了，我們也會因為它失效而直接丟掉，只留最新點的歌單！
+  // 使用 ref 紀錄上一次選取的專輯 ID，防止相同專輯因路由切換（例如從 /album/1 點選歌曲跳轉至 /album/1/song/2）重複觸發載入歌單
+  const prevAlbumIdRef = useRef(null)
+  
   useEffect(() => {
     let active = true
     if (selectedAlbum) {
+      // 如果選取的專輯 ID 與上一次相同，代表只是單純切換單曲路由，不需重新獲取歌單與清空曲目
+      if (prevAlbumIdRef.current === selectedAlbum.id) {
+        return
+      }
+      prevAlbumIdRef.current = selectedAlbum.id
+      
       setTracks([])
       setSelectedTrack(null)
       setLyricsData('')
@@ -108,6 +117,7 @@ function App() {
           if (active) setTracksLoading(false)
         })
     } else {
+      prevAlbumIdRef.current = null
       setTracks([])
       setSelectedTrack(null)
       setLyricsData('')
@@ -422,17 +432,12 @@ function App() {
                   />
                 ) : (
                   <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px] hover:border-white/20 transition-all duration-300">
-                    <div className="w-16 h-16 rounded-full bg-spotify-green/10 flex items-center justify-center mb-6 text-spotify-green animate-pulse">
+                    <div className="w-16 h-16 rounded-full bg-spotify-green/10 flex items-center justify-center mb-4 text-spotify-green animate-pulse">
                       <Music size={32} />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2">探索單曲的 AI 靈魂</h3>
-                    <p className="text-xs text-gray-400 max-w-sm leading-relaxed mb-6">
-                      請從左側曲目清單中點選任何一首歌曲。AI 將即時為您尋找原文歌詞、編寫優雅的雙語翻譯，並提供深度的音樂風格與意境剖析。
+                    <p className="text-xs text-gray-400 max-w-sm leading-relaxed">
+                      請從左側曲目清單中選擇一首歌曲以開始 AI 雙語歌詞與音樂賞析
                     </p>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-500 bg-white/5 px-3 py-1.5 rounded-full font-mono">
-                      <Sparkles size={12} className="text-spotify-green" />
-                      <span>Gemini 1.5 Pro AI Engine Active</span>
-                    </div>
                   </div>
                 )}
 

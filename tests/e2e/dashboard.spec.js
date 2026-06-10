@@ -119,8 +119,8 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // 6. 驗證 URL 是否更新為帶有 /album/ 的路徑
     await expect(page).toHaveURL(/\/album\//);
 
-    // 7. 驗證專輯明細面板已載入，且右側顯示「探索單曲的 AI 靈魂」引導卡
-    await expect(page.locator('text=探索單曲的 AI 靈魂')).toBeVisible();
+    // 7. 驗證專輯明細面板已載入，且右側顯示引導選擇單曲的佔位文字
+    await expect(page.locator('text=請從左側曲目清單中選擇一首歌曲以開始 AI 雙語歌詞與音樂賞析')).toBeVisible();
 
     // 8. 點擊曲目清單的第一首歌曲以跳轉至單曲專屬路由
     const firstTrackBtn = page.locator('button:has-text("Test Track 1")');
