@@ -2,20 +2,33 @@ import React from 'react'
 import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle } from 'lucide-react'
 
 // 輔助函式：將 Markdown 語法安全且語意化地轉譯為具有 Tailwind 樣式的 HTML
+// 【小朋友解釋法】：
+// 想像 AI 給我們的內容是一張可能有藏有壞人（惡意腳本）的畫。
+// 如果直接貼到牆上（dangerouslySetInnerHTML），壞人就會跑出來做壞事（XSS 攻擊）。
+// 所以我們需要一個安檢門（escapeHtml），把 `<` 和 `>` 這些可能變成壞人的符號，
+// 通通貼上安全膠帶（轉譯為 &lt; 和 &gt;），這樣壞人就只能乖乖當字元展示，不能活過來作怪了！
 function parseMarkdownToHtml(markdown) {
   if (!markdown) return '';
+
+  // 轉譯 HTML 字元以防止 XSS 漏洞
+  const escapeHtml = (text) => text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
   const lines = markdown.split('\n');
   return lines.map(line => {
     line = line.trim();
+    const escapedLine = escapeHtml(line);
     
     // 處理副標題 H3 (例如 ### 歌曲意境與背景)
     if (line.startsWith('###')) {
-      return `<h3 class="text-sm font-bold text-spotify-green mt-4 mb-2 flex items-center gap-1">${line.replace('###', '')}</h3>`;
+      return `<h3 class="text-sm font-bold text-spotify-green mt-4 mb-2 flex items-center gap-1">${escapedLine.replace('###', '')}</h3>`;
     }
     
     // 處理主標題 H2
     if (line.startsWith('##')) {
-      return `<h2 class="text-base font-bold text-white mt-6 mb-3">${line.replace('##', '')}</h2>`;
+      return `<h2 class="text-base font-bold text-white mt-6 mb-3">${escapedLine.replace('##', '')}</h2>`;
     }
 
     // 處理水平分隔線 ---
@@ -25,7 +38,7 @@ function parseMarkdownToHtml(markdown) {
 
     // 處理無序清單 -
     if (line.startsWith('-')) {
-      let content = line.substring(1).trim();
+      let content = escapedLine.substring(1).trim();
       // 處理粗體 text
       content = content.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
       return `<div class="flex items-start gap-2 my-1 text-xs text-gray-300"><span class="text-spotify-green">•</span><span>${content}</span></div>`;
@@ -33,15 +46,15 @@ function parseMarkdownToHtml(markdown) {
 
     // 處理純粗體段落 (通常是精選歌詞或金句)
     if (line.startsWith('**') && line.endsWith('**')) {
-      return `<p class="text-sm italic font-medium text-spotify-green/90 bg-spotify-green/5 border-l-2 border-spotify-green py-2 px-3 my-3 rounded-r-lg">${line.replace(/\*\*/g, '')}</p>`;
+      return `<p class="text-sm italic font-medium text-spotify-green/90 bg-spotify-green/5 border-l-2 border-spotify-green py-2 px-3 my-3 rounded-r-lg">${escapedLine.replace(/\*\*/g, '')}</p>`;
     }
 
     // 處理一般段落，支援內建粗體
     if (line) {
-      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+      const formatted = escapedLine.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
       return `<p class="text-xs text-gray-300 leading-relaxed my-2">${formatted}</p>`;
     }
-    return line ? `${line}<br/>` : '<br/>';
+    return '<br/>';
   }).join('\n');
 }
 

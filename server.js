@@ -31,7 +31,10 @@ async function buildReadinessReport() {
     pathAccessible(dashboardIndexPath),
     pathAccessible(mockDataPath),
     pathAccessible(cacheDataPath),
-    socialClient.isHealthy()
+    // 【小朋友解釋法】：
+    // 打電話給特別嘉賓確認健康狀態時，如果電話線斷了（請求報錯），不要讓整個派對取消（Promise.all 崩潰回傳 500）。
+    // 我們加上保險絲 (.catch(() => false))，打不通就當他無法出席 (false) 就好，派對照常開門！
+    socialClient.isHealthy().catch(() => false)
   ]);
 
   const coreReady = dashboardBuilt && mockDataAvailable;

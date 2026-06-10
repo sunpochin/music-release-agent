@@ -28,6 +28,12 @@ function App() {
   const [activeTab, setActiveTab] = useState('lyrics') // 'lyrics' | 'analysis'
   
   const shareCardRef = useRef(null)
+  // 隨時追蹤當前選中的單曲，以防異步請求結束時選取已改變
+  const selectedTrackRef = useRef(selectedTrack)
+  useEffect(() => {
+    selectedTrackRef.current = selectedTrack
+  }, [selectedTrack])
+
   // 社群自動發文狀態
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishResult, setPublishResult] = useState(null)
@@ -73,7 +79,12 @@ function App() {
   }, [selectedAlbum])
 
   // 當選取專輯時，自後端 API 取得專輯歌曲清單 (動態隨選載入)
+  // 【小朋友解釋法】：
+  // 當快速切換專輯時，舊的送貨員（舊的異步請求）可能會比較慢把歌單送來，不小心蓋掉最新點的歌單。
+  // 我們加一個「有效標記」(active)。每當切換專輯時，就把上一次的標記設成失效 (false)；
+  // 這樣就算舊的歌單送到了，我們也會因為它失效而直接丟掉，只留最新點的歌單！
   useEffect(() => {
+    let active = true
     if (selectedAlbum) {
       setTracks([])
       setSelectedTrack(null)
@@ -83,6 +94,7 @@ function App() {
       fetch(`/api/albums/${selectedAlbum.id}/tracks`)
         .then(res => res.json())
         .then(data => {
+          if (!active) return
           if (Array.isArray(data)) {
             setTracks(data)
             if (data.length > 0) {
@@ -93,13 +105,20 @@ function App() {
             setSelectedTrack(null)
           }
         })
-        .catch(err => console.error("Failed to fetch album tracks", err))
-        .finally(() => setTracksLoading(false))
+        .catch(err => {
+          if (active) console.error("Failed to fetch album tracks", err)
+        })
+        .finally(() => {
+          if (active) setTracksLoading(false)
+        })
     } else {
       setTracks([])
       setSelectedTrack(null)
       setLyricsData('')
       setAnalysisData('')
+    }
+    return () => {
+      active = false
     }
   }, [selectedAlbum])
 
@@ -147,8 +166,14 @@ function App() {
   }
 
 // 手動觸發 AI 歌詞搜尋與翻譯 (綁定選中的單曲)
+  // 【小朋友解釋法】：
+  // 當我們去搜尋並翻譯歌詞時，如果翻譯期間使用者換了歌，
+  // 歌詞送來後就會不小心蓋掉新歌的歌詞！
+  // 所以我們在開始時用小紙條記下歌曲編號 (trackIdAtStart)，
+  // 翻譯送達後比對「監視器」(selectedTrackRef) 是否還是同一首，一樣才更新畫面！
   const handleFetchLyrics = async () => {
     if (!selectedAlbum || !selectedTrack) return
+    const trackIdAtStart = selectedTrack.id
     setIsLoading(true)
     setLyricsData('')
     
@@ -162,21 +187,33 @@ function App() {
         })
       })
       const result = await res.json()
-      if (result.text) {
-        setLyricsData(result.text)
-      } else {
-        setLyricsData("無法取得歌詞翻譯。")
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        if (result.text) {
+          setLyricsData(result.text)
+        } else {
+          setLyricsData("無法取得歌詞翻譯。")
+        }
       }
     } catch (err) {
-      setLyricsData("翻譯過程發生錯誤。")
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setLyricsData("翻譯過程發生錯誤。")
+      }
     } finally {
-      setIsLoading(false)
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setIsLoading(false)
+      }
     }
   }
 
   // 手動觸發單曲 AI 賞析與分析
+  // 【小朋友解釋法】：
+  // 當我們叫倉庫（API）去寫某一首歌的分析時，如果寫報告期間使用者換了歌，
+  // 報告送來後就會不小心蓋掉新歌的分析內容！
+  // 所以我們要在開始時拿小紙條記下開始時的歌曲編號 (trackIdAtStart)，
+  // 報告送達後看一下「監視器」(selectedTrackRef) 當前顯示的歌是不是同一首，一模一樣才更新畫面！
   const handleAnalyzeTrack = async () => {
     if (!selectedAlbum || !selectedTrack) return
+    const trackIdAtStart = selectedTrack.id
     setAnalysisLoading(true)
     setAnalysisData('')
     
@@ -191,15 +228,21 @@ function App() {
         })
       })
       const result = await res.json()
-      if (result.text) {
-        setAnalysisData(result.text)
-      } else {
-        setAnalysisData("無法取得歌曲分析。")
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        if (result.text) {
+          setAnalysisData(result.text)
+        } else {
+          setAnalysisData("無法取得歌曲分析。")
+        }
       }
     } catch (err) {
-      setAnalysisData("分析過程發生錯誤。")
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setAnalysisData("分析過程發生錯誤。")
+      }
     } finally {
-      setAnalysisLoading(false)
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setAnalysisLoading(false)
+      }
     }
   }
 
