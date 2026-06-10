@@ -11,3 +11,7 @@ data/spotify-cache.json
 data/mock-gitbook/
 .npm-cache/
 coverage/
+
+# Playwright
+playwright-report/
+test-results/

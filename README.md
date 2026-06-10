@@ -4,6 +4,8 @@
 [![PM2 Process Guard](https://img.shields.io/badge/PM2-process%20guard-blueviolet)](./PM2_DAEMON_GUIDE.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![Music Release Agent Hero](./docs/assets/music-release-agent-hero.png)
+
 `music-release-agent` 是一個自動化音樂內容系統：追蹤新發行、生成 AI 樂評、輸出 GitBook 內容，並透過 companion service 處理非同步社群發文。
 
 這個 repo 的重點不是單一 UI 或單一 API，而是三件事一起成立：
@@ -15,6 +17,11 @@
 快速導覽：
 
 - [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
+- [Portfolio Case Study](./docs/portfolio_case_study.md)
+- [Portfolio Website Copy](./docs/portfolio_website_case_study.md)
+- [Release Showcase](./docs/release_showcase.md)
+- [Hero Image Brief](./docs/hero_image_brief.md)
+- [Hero Image Spec](./docs/hero_image_spec.md)
 - [Readiness And Observability Guide](./docs/readiness_and_observability.md)
 
 ---
@@ -99,6 +106,16 @@ npx pm2 start ecosystem.config.cjs
 
 *(詳細指令與除錯方式請參考：[🐶 PM2 守護進程指南](./PM2_DAEMON_GUIDE.md))*
 
+### 🐳 Containerized Demo Path (Docker)
+
+如果你想用更現代的雲原生方式啟動，我們也提供了完整的 Docker Compose 支持。這會一次打包並拉起後端 API 與 Nginx 託管的前端 Dashboard：
+
+```bash
+# 確保你位於 music-release-agent 根目錄
+docker-compose up --build
+```
+*註：Dashboard 預設會映射到本機的 port 5173，後端為 3011。*
+
 打開 [http://localhost:5173](http://localhost:5173)：
 
 - 音樂庫瀏覽
@@ -161,6 +178,25 @@ npm run scan:dry
   - 核心服務 ready，但 `social-post-service` 不可達
 - `status: not_ready`
   - 連核心靜態資產或必要 mock data 都不完整
+
+## External Showcase Surface
+
+如果你是從 portfolio 或 GitHub 首頁進來，建議順序：
+
+1. [Portfolio Case Study](./docs/portfolio_case_study.md)
+2. [Portfolio Website Copy](./docs/portfolio_website_case_study.md)
+3. [Demo Walkthrough Artifact](./docs/demo_walkthrough_artifact.md)
+4. [Release Showcase](./docs/release_showcase.md)
+5. [Hero Image Brief](./docs/hero_image_brief.md)
+
+目前狀態：
+
+- repo-level evaluator proof: ready
+- runtime readiness story: ready
+- public case-study copy: ready
+- hero image asset: ready
+- hero image brief/spec: ready
+- live deployment URL: still optional, not bundled in this branch
 
 ---
 
