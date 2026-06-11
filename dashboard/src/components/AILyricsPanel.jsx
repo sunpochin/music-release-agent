@@ -159,14 +159,15 @@ const AILyricsPanel = ({
               <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
             </div>
           ) : (
-            // 歌詞會在選歌時自動載入；這個狀態只在自動載入未觸發/被中斷時出現
+            // 歌詞會在選歌後自動載入（含 400ms debounce）；此狀態僅短暫過場或載入被中斷時出現
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
-              <Sparkles size={32} className="text-gray-500 opacity-40" />
+              <Sparkles size={32} className="text-spotify-green/40 animate-pulse" />
+              <p className="text-xs text-gray-500">正在準備 AI 雙語歌詞…</p>
               <button
                 onClick={handleFetchLyrics}
                 className="text-xs text-gray-400 hover:text-spotify-green transition-colors underline underline-offset-4"
               >
-                重新載入歌詞
+                沒有自動載入？點此重新載入
               </button>
             </div>
           )

@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import pinoHttp from 'pino-http';
 import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js';
-import { translateLyrics } from './src/lyrics-translator.js';
+import { getLyricsWithCache } from './src/services/lyrics-service.js';
 import { getSpotifyAlbumTracks } from './src/spotify-client.js';
 import { generateTrackAnalysis } from './src/album-reviewer.js';
 import { socialClient } from './src/services/social-client.js';
@@ -274,15 +274,21 @@ app.get('/api/review', async (req, res) => {
 });
 
 // 翻譯歌詞 API
+// 歌詞翻譯（快取優先）：cache hit 零 token；miss 才呼叫 LYRICS_PROVIDER（gemini|ollama）
+// 失效策略見 docs/lyrics_cache_design.md — 不可變內容無 TTL，promptVersion 改版自然 miss
 app.post('/api/lyrics', async (req, res) => {
-  const { artistName, trackName } = req.body;
+  const { artistName, trackName, refresh } = req.body;
   if (!artistName || !trackName) {
     return res.status(400).json({ error: 'Missing artistName or trackName' });
   }
-  
+
   try {
-    const translation = await translateLyrics(artistName, trackName);
-    res.json({ text: translation });
+    const result = await getLyricsWithCache({
+      artistName,
+      trackName,
+      forceRefresh: Boolean(refresh)
+    });
+    res.json(result); // { text, cached, provider }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
