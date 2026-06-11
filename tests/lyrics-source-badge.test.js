@@ -26,11 +26,11 @@ describe('Lyrics source provenance：可信來源（verified）', () => {
 });
 
 describe('Lyrics source provenance：高風險來源必須誠實標示', () => {
-  it('llm-recall 絕不可標為 verified，且用 unverified（紅色）語氣', () => {
+  it('llm-recall 絕不可標為 verified，且用 neutral 語氣', () => {
     const meta = lyricsSourceMeta('llm-recall');
     expect(meta.verified).toBe(false);
-    expect(meta.tone).toBe('unverified');
-    expect(meta.label).toContain('可能不準確');
+    expect(meta.tone).toBe('neutral');
+    expect(meta.label).toContain('無歌詞原文');
   });
 
   it('spotify 轉接器標為 experimental，不偽裝成官方', () => {
@@ -41,10 +41,11 @@ describe('Lyrics source provenance：高風險來源必須誠實標示', () => {
     expect(meta.label).not.toContain('官方');
   });
 
-  it('未翻譯的記憶模式同樣保持 unverified', () => {
+  it('未翻譯的記憶模式同樣保持 neutral', () => {
     expect(lyricsSourceMeta('llm-recall-untranslated').verified).toBe(false);
-    expect(lyricsSourceMeta('llm-recall-untranslated').tone).toBe('unverified');
+    expect(lyricsSourceMeta('llm-recall-untranslated').tone).toBe('neutral');
   });
+
 });
 
 describe('Lyrics source provenance：未知/空來源的保守處理（ambiguous）', () => {
