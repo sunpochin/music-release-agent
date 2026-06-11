@@ -30,10 +30,24 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     setAnalysisData('')
   }, [selectedTrack])
 
-  // 手動觸發 AI 歌詞搜尋與翻譯（綁定選中的單曲）
-  const handleFetchLyrics = async () => {
+  // 🪄 選歌即自動載入歌詞（產品決策）：
+  // 【小朋友解釋法】：歌曲頁的「主菜」就是歌詞 — 客人坐下來就上菜，
+  // 不要再遞菜單要客人「按一下才出餐」。
+  // AI 賞析比較重（像甜點要現做），保留手動觸發，給客人明確的選擇權。
+  // autoFetchedRef 確保同一首歌只自動叫一次菜（StrictMode 雙重 effect 也不會重複）。
+  const autoFetchedRef = useRef(null)
+  useEffect(() => {
     if (!selectedAlbum || !selectedTrack) return
-    const trackIdAtStart = selectedTrack.id
+    if (autoFetchedRef.current === selectedTrack.id) return
+    autoFetchedRef.current = selectedTrack.id
+    fetchLyricsFor(selectedTrack)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAlbum, selectedTrack])
+
+  // AI 歌詞搜尋與翻譯（自動載入與手動重試共用同一條路徑）
+  const fetchLyricsFor = async (track) => {
+    if (!selectedAlbum || !track) return
+    const trackIdAtStart = track.id
     setIsLoading(true)
     setLyricsData('')
 
@@ -43,7 +57,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           artistName: selectedAlbum.artistName || 'Unknown Artist',
-          trackName: selectedTrack.name
+          trackName: track.name
         })
       })
       const result = await res.json()
@@ -60,6 +74,9 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
       }
     }
   }
+
+  // 手動重試入口（自動載入失敗時的「重新載入歌詞」按鈕用）
+  const handleFetchLyrics = () => fetchLyricsFor(selectedTrack)
 
   // 手動觸發單曲 AI 賞析與分析
   const handleAnalyzeTrack = async () => {

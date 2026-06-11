@@ -5,7 +5,7 @@ import html2canvas from 'html2canvas'
 import ShareCard from './components/ShareCard'
 import Sidebar from './components/Sidebar'
 import HeaderBanner from './components/HeaderBanner'
-import MetadataPanel from './components/MetadataPanel'
+import AlbumInfo from './components/AlbumInfo'
 import SongPage from './components/SongPage'
 import { useAlbumTracks } from './hooks/useAlbumTracks'
 import { useTrackAi } from './hooks/useTrackAi'
@@ -271,46 +271,59 @@ function App() {
               setSelectedAlbum={() => handleSelectAlbum(null)}
             />
 
-            {/* AI 面板與本地元數據 */}
+            {/* 主內容：mobile first 雙模式版面
+                - 專輯頁（未選歌）：AlbumInfo 置中放大，專心展示專輯
+                - 歌曲頁（已選歌或 URL 帶 trackId）：手機直向堆疊、桌面雙欄 */}
             <div className="flex-1 overflow-y-auto p-4 lg:p-8 lg:pt-4">
-              <div className="max-w-6xl flex flex-col lg:flex-row gap-6">
-                
-                {/* 專輯、曲目列表與系統診斷資訊面板 */}
-                <MetadataPanel 
+              {(trackId || selectedTrack) ? (
+                <div className="max-w-6xl flex flex-col lg:flex-row gap-6">
+                  <AlbumInfo
+                    variant="compact"
+                    selectedAlbum={selectedAlbum}
+                    albumReview={albumReview}
+                    tracks={tracks}
+                    selectedTrack={selectedTrack}
+                    tracksLoading={tracksLoading}
+                    tracksError={tracksError}
+                    retryTracks={retryTracks}
+                  />
+
+                  {/* 單曲頁容器：三態（loading / error / data）+ 友善 404 的決策都在 SongPage */}
+                  <SongPage
+                    trackId={trackId}
+                    tracks={tracks}
+                    tracksLoading={tracksLoading}
+                    tracksError={tracksError}
+                    retryTracks={retryTracks}
+                    selectedAlbum={selectedAlbum}
+                    selectedTrack={selectedTrack}
+                    lyricsData={lyricsData}
+                    isLoading={isLoading}
+                    isExporting={isExporting}
+                    isPublishing={isPublishing}
+                    publishResult={publishResult}
+                    handleFetchLyrics={handleFetchLyrics}
+                    exportShareCard={exportShareCard}
+                    analysisData={analysisData}
+                    analysisLoading={analysisLoading}
+                    handleAnalyzeTrack={handleAnalyzeTrack}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    handlePublishToSocial={handlePublishToSocial}
+                  />
+                </div>
+              ) : (
+                <AlbumInfo
+                  variant="full"
                   selectedAlbum={selectedAlbum}
                   albumReview={albumReview}
-                  shareFile={shareFile}
                   tracks={tracks}
                   selectedTrack={selectedTrack}
-                  setSelectedTrack={setSelectedTrack}
-                  tracksLoading={tracksLoading}
-                />
-
-                {/* 單曲頁容器：三態（loading / error / data）+ 友善 404 的決策都在 SongPage */}
-                <SongPage
-                  trackId={trackId}
-                  tracks={tracks}
                   tracksLoading={tracksLoading}
                   tracksError={tracksError}
                   retryTracks={retryTracks}
-                  selectedAlbum={selectedAlbum}
-                  selectedTrack={selectedTrack}
-                  lyricsData={lyricsData}
-                  isLoading={isLoading}
-                  isExporting={isExporting}
-                  isPublishing={isPublishing}
-                  publishResult={publishResult}
-                  handleFetchLyrics={handleFetchLyrics}
-                  exportShareCard={exportShareCard}
-                  analysisData={analysisData}
-                  analysisLoading={analysisLoading}
-                  handleAnalyzeTrack={handleAnalyzeTrack}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  handlePublishToSocial={handlePublishToSocial}
                 />
-
-              </div>
+              )}
             </div>
           </>
         ) : (

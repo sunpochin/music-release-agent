@@ -159,20 +159,14 @@ const AILyricsPanel = ({
               <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
             </div>
           ) : (
-            <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">
-              <Sparkles size={48} className="text-gray-500 opacity-40 animate-pulse" />
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-gray-300">尚未產生 AI 歌詞</h3>
-                <p className="text-xs text-gray-500 max-w-md">
-                  您可以點擊下方按鈕，請 AI 尋找這首單曲的原文歌詞，並為其翻譯成優雅的繁體中文。
-                </p>
-              </div>
-              <button 
+            // 歌詞會在選歌時自動載入；這個狀態只在自動載入未觸發/被中斷時出現
+            <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
+              <Sparkles size={32} className="text-gray-500 opacity-40" />
+              <button
                 onClick={handleFetchLyrics}
-                className="bg-spotify-green text-black hover:scale-105 transition-all px-6 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-spotify-green/20"
+                className="text-xs text-gray-400 hover:text-spotify-green transition-colors underline underline-offset-4"
               >
-                <Sparkles size={16} />
-                尋找歌詞與 AI 翻譯
+                重新載入歌詞
               </button>
             </div>
           )
