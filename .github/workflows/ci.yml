@@ -26,6 +26,12 @@ jobs:
     - name: Install dependencies (Backend)
       run: npm ci
 
+    - name: Install dependencies (Dashboard)
+      run: cd dashboard && npm ci
+
+    - name: Build Dashboard
+      run: cd dashboard && npm run build
+
     - name: Run Unit Tests
       run: npm run test
 
@@ -37,12 +43,6 @@ jobs:
 
     - name: Verify Failure Mode (companion service down)
       run: npm run demo:verify:social:down
-
-    - name: Install dependencies (Dashboard)
-      run: cd dashboard && npm ci
-
-    - name: Build Dashboard
-      run: cd dashboard && npm run build
 
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps chromium

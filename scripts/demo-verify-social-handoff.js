@@ -13,7 +13,8 @@ const bundledMockScript = path.join(musicRepoDir, 'tests', 'fixtures', 'mock-soc
 
 // 優先使用真實的姊妹 repo；不存在時退回內建 mock，讓本 repo 可以獨立驗證 handoff 契約
 const externalSocialServer = path.join(socialRepoDir, 'server.js');
-const useExternalSocialService = fs.existsSync(externalSocialServer);
+// 若設定 FORCE_MOCK_SOCIAL 環境變數，則強制使用內建的 mock 服務
+const useExternalSocialService = process.env.FORCE_MOCK_SOCIAL === 'true' ? false : fs.existsSync(externalSocialServer);
 const musicPort = 3411;
 const socialPort = 3412;
 const socialUrl = `http://127.0.0.1:${socialPort}`;
