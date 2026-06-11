@@ -24,15 +24,26 @@ async function main() {
   console.log('   Runs in an isolated browser sandbox. Password is never saved.');
   console.log('==================================================\n');
 
+  console.log('ℹ️ 登入小提示 (Login Tips)：');
+  console.log('- 由於自動化防護限制，使用「Google 帳號登入」可能會被 Google 攔截。');
+  console.log('  如果遇到攔截，請嘗試使用「Spotify 帳號密碼（Email）」進行原生登入。');
+  console.log('- Google may block "Sign in with Google" inside automated browsers.');
+  console.log('  If blocked, please sign in using your native Spotify Email & Password.');
+  console.log('==================================================\n');
+
   console.log('正在啟動安全沙盒瀏覽器視窗...');
 
   let context;
   try {
-    // 啟動獨立持久化 Chrome 實例 (沙盒隔離)
+    // 啟動獨立持久化 Chrome 實例 (沙盒隔離 + 規避自動化標記)
     context = await chromium.launchPersistentContext(userDir, {
       headless: false,
       viewport: { width: 1200, height: 800 },
-      args: ['--no-sandbox']
+      // 使用 disable-blink-features 規避 navigator.webdriver 偵測
+      args: [
+        '--no-sandbox',
+        '--disable-blink-features=AutomationControlled'
+      ]
     });
 
     const page = await context.newPage();
