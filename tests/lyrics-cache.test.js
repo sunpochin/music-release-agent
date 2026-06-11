@@ -1,0 +1,158 @@
+/**
+ * =====================================================================
+ * 🗃️ Lyrics Cache 測試 — 「快取優先、零 token」宣稱的可執行證明
+ * =====================================================================
+ * 三類情境：
+ *   1. 正常：寫入/讀回 roundtrip、cache key 規則、hit 不呼叫 provider
+ *   2. 模糊：中文/符號歌名、壞快取檔視為 miss、promptVersion 改版自然失效
+ *   3. 失敗/安全：路徑跳脫防護、miss 且無金鑰 → 明確錯誤、forceRefresh 跳過快取
+ * 全部離線執行（Gemini/Ollama 都不需要）。
+ * =====================================================================
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import {
+  safeSlug,
+  cacheFileName,
+  parseCacheFile,
+  readCachedLyrics,
+  writeCachedLyrics
+} from '../src/services/lyrics-cache.js';
+import { getLyricsWithCache, translateWithOllama } from '../src/services/lyrics-service.js';
+import { PROMPT_VERSION } from '../src/services/lyrics-prompt.js';
+
+let tmpDir;
+const envBackup = {};
+
+beforeEach(async () => {
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lyrics-cache-'));
+  for (const key of ['LYRICS_CACHE_DIR', 'LYRICS_PROVIDER', 'GEMINI_API_KEY', 'OLLAMA_URL', 'OLLAMA_MODEL']) {
+    envBackup[key] = process.env[key];
+  }
+  process.env.LYRICS_CACHE_DIR = tmpDir;
+});
+
+afterEach(async () => {
+  for (const [key, value] of Object.entries(envBackup)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  vi.unstubAllGlobals();
+  await fs.rm(tmpDir, { recursive: true, force: true });
+});
+
+describe('快取檔案：roundtrip 與 key 規則（正常情境）', () => {
+  it('寫入後讀回，frontmatter 與本文一致', async () => {
+    const fileName = cacheFileName({ artistName: 'Las Migas', trackName: 'Amanecer', provider: 'gemini', promptVersion: 1 });
+    await writeCachedLyrics(tmpDir, fileName, {
+      frontmatter: { artist: 'Las Migas', track: 'Amanecer', provider: 'gemini', promptVersion: 1 },
+      body: '### 歌曲介紹\n美麗的黎明之歌。'
+    });
+
+    const hit = await readCachedLyrics(tmpDir, fileName);
+    expect(hit.frontmatter.artist).toBe('Las Migas');
+    expect(hit.frontmatter.promptVersion).toBe(1);
+    expect(hit.body).toContain('黎明之歌');
+  });
+
+  it('cache key 包含歌手、歌名、provider、promptVersion — 任一變動即不同檔案', () => {
+    const base = { artistName: 'A', trackName: 'B', provider: 'gemini', promptVersion: 1 };
+    const key = cacheFileName(base);
+    expect(key).toBe('a--b.gemini.v1.md');
+    expect(cacheFileName({ ...base, provider: 'ollama' })).not.toBe(key);
+    expect(cacheFileName({ ...base, promptVersion: 2 })).not.toBe(key); // 改版自然失效
+    expect(cacheFileName({ ...base, trackName: 'C' })).not.toBe(key);
+  });
+
+  it('cache hit 時完全不呼叫 provider（無金鑰也能回應 = 零 token 證明）', async () => {
+    delete process.env.GEMINI_API_KEY; // 沒有金鑰：若走到 provider 會 throw
+    process.env.LYRICS_PROVIDER = 'gemini';
+    const fileName = cacheFileName({ artistName: 'Café Tacvba', trackName: 'Eres', provider: 'gemini', promptVersion: PROMPT_VERSION });
+    await writeCachedLyrics(tmpDir, fileName, {
+      frontmatter: { artist: 'Café Tacvba', track: 'Eres', provider: 'gemini', promptVersion: PROMPT_VERSION },
+      body: '快取的翻譯內容'
+    });
+
+    const result = await getLyricsWithCache({ artistName: 'Café Tacvba', trackName: 'Eres' });
+    expect(result.cached).toBe(true);
+    expect(result.text).toBe('快取的翻譯內容');
+  });
+});
+
+describe('快取檔案：模糊輸入（ambiguous scenario）', () => {
+  it('中文與符號歌名 slug 安全且穩定', () => {
+    expect(safeSlug('鄧麗君 / 月亮代表我的心!')).toBe('鄧麗君-月亮代表我的心');
+    expect(safeSlug('!!!')).toBe('untitled');
+  });
+
+  it('歌名含路徑跳脫字元無法逃出快取目錄（安全）', () => {
+    const fileName = cacheFileName({ artistName: '../../etc', trackName: 'passwd/../x', provider: 'gemini', promptVersion: 1 });
+    expect(fileName).not.toContain('/');
+    expect(fileName).not.toContain('..');
+  });
+
+  it('壞掉的快取檔（無 frontmatter / 空本文）視為 miss 而非毒死服務', async () => {
+    await fs.writeFile(path.join(tmpDir, 'broken.md'), 'not a cache file', 'utf-8');
+    expect(await readCachedLyrics(tmpDir, 'broken.md')).toBeNull();
+    expect(parseCacheFile('---\nartist: "A"\n---\n')).toBeNull(); // 空本文
+    expect(await readCachedLyrics(tmpDir, 'does-not-exist.md')).toBeNull();
+  });
+
+  it('frontmatter 值含引號與反斜線可正確 roundtrip', async () => {
+    await writeCachedLyrics(tmpDir, 'quotes.md', {
+      frontmatter: { artist: 'The "Best" Band\\Ever' },
+      body: 'content'
+    });
+    const hit = await readCachedLyrics(tmpDir, 'quotes.md');
+    expect(hit.frontmatter.artist).toBe('The "Best" Band\\Ever');
+  });
+});
+
+describe('快取服務：失敗與 forceRefresh（failure scenario）', () => {
+  it('cache miss 且無 GEMINI 金鑰 → 丟出明確錯誤（不默默回空字串）', async () => {
+    delete process.env.GEMINI_API_KEY;
+    process.env.LYRICS_PROVIDER = 'gemini';
+    await expect(
+      getLyricsWithCache({ artistName: 'No', trackName: 'Cache' })
+    ).rejects.toThrow(/GEMINI_API_KEY/);
+  });
+
+  it('forceRefresh 跳過快取直接重生（證明：有快取但無金鑰 → 仍然 throw）', async () => {
+    delete process.env.GEMINI_API_KEY;
+    process.env.LYRICS_PROVIDER = 'gemini';
+    const fileName = cacheFileName({ artistName: 'X', trackName: 'Y', provider: 'gemini', promptVersion: PROMPT_VERSION });
+    await writeCachedLyrics(tmpDir, fileName, {
+      frontmatter: { artist: 'X', track: 'Y', provider: 'gemini', promptVersion: PROMPT_VERSION },
+      body: '舊的快取'
+    });
+
+    await expect(
+      getLyricsWithCache({ artistName: 'X', trackName: 'Y', forceRefresh: true })
+    ).rejects.toThrow(/GEMINI_API_KEY/);
+  });
+
+  it('Ollama provider：成功回傳並 write-through 快取', async () => {
+    process.env.LYRICS_PROVIDER = 'ollama';
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ response: '### 歌曲介紹\nOllama 翻譯結果' })
+    })));
+
+    const result = await getLyricsWithCache({ artistName: 'Local', trackName: 'Song' });
+    expect(result).toMatchObject({ cached: false, provider: 'ollama' });
+    expect(result.text).toContain('Ollama 翻譯結果');
+
+    // 第二次呼叫吃快取，不再打 Ollama
+    fetch.mockClear();
+    const second = await getLyricsWithCache({ artistName: 'Local', trackName: 'Song' });
+    expect(second.cached).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('Ollama 不可達 → 錯誤訊息指引使用者啟動 Ollama 與 pull 模型', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 })));
+    await expect(translateWithOllama('A', 'B')).rejects.toThrow(/Ollama/);
+  });
+});

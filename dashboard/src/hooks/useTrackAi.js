@@ -35,12 +35,18 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   // 不要再遞菜單要客人「按一下才出餐」。
   // AI 賞析比較重（像甜點要現做），保留手動觸發，給客人明確的選擇權。
   // autoFetchedRef 確保同一首歌只自動叫一次菜（StrictMode 雙重 effect 也不會重複）。
+  // Debounce 400ms：用 j/k 快速逛專輯時，路過的歌不叫菜 —
+  // 停下來的那首才真正呼叫 API（不浪費 token、不製造一串被丟棄的請求）。
   const autoFetchedRef = useRef(null)
   useEffect(() => {
     if (!selectedAlbum || !selectedTrack) return
     if (autoFetchedRef.current === selectedTrack.id) return
-    autoFetchedRef.current = selectedTrack.id
-    fetchLyricsFor(selectedTrack)
+
+    const timer = setTimeout(() => {
+      autoFetchedRef.current = selectedTrack.id
+      fetchLyricsFor(selectedTrack)
+    }, 400)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAlbum, selectedTrack])
 
