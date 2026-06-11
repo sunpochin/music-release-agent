@@ -308,6 +308,9 @@ app.delete('/api/lyrics', async (req, res) => {
 
   try {
     const result = await clearTrackCache({ artistName, trackName });
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

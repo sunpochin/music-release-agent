@@ -56,6 +56,16 @@ async function main() {
     console.log('⏱️ 系統將持續監測登入狀態（超時時間：5分鐘）...\n');
 
     let spDcValue = null;
+    let accessTokenValue = null;
+    
+    // 攔截網路請求以獲取 accessToken (因 Node.js fetch 會被 WAF 阻擋)
+    page.on('request', req => {
+      const auth = req.headers()['authorization'];
+      if (auth && auth.startsWith('Bearer ')) {
+        accessTokenValue = auth.split(' ')[1];
+      }
+    });
+
     const maxAttempts = 150; // 最多等待 300 秒 (150 * 2 秒)
     
     for (let i = 0; i < maxAttempts; i++) {
@@ -63,7 +73,7 @@ async function main() {
       const cookies = await context.cookies();
       const spDcCookie = cookies.find(c => c.name === 'sp_dc');
       
-      if (spDcCookie) {
+      if (spDcCookie && accessTokenValue) {
         spDcValue = spDcCookie.value;
         break;
       }
@@ -88,22 +98,35 @@ async function main() {
         }
       }
 
-      const key = 'SPOTIFY_SP_DC';
-      const newline = `${key}=${spDcValue}`;
+      const keySpDc = 'SPOTIFY_SP_DC';
+      const keyToken = 'SPOTIFY_ACCESS_TOKEN';
+      const newlineSpDc = `${keySpDc}=${spDcValue}`;
+      const newlineToken = `${keyToken}=${accessTokenValue}`;
 
       // 使用正則表達式更新或新增憑證
-      if (envContent.match(new RegExp(`^${key}\\s*=`, 'm'))) {
-        envContent = envContent.replace(new RegExp(`^${key}\\s*=.*$`, 'm'), newline);
+      if (envContent.match(new RegExp(`^${keySpDc}\\s*=`, 'm'))) {
+        envContent = envContent.replace(new RegExp(`^${keySpDc}\\s*=.*$`, 'm'), newlineSpDc);
       } else {
-        envContent = envContent.trim() + `\n\n# Spotify Premium 憑證 (由轉接器自動獲取)\n${newline}\n`;
+        envContent = envContent.trim() + `\n\n# Spotify Premium 憑證 (由轉接器自動獲取)\n${newlineSpDc}\n`;
+      }
+      
+      if (envContent.match(new RegExp(`^${keyToken}\\s*=`, 'm'))) {
+        envContent = envContent.replace(new RegExp(`^${keyToken}\\s*=.*$`, 'm'), newlineToken);
+      } else {
+        envContent = envContent.trim() + `\n${newlineToken}\n`;
       }
 
       fs.writeFileSync(envPath, envContent, 'utf8');
-      console.log('✅ 已成功將憑證寫入至根目錄的 .env.local 檔案中！');
+      console.log('✅ 已成功將憑證與 Access Token 寫入至根目錄的 .env.local 檔案中！');
 
       // 進行歌詞抓取驗證測試
       console.log('\n🔍 正在進行連線驗證測試 (Verifying connection)...');
-      const testTrackId = '4PTG3Z6ehGkBFmzsOhPEui'; // 使用熱門單曲 ID 進行驗證
+      
+      // 更新當前 process 環境變數，讓測試能讀到最新憑證
+      process.env.SPOTIFY_SP_DC = spDcValue;
+      process.env.SPOTIFY_ACCESS_TOKEN = accessTokenValue;
+      
+      const testTrackId = '2lAgFL0Vh2UlcOimU8uaLZ'; // 使用確定有歌詞的單曲 ID 進行驗證
       try {
         const result = await fetchSpotifyLyrics(testTrackId, spDcValue);
         if (result && result.lyrics) {

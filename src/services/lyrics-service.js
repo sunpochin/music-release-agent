@@ -223,7 +223,7 @@ async function persistCache(cacheDir, fileName, { artistName, trackName, provide
         source, // lrclib（真實歌詞）| llm-recall（模型記憶，幻覺風險誠實標示）
         verified,
         containsFullLyrics,
-        promptVersion: PROMPT_VERSION,
+        promptVersion: provider === 'raw' ? 0 : PROMPT_VERSION,
         language: 'zh-Hant',
         createdAt: new Date().toISOString(),
         tags: 'lyrics, ai-translation'

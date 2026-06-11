@@ -106,7 +106,7 @@ const SongPanel = ({
     if (isTranslated) {
       return (
         <button
-          onClick={handleTranslate}
+          onClick={() => handleTranslate(true)}
           className="bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white hover:scale-105 active:scale-95 transition-all px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 shadow-lg"
         >
           <Sparkles size={12} className="text-spotify-green" />
@@ -130,14 +130,9 @@ const SongPanel = ({
   return (
     <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col gap-6">
 
-      {/* ── 歌曲標題與隨選翻譯按鈕 ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-white leading-tight">
-            {selectedTrack?.name || selectedAlbum.name}
-          </h2>
-          <p className="text-sm text-gray-400 mt-0.5">{selectedAlbum.artistName}</p>
-        </div>
+      {/* ── 隨選翻譯按鈕 ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
+
 
         {/* 智慧多態按鈕與進階下拉選單 */}
         <div className="flex items-center gap-2 relative">
@@ -150,6 +145,8 @@ const SongPanel = ({
               setMenuOpen(!menuOpen);
             }}
             aria-label="更多歌詞選項"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
             className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-gray-400 hover:text-white rounded-full transition-all active:scale-95 flex items-center justify-center"
           >
             <MoreHorizontal size={14} />
@@ -239,20 +236,6 @@ const SongPanel = ({
           </div>
         </div>
 
-        {/* 發文結果通知 */}
-        {publishResult && (
-          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium ${
-            publishResult.success
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}>
-            {publishResult.success ? (
-              <><CheckCircle size={14} /> 發文已排程成功！JobId: {publishResult.jobId?.slice(0, 8)}...</>
-            ) : (
-              <><XCircle size={14} /> 發文失敗: {publishResult.error}</>
-            )}
-          </div>
-        )}
 
         {/* 操作按鈕群組（垂直堆疊讓手機也寬敞） */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-2">
@@ -264,17 +247,9 @@ const SongPanel = ({
             className="bg-white text-black hover:bg-spotify-green hover:scale-105 transition-all px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg w-full sm:w-auto"
           >
             {isExporting ? <AlertCircle size={16} className="animate-spin" /> : <Download size={16} />}
-            匯出 IG/TikTok 限動卡
+            匯出 IG 限動卡
           </button>
 
-          <button
-            onClick={handlePublishToSocial}
-            disabled={isPublishing || rawLoading}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-400 hover:to-purple-500 hover:scale-105 transition-all px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg w-full sm:w-auto"
-          >
-            {isPublishing ? <AlertCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            {isPublishing ? '發文中...' : '發佈到社群'}
-          </button>
         </div>
 
         {/* 「返回專輯資訊」按鈕（手機桌機皆顯示，讓使用者從歌曲頁回到 AlbumPanel） */}

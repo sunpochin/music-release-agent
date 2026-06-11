@@ -24,37 +24,43 @@ const ShareCard = forwardRef(({ album, track, lyrics, artistName, introduction }
       </div>
 
       {/* Album Art & Info */}
-      <div className="z-10 flex flex-col items-center mt-6">
+      <div className={`z-10 flex ${track ? 'flex-row gap-4 items-center mt-4' : 'flex-col items-center mt-6'}`}>
         <img 
           src={album.image} 
           alt={album.name} 
           crossOrigin="anonymous"
-          className="w-48 h-48 rounded-xl shadow-2xl mb-6 object-cover border border-white/10"
+          className={track ? "w-20 h-20 rounded-xl shadow-xl object-cover border border-white/10 shrink-0" : "w-48 h-48 rounded-xl shadow-2xl mb-6 object-cover border border-white/10"}
         />
-        <h2 className="text-2xl font-black text-center mb-1 leading-tight">
-          {track ? track.name : album.name}
-        </h2>
-        {track && (
-          <p className="text-xs text-gray-400 mb-1">
-            收錄於《{album.name}》
+        <div className={track ? "flex flex-col text-left flex-1 min-w-0" : "flex flex-col items-center text-center"}>
+          <h2 className={`${track ? 'text-xl' : 'text-2xl'} font-black mb-1 leading-tight truncate w-full`}>
+            {track ? track.name : album.name}
+          </h2>
+          {track && (
+            <p className="text-xs text-gray-400 mb-1 truncate w-full">
+              收錄於《{album.name}》
+            </p>
+          )}
+          <p className={`text-spotify-green font-medium ${track ? 'text-sm' : 'text-lg'} truncate w-full`}>
+            {album.artistName || artistName || '未知藝人'}
           </p>
-        )}
-        <p className="text-spotify-green font-medium text-lg">{album.artistName || artistName || '未知藝人'}</p>
+        </div>
       </div>
 
       {/* Lyrics Snippet */}
-      <div className="z-10 flex-1 flex flex-col justify-center mt-6">
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl relative">
+      <div className="z-10 flex-1 flex flex-col justify-center mt-4">
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl relative h-full flex flex-col justify-center">
           <div className="absolute -top-3 left-4 text-4xl text-spotify-green opacity-50 font-serif">"</div>
-          <div className="text-base font-medium text-gray-200 leading-relaxed max-h-[140px] overflow-hidden text-ellipsis line-clamp-5">
-            {/* 優先顯示歌詞片段，其次顯示本地 AI 樂評介紹，最後才使用預設文案 */}
+          <div className={`font-medium text-gray-200 leading-relaxed overflow-hidden ${track ? 'text-sm max-h-[300px]' : 'text-base line-clamp-5 max-h-[140px]'}`}>
             {lyrics ? (
-              // 移除 Markdown 格式標籤（如 #, *, _, -, `）並整理空白以確保圖卡顯示純文字
-              lyrics.replace(/[#*_\-`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 150) + '...'
+              <div className="whitespace-pre-wrap">
+                {track 
+                  ? lyrics.replace(/[#*_\-`]/g, '').trim().split('\n').filter(l => l.trim().length > 0).slice(0, 12).join('\n') + '\n...'
+                  : lyrics.replace(/[#*_\-`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 150) + '...'}
+              </div>
             ) : introduction ? (
-              introduction
+              <div className="line-clamp-5 whitespace-pre-wrap">{introduction}</div>
             ) : (
-              `這首來自《${album.name}》的動人旋律已正式發行。\n點擊一同感受音符中的溫度與 AI 歌詞深度解析！`
+              <div className="whitespace-pre-wrap">{`這首來自《${album.name}》的動人旋律已正式發行。\n點擊一同感受音符中的溫度與 AI 歌詞深度解析！`}</div>
             )}
           </div>
           <div className="absolute -bottom-6 right-4 text-4xl text-spotify-green opacity-50 font-serif">"</div>

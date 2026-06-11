@@ -21,7 +21,7 @@ export function lyricsSourceMeta(source) {
     case 'lrclib':
       return { label: '來源：LRCLIB 歌詞庫（真實原文）', tone: 'verified', verified: true, show: true };
     case 'spotify':
-      return { label: '來源：Spotify Web 轉接器（實驗性本機）', tone: 'experimental', verified: false, show: true };
+      return { label: '', tone: 'neutral', verified: false, show: false };
     case 'lrclib-instrumental':
       return { label: '演奏曲（無歌詞）', tone: 'neutral', verified: true, show: true };
     case 'llm-recall':
