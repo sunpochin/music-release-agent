@@ -79,8 +79,22 @@ npx vitest run tests/lyrics-cache.test.js tests/lyrics-source.test.js
 promptVersion 改版自然失效、壞檔視為 miss、路徑跳脫防護、
 forceRefresh 跳過快取、Ollama 成功/失敗路徑、LRCLIB 成功/失敗/同步歌詞降級路徑（fetch stub，不需真的打外部服務）。
 
+## Provenance（來源可信度）— 為什麼這比「全自動抓取」更 senior
+
+「能不能做得更全自動？」的正確答案是：**不要**。把 Spotify 歌詞抓取做得越無縫，越像在掩蓋它是繞過未公開 API + 抓取受版權內容的事實。真正的工程成熟度是把邊界劃對：
+
+- **預設路徑全自動且合規**：cache → LRCLIB（免金鑰、開放資料庫）→ 找不到時**不編造完整歌詞**，只給短評 + 明確「找不到可驗證來源」。
+- **Spotify sp_dc 是 opt-in 的 local-only adapter**：用 `SPOTIFY_SP_DC` env 閘門，不在 `demo:verify` 必經路徑；憑證只寫 `.env.local`（已 gitignore）；命名一律「Spotify Web 轉接器（實驗性）」，不稱「官方 API」。
+- **可信度攤在 UI 上**：後端每筆歌詞標 `source`，前端 `LyricsSourceBadge` 把它變成徽章 —
+  `lrclib` 綠色「真實原文」、`spotify` 琥珀色「實驗性」、`llm-recall` **紅色「可能不準確」**。
+  誠實的產品不把「這段是 AI 憑記憶生成的」藏進 frontmatter，而是讓用戶一眼看到。
+
+對映規則是純函式 `dashboard/src/utils/lyricsSource.js`，由 `tests/lyrics-source-badge.test.js` 鎖定（含「未知來源一律保守歸為 unverified」「llm-recall 絕不可標為 verified」），瀏覽器層由 e2e 驗證紅色警示徽章真的在 DOM 出現。
+
+面試講法（誠實版，不炫技）：「我把官方可 demo 路徑和 local-only experimental 路徑切開。預設不依賴任何私人 cookie，先 cache 再 LRCLIB 這類 no-key public source；找不到歌詞時系統不假裝有資料，而是標記 source 並在 UI 紅字警示。Spotify Web Player 的 lyrics adapter 我做成 env opt-in 的本機 helper，用來展示 provider abstraction、credential boundary 與 source provenance —— 但它不是 Spotify 公開 API 的歌詞端點，所以我沒把它放進公開 demo 路徑。」
+
 ## 下一步（依 ROI 排序）
 
-1. 前端顯示「快取 / LRCLIB / 記憶模式」來源徽章 + 「重新翻譯」按鈕（force refresh 的 UI 入口）
-2. 把專輯 AI 賞析（/api/tracks/analyze）接上同一套快取
+1. 把專輯 AI 賞析（/api/tracks/analyze）接上同一套快取與 provenance
+2. force refresh 的 UI 入口（「重新翻譯」按鈕已有，補一個「忽略快取」選項）
 3. 若 demo 需要更高命中率，再評估 Musixmatch/Genius 等需金鑰的來源；目前 LRCLIB 符合 clone 即可跑。

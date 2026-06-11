@@ -4,6 +4,7 @@ import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle, Link2, Che
 // 由根目錄 tests/markdown-renderer.test.js 做 XSS 防護與格式轉譯的確定性單元測試。
 import { parseMarkdownToHtml } from '../utils/markdown.js'
 import WaveformVisualizer from './WaveformVisualizer'
+import LyricsSourceBadge from './LyricsSourceBadge'
 
 // 複製目前頁面連結的小按鈕（桌面端分享體驗；行動端已有原生分享）
 const CopyLinkButton = () => {
@@ -49,6 +50,7 @@ const SongPanel = ({
   selectedAlbum,
   selectedTrack,
   lyricsData,
+  lyricsSource,
   rawLoading,
   isTranslated,
   isTranslating,
@@ -196,6 +198,10 @@ const SongPanel = ({
           </div>
         ) : lyricsData ? (
           <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-2">
+            {/* 歌詞來源徽章：誠實標示可信度（真實來源 / 實驗性 / AI 記憶模式可能不準確） */}
+            <div className="not-prose mb-3">
+              <LyricsSourceBadge source={lyricsSource} />
+            </div>
             <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
             {isTranslating && (
               <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md animate-pulse flex items-center gap-3">

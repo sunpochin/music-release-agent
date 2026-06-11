@@ -35,6 +35,7 @@ function App() {
   // 單曲 AI 歌詞翻譯與賞析（含防舊蓋新與換歌擦黑板）
   const {
     lyricsData,
+    lyricsSource,
     rawLoading,
     isTranslated,
     isTranslating,
@@ -295,6 +296,7 @@ function App() {
                     selectedAlbum={selectedAlbum}
                     selectedTrack={selectedTrack}
                     lyricsData={lyricsData}
+                    lyricsSource={lyricsSource}
                     rawLoading={rawLoading}
                     isTranslated={isTranslated}
                     isTranslating={isTranslating}
