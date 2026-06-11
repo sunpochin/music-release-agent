@@ -280,7 +280,7 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     });
     // 選歌會自動載入歌詞，deep link 測試也要攔截
     await page.route('**/api/lyrics', async (route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: '### 自動載入\n深層連結的歌詞內容' }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: '### 自動載入\n深層連結的歌詞內容', source: 'lrclib', translated: false }) });
     });
   }
 
@@ -297,6 +297,29 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // 不應出現 404 或骨架屏殘留
     await expect(page.getByTestId('track-not-found')).toHaveCount(0);
     await expect(page.getByTestId('song-page-skeleton')).toHaveCount(0);
+
+    // provenance：LRCLIB 來源 → verified 徽章
+    const badge = page.getByTestId('lyrics-source-badge');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveAttribute('data-tone', 'verified');
+  });
+
+  test('provenance: AI-recall lyrics show a loud unverified warning badge', async ({ page }) => {
+    // 誠實標示：當後端標記 source=llm-recall（AI 憑記憶），UI 必須醒目警示，不可偽裝成真實歌詞
+    await mockAlbumApis(page);
+    await page.route('**/api/lyrics', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ text: '### 歌曲介紹\n這是一首小眾歌曲。', source: 'llm-recall', translated: false })
+      });
+    });
+    await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
+
+    const badge = page.getByTestId('lyrics-source-badge');
+    await expect(badge).toBeVisible({ timeout: 15000 });
+    await expect(badge).toHaveAttribute('data-tone', 'unverified');
+    await expect(badge).toContainText('可能不準確');
   });
 
   test('deep link 404: unknown trackId shows friendly fallback with other tracks', async ({ page }) => {

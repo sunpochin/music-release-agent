@@ -17,6 +17,9 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   const [rawLoading, setRawLoading] = useState(false)
   const [isTranslated, setIsTranslated] = useState(false)
   const [isTranslating, setIsTranslating] = useState(false)
+  // 歌詞來源（provenance）：lrclib / spotify / llm-recall / none …
+  // 攤在 UI 上，讓用戶看得到可信度，而不是只躺在 cache frontmatter
+  const [lyricsSource, setLyricsSource] = useState(undefined)
 
   // 隨時追蹤當前選中的單曲，以防異步請求結束時選取已改變
   const selectedTrackRef = useRef(selectedTrack)
@@ -29,6 +32,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     setLyricsData('')
     setIsTranslated(false)
     setIsTranslating(false)
+    setLyricsSource(undefined)
   }, [selectedTrack])
 
   // 🪄 選歌即自動載入歌詞（產品決策）：
@@ -75,6 +79,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
         setLyricsData(result?.text || '無法取得歌詞。')
         setIsTranslated(Boolean(result?.translated))
+        setLyricsSource(result?.source)
       }
     } catch {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
@@ -128,6 +133,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
 
   return {
     lyricsData,
+    lyricsSource,
     rawLoading,
     isTranslated,
     isTranslating,
