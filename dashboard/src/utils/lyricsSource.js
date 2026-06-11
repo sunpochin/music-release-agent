@@ -25,11 +25,12 @@ export function lyricsSourceMeta(source) {
     case 'lrclib-instrumental':
       return { label: '演奏曲（無歌詞）', tone: 'neutral', verified: true, show: true };
     case 'llm-recall':
-      return { label: 'AI 記憶模式：找不到可驗證來源，內容可能不準確', tone: 'unverified', verified: false, show: true };
+      return { label: '來源：AI 背景分析（無歌詞原文）', tone: 'neutral', verified: false, show: true };
     case 'lrclib-untranslated':
       return { label: '來源：LRCLIB 原文（翻譯服務暫時不可用）', tone: 'verified', verified: true, show: true };
     case 'llm-recall-untranslated':
-      return { label: 'AI 記憶模式（未翻譯，內容可能不準確）', tone: 'unverified', verified: false, show: true };
+      return { label: 'AI 背景分析（未翻譯，無歌詞原文）', tone: 'neutral', verified: false, show: true };
+
     case 'none':
     case undefined:
     case null:

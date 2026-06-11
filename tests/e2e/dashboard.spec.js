@@ -304,23 +304,24 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await expect(badge).toHaveAttribute('data-tone', 'verified');
   });
 
-  test('provenance: AI-recall lyrics show a loud unverified warning badge', async ({ page }) => {
-    // 誠實標示：當後端標記 source=llm-recall（AI 憑記憶），UI 必須醒目警示，不可偽裝成真實歌詞
+  test('provenance: AI-recall lyrics show a neutral commentary badge', async ({ page }) => {
+    // 誠實標示：當後端標記 source=llm-recall（無原文歌詞，僅有 AI 背景分析），UI 應呈現 neutral 徽章說明
     await mockAlbumApis(page);
     await page.route('**/api/lyrics', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ text: '### 歌曲介紹\n這是一首小眾歌曲。', source: 'llm-recall', translated: false })
+        body: JSON.stringify({ text: '### 歌詞說明\n⚠️ 找不到本首歌曲的可驗證歌詞來源。', source: 'llm-recall', translated: false })
       });
     });
     await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
 
     const badge = page.getByTestId('lyrics-source-badge');
     await expect(badge).toBeVisible({ timeout: 15000 });
-    await expect(badge).toHaveAttribute('data-tone', 'unverified');
-    await expect(badge).toContainText('可能不準確');
+    await expect(badge).toHaveAttribute('data-tone', 'neutral');
+    await expect(badge).toContainText('無歌詞原文');
   });
+
 
   test('deep link 404: unknown trackId shows friendly fallback with other tracks', async ({ page }) => {
     // 過期/錯誤的分享連結：不能白屏，要推薦同專輯其他曲目
