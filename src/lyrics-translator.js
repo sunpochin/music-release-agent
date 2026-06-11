@@ -5,7 +5,7 @@ import { SYSTEM_INSTRUCTION, buildLyricsPrompt } from './services/lyrics-prompt.
 
 dotenv.config();
 
-export async function translateLyrics(artistName, trackName) {
+export async function translateLyrics(artistName, trackName, sourceLyrics) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('Missing GEMINI_API_KEY in environment variables');
   }
@@ -17,7 +17,7 @@ export async function translateLyrics(artistName, trackName) {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: [{ text: buildLyricsPrompt(artistName, trackName) }],
+      contents: [{ text: buildLyricsPrompt(artistName, trackName, sourceLyrics) }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION
       }

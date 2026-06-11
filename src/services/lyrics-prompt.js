@@ -14,18 +14,14 @@
  * =====================================================================
  */
 
-/** 改 prompt 或換模型時 +1（快取失效的唯一開關） */
-export const PROMPT_VERSION = 1;
+/** 改 prompt 或換模型時 +1（快取失效的唯一開關）
+ *  v2：接上 LRCLIB 真實歌詞來源 — 有原文時 LLM 只翻譯、不再「憑記憶找詞」 */
+export const PROMPT_VERSION = 2;
 
 export const SYSTEM_INSTRUCTION =
   '你是一位精通多國語言且極具文學素養的資深樂評人，擅長將外文歌詞翻譯為優美、感性且富含意境的繁體中文。';
 
-export function buildLyricsPrompt(artistName, trackName) {
-  return `
-請為我尋找並翻譯以下歌曲的歌詞：
-- 歌手：${artistName}
-- 歌名：${trackName}
-
+const OUTPUT_FORMAT = `
 請提供：
 1. 一段簡短的歌曲背景或意境介紹（約 50 字）。
 2. 完整原文歌詞與「繁體中文」翻譯對照。
@@ -43,4 +39,32 @@ export function buildLyricsPrompt(artistName, trackName) {
 
 請確保翻譯感性且通順，符合音樂的意境。
 `;
+
+/**
+ * @param {string} artistName
+ * @param {string} trackName
+ * @param {string} [sourceLyrics] 來自歌詞庫的真實原文。提供時 LLM 只翻譯，
+ *                                嚴禁更改或補寫原文（消滅幻覺）；未提供時
+ *                                退回記憶模式（來源故障的降級路徑）。
+ */
+export function buildLyricsPrompt(artistName, trackName, sourceLyrics) {
+  if (sourceLyrics) {
+    return `
+以下是歌曲的「真實原文歌詞」（來自歌詞資料庫，請以此為唯一依據）：
+- 歌手：${artistName}
+- 歌名：${trackName}
+
+<original_lyrics>
+${sourceLyrics}
+</original_lyrics>
+
+請「只」針對上面提供的原文進行翻譯與賞析 — 嚴禁更改、增補或省略任何一句原文歌詞。
+${OUTPUT_FORMAT}`;
+  }
+
+  return `
+請為我尋找並翻譯以下歌曲的歌詞：
+- 歌手：${artistName}
+- 歌名：${trackName}
+${OUTPUT_FORMAT}`;
 }

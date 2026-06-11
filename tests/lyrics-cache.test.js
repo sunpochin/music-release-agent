@@ -6,7 +6,7 @@
  *   1. 正常：寫入/讀回 roundtrip、cache key 規則、hit 不呼叫 provider
  *   2. 模糊：中文/符號歌名、壞快取檔視為 miss、promptVersion 改版自然失效
  *   3. 失敗/安全：路徑跳脫防護、miss 且無金鑰 → 明確錯誤、forceRefresh 跳過快取
- * 全部離線執行（Gemini/Ollama 都不需要）。
+ * 全部離線執行（Gemini/Ollama/LRCLIB 都不需要）。
  * =====================================================================
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -114,14 +114,31 @@ describe('快取服務：失敗與 forceRefresh（failure scenario）', () => {
   it('cache miss 且無 GEMINI 金鑰 → 丟出明確錯誤（不默默回空字串）', async () => {
     delete process.env.GEMINI_API_KEY;
     process.env.LYRICS_PROVIDER = 'gemini';
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
+
     await expect(
       getLyricsWithCache({ artistName: 'No', trackName: 'Cache' })
     ).rejects.toThrow(/GEMINI_API_KEY/);
   });
 
+  it('若沒有 API 金鑰但 LRCLIB 有原文，應優雅降級顯示原文並快取之', async () => {
+    // 測試若沒有 API 金鑰但 LRCLIB 有原文，應優雅降級顯示原文
+    delete process.env.GEMINI_API_KEY;
+    process.env.LYRICS_PROVIDER = 'gemini';
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ plainLyrics: 'My Raw Lyrics' })
+    })));
+
+    const result = await getLyricsWithCache({ artistName: 'Fallback', trackName: 'Test' });
+    expect(result.source).toBe('lrclib-untranslated');
+    expect(result.text).toContain('My Raw Lyrics');
+  });
+
   it('forceRefresh 跳過快取直接重生（證明：有快取但無金鑰 → 仍然 throw）', async () => {
     delete process.env.GEMINI_API_KEY;
     process.env.LYRICS_PROVIDER = 'gemini';
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
     const fileName = cacheFileName({ artistName: 'X', trackName: 'Y', provider: 'gemini', promptVersion: PROMPT_VERSION });
     await writeCachedLyrics(tmpDir, fileName, {
       frontmatter: { artist: 'X', track: 'Y', provider: 'gemini', promptVersion: PROMPT_VERSION },
@@ -149,6 +166,34 @@ describe('快取服務：失敗與 forceRefresh（failure scenario）', () => {
     const second = await getLyricsWithCache({ artistName: 'Local', trackName: 'Song' });
     expect(second.cached).toBe(true);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('LRCLIB 命中時，Ollama prompt 使用真實原文且快取標記 source=lrclib', async () => {
+    process.env.LYRICS_PROVIDER = 'ollama';
+    const fetchMock = vi.fn(async (url, options) => {
+      if (String(url).includes('/api/get')) {
+        return {
+          ok: true,
+          json: async () => ({ plainLyrics: 'Original line from LRCLIB' })
+        };
+      }
+
+      const body = JSON.parse(options.body);
+      expect(body.prompt).toContain('Original line from LRCLIB');
+      expect(body.prompt).toContain('嚴禁更改、增補或省略');
+      return {
+        ok: true,
+        json: async () => ({ response: '### 歌曲介紹\n真歌詞翻譯結果' })
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getLyricsWithCache({ artistName: 'Real', trackName: 'Song' });
+    expect(result).toMatchObject({ cached: false, provider: 'ollama', source: 'lrclib' });
+
+    const second = await getLyricsWithCache({ artistName: 'Real', trackName: 'Song' });
+    expect(second).toMatchObject({ cached: true, provider: 'ollama', source: 'lrclib' });
+    expect(second.text).toContain('真歌詞翻譯結果');
   });
 
   it('Ollama 不可達 → 錯誤訊息指引使用者啟動 Ollama 與 pull 模型', async () => {
