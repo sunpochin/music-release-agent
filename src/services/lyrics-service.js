@@ -141,9 +141,9 @@ export async function getLyricsWithCache({ artistName, trackName, trackId, force
   // 3. 如果不要求進行翻譯，直接回傳原始歌詞（隨選翻譯產品設計）
   if (!translate) {
     if (!sourced) {
-      // 找不到網路原文歌詞時，回傳引導提示，讓使用者仍可點選 AI 翻譯/召回
+      // 找不到網路原文歌詞時，回傳簡潔引導提示
       return {
-        text: '### 歌詞原文\n\n*(未能在網路資料庫尋獲本歌曲的官方歌詞。您可點擊上方按鈕，嘗試透過 AI 記憶庫召回並翻譯本曲。)*',
+        text: '### 歌詞原文\n\n*(此歌曲目前沒有歌詞記錄。您可以點擊標題旁的「🎵 AI 雙語對照翻譯」按鈕，讓 AI 為您生成歌詞與翻譯。)*',
         cached: false,
         provider: 'raw',
         source: 'none',
