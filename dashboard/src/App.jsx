@@ -278,28 +278,13 @@ function App() {
               }}
             />
 
-            {/* 主內容：mobile-first 獨佔/雙欄動態版面
+            {/* 主內容：mobile-first 全螢幕專注模式
                 - 專輯頁（未選歌）：AlbumPanel 全版顯示
-                - 歌曲頁（已選歌）：手機只顯示 SongPage，桌機顯示 AlbumPanel + SongPage 雙欄
-                  onBackToAlbum 讓 SongPanel 內的「返回專輯資訊」按鈕可以導回專輯頁 */}
+                - 歌曲頁（已選歌）：SongPanel 獨佔全幅，底部「返回專輯資訊」可導回 */}
             <div className="flex-1 overflow-y-auto p-4 lg:p-8 lg:pt-4">
               {(trackId || selectedTrack) ? (
-                <div className="max-w-6xl flex flex-col lg:flex-row gap-6">
-                  {/* 手機上選歌後隱藏 AlbumPanel，讓 SongPage 全版佔滿 */}
-                  <div className="hidden lg:block lg:w-1/3">
-                    <AlbumPanel
-                      variant="compact"
-                      selectedAlbum={selectedAlbum}
-                      albumReview={albumReview}
-                      tracks={tracks}
-                      selectedTrack={selectedTrack}
-                      tracksLoading={tracksLoading}
-                      tracksError={tracksError}
-                      retryTracks={retryTracks}
-                    />
-                  </div>
-
-                  {/* 單曲頁容器：三態（loading / error / data）+ 友善 404 */}
+                <div className="max-w-3xl mx-auto">
+                  {/* 歌曲頁：SongPanel 單欄全幅，不再與 AlbumPanel 並排 */}
                   <SongPage
                     trackId={trackId}
                     tracks={tracks}

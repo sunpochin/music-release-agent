@@ -216,11 +216,11 @@ const SongPanel = ({
           </button>
         </div>
 
-        {/* 手機版「返回專輯資訊」按鈕（桌機隱藏，桌機靠 HeaderBanner） */}
+        {/* 「返回專輯資訊」按鈕（手機桌機皆顯示，讓使用者從歌曲頁回到 AlbumPanel） */}
         {onBackToAlbum && (
           <button
             onClick={onBackToAlbum}
-            className="lg:hidden mt-1 flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors text-sm font-medium py-2 rounded-xl hover:bg-white/5"
+            className="flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors text-sm font-medium py-2 rounded-xl hover:bg-white/5 mt-1"
           >
             <ChevronLeft size={16} />
             返回專輯資訊
