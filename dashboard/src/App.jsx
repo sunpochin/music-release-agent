@@ -160,15 +160,38 @@ function App() {
   const exportShareCard = async () => {
     if (!selectedAlbum) return
 
-    // 如果預先產生的檔案已經在背景準備妥當，則「完全同步」呼叫 Web Share API 繞過 Safari 的 transient user activation 限制
+    const spotifyLink = selectedTrack?.url || `https://open.spotify.com/album/${selectedAlbum.id}`
+    const shareText = `🎵 ${selectedTrack ? selectedTrack.name : selectedAlbum.name} - ${selectedAlbum.artistName || '未知藝人'}
+${spotifyLink}
+
+${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summary || '')}`
+
+    // --- 完全同步的剪貼簿複製 (繞過 iOS 嚴格的非同步安全限制) ---
+    const textArea = document.createElement("textarea")
+    textArea.value = shareText
+    textArea.style.position = "fixed"
+    textArea.style.left = "-9999px"
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      // 提示使用者已成功複製，可以直接貼到 IG Reels
+      setTimeout(() => alert("✅ 包含 Spotify 歌曲連結與翻譯歌詞的文案已為您複製到剪貼簿！\n\n您可以直接貼上到 Instagram Reels！"), 100);
+    } catch (e) {
+      console.warn("execCommand copy failed", e)
+    }
+    document.body.removeChild(textArea)
+
+    // --- 以下為圖卡匯出邏輯 ---
+    // 如果預先產生的檔案已經在背景準備妥當，則「完全同步」呼叫 Web Share API
     if (shareFile) {
       try {
         if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
           await navigator.share({
             files: [shareFile],
             title: `分享《${selectedAlbum.name}》`,
-            // 優先使用本地 AI 樂評之精選總結或介紹作為分享推薦文案
-            text: albumReview?.summary || albumReview?.introduction || `推薦這首好歌！這是來自 ${selectedAlbum.artistName || '未知藝人'} 的作品。`
+            text: shareText
           })
           return // 成功分享直接返回
         }
@@ -195,10 +218,6 @@ function App() {
       link.href = image
       link.download = `share-${selectedAlbum.name || 'card'}.png`
       link.click()
-      
-      if (!navigator.canShare) {
-        alert("圖卡已成功下載！由於您使用的是電腦，請手動將下載的圖片上傳至 Instagram/TikTok 限時動態分享。")
-      }
     } catch (err) {
       console.error("Export failed", err)
       alert("匯出失敗，請稍後再試。")
@@ -270,6 +289,7 @@ function App() {
             {/* Header Banner 頂部專輯資訊橫幅（手機返回鍵：歌曲頁先回專輯頁，再回清單） */}
             <HeaderBanner
               selectedAlbum={selectedAlbum}
+              selectedTrack={selectedTrack}
               backLabel={trackId ? '返回專輯' : '返回列表'}
               onBack={() => {
                 if (trackId) {

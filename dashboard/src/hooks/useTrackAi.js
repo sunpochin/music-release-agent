@@ -96,8 +96,11 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   // 手動重試與重新載入原文
   const handleFetchLyrics = () => fetchLyricsFor(selectedTrack, { translate: false })
 
-  // 隨選翻譯入口
-  const handleTranslate = () => fetchLyricsFor(selectedTrack, { translate: true })
+  // 隨選翻譯入口（可選擇是否強制刷新快取）
+  const handleTranslate = (forceRefresh = false) => {
+    const isRefresh = typeof forceRefresh === 'boolean' ? forceRefresh : false;
+    return fetchLyricsFor(selectedTrack, { translate: true, refresh: isRefresh });
+  }
 
   // 強制重新下載原文入口
   const handleRedownloadRaw = () => fetchLyricsFor(selectedTrack, { translate: false, refresh: true })
@@ -108,7 +111,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     const trackIdAtStart = selectedTrack.id
     setRawLoading(true)
     try {
-      await fetch('/api/lyrics', {
+      const res = await fetch('/api/lyrics', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,6 +119,9 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
           trackName: selectedTrack.name
         })
       })
+      if (!res.ok) {
+        throw new Error('Failed to clear cache on the server')
+      }
       if (selectedTrackRef.current?.id === trackIdAtStart) {
         setLyricsData('')
         setIsTranslated(false)
