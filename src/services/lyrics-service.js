@@ -12,6 +12,7 @@
  */
 import { translateLyrics } from '../lyrics-translator.js';
 import { PROMPT_VERSION, SYSTEM_INSTRUCTION, buildLyricsPrompt } from './lyrics-prompt.js';
+import { fetchLyricsFromSource } from './lyrics-source.js';
 import {
   resolveCacheDir,
   cacheFileName,
@@ -20,7 +21,7 @@ import {
 } from './lyrics-cache.js';
 
 /** Ollama provider：本地模型，零 API 費用（需本機跑 Ollama） */
-export async function translateWithOllama(artistName, trackName) {
+export async function translateWithOllama(artistName, trackName, sourceLyrics) {
   const baseUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
   const model = process.env.OLLAMA_MODEL || 'qwen2.5:7b';
 
@@ -30,7 +31,7 @@ export async function translateWithOllama(artistName, trackName) {
     body: JSON.stringify({
       model,
       system: SYSTEM_INSTRUCTION,
-      prompt: buildLyricsPrompt(artistName, trackName),
+      prompt: buildLyricsPrompt(artistName, trackName, sourceLyrics),
       stream: false
     })
   });
@@ -59,22 +60,59 @@ export async function getLyricsWithCache({ artistName, trackName, forceRefresh =
   if (!forceRefresh) {
     const hit = await readCachedLyrics(cacheDir, fileName);
     if (hit) {
-      return { text: hit.body, cached: true, provider: String(hit.frontmatter.provider || provider) };
+      return {
+        text: hit.body,
+        cached: true,
+        provider: String(hit.frontmatter.provider || provider),
+        source: hit.frontmatter.source ? String(hit.frontmatter.source) : undefined
+      };
     }
   }
 
-  // 2. miss → 請廚師現做
-  const text = provider === 'ollama'
-    ? await translateWithOllama(artistName, trackName)
-    : await translateLyrics(artistName, trackName);
+  // 2. miss → 先去歌詞圖書館（LRCLIB）借真實原文；借不到則降級為 LLM 記憶模式
+  const sourced = await fetchLyricsFromSource(artistName, trackName);
 
-  // 3. write-through：冰一份進冷凍庫（寫入失敗不影響回應，只記 log）
+  if (sourced?.instrumental) {
+    const text = '### 歌曲介紹\n這是一首演奏曲（Instrumental），沒有歌詞，請直接聆聽音樂本身的故事。';
+    await persistCache(cacheDir, fileName, { artistName, trackName, provider, source: 'lrclib-instrumental', text });
+    return { text, cached: false, provider, source: 'lrclib-instrumental' };
+  }
+
+  const source = sourced ? 'lrclib' : 'llm-recall';
+  let text;
+  let finalSource = source;
+
+  try {
+    // 3. 請廚師翻譯（有真實原文時只翻譯，嚴禁改寫）
+    text = provider === 'ollama'
+      ? await translateWithOllama(artistName, trackName, sourced?.lyrics)
+      : await translateLyrics(artistName, trackName, sourced?.lyrics);
+  } catch (err) {
+    // 如果翻譯失敗（金鑰無效、API 限制或 503），但有從 LRCLIB 獲取的原文，則退回顯示原文
+    if (sourced?.lyrics) {
+      console.warn(`[LyricsService] ⚠️ 歌詞翻譯失敗 (${err.message})，退回顯示 LRCLIB 原文`);
+      text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${sourced.lyrics}`;
+      finalSource = 'lrclib-untranslated';
+    } else {
+      // 如果連原文都沒有，則直接拋出錯誤
+      throw err;
+    }
+  }
+
+  // 4. write-through：冰一份進冷凍庫（寫入失敗不影響回應，只記 log）
+  await persistCache(cacheDir, fileName, { artistName, trackName, provider, source: finalSource, text });
+
+  return { text, cached: false, provider, source: finalSource };
+}
+
+async function persistCache(cacheDir, fileName, { artistName, trackName, provider, source, text }) {
   try {
     await writeCachedLyrics(cacheDir, fileName, {
       frontmatter: {
         artist: artistName,
         track: trackName,
         provider,
+        source, // lrclib（真實歌詞）| llm-recall（模型記憶，幻覺風險誠實標示）
         promptVersion: PROMPT_VERSION,
         language: 'zh-Hant',
         createdAt: new Date().toISOString(),
@@ -85,6 +123,4 @@ export async function getLyricsWithCache({ artistName, trackName, forceRefresh =
   } catch (error) {
     console.error('[LyricsService] 快取寫入失敗（不影響本次回應）:', error.message);
   }
-
-  return { text, cached: false, provider };
 }

@@ -288,7 +288,7 @@ app.post('/api/lyrics', async (req, res) => {
       trackName,
       forceRefresh: Boolean(refresh)
     });
-    res.json(result); // { text, cached, provider }
+    res.json(result); // { text, cached, provider, source }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
