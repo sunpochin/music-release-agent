@@ -55,11 +55,6 @@ const SongPanel = ({
   publishResult,
   handleFetchLyrics,
   exportShareCard,
-  analysisData,
-  analysisLoading,
-  handleAnalyzeTrack,
-  activeTab = 'lyrics',
-  setActiveTab,
   handlePublishToSocial,
   onBackToAlbum // 手機版「返回專輯資訊」的回調
 }) => {
@@ -76,91 +71,35 @@ const SongPanel = ({
         <p className="text-sm text-gray-400 mt-0.5">{selectedAlbum.artistName}</p>
 
         {selectedTrack && (
-          <div className="mt-4" title={`${selectedTrack.name} 的專屬音波`}>
+          <div className="hidden" title={`${selectedTrack.name} 的專屬音波`}>
             <WaveformVisualizer seed={selectedTrack.id} />
           </div>
         )}
       </div>
 
-      {/* ── 雙頁籤切換 ── */}
-      <div className="flex gap-2 border-b border-white/5 pb-3">
-        <button
-          onClick={() => setActiveTab('lyrics')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-            activeTab === 'lyrics'
-              ? 'bg-spotify-green/20 text-spotify-green border border-spotify-green/30'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          🎵 AI 雙語歌詞
-        </button>
-        <button
-          onClick={() => setActiveTab('analysis')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-            activeTab === 'analysis'
-              ? 'bg-spotify-green/20 text-spotify-green border border-spotify-green/30'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          🧠 歌曲 AI 賞析
-        </button>
-      </div>
-
-      {/* ── 主內容渲染區域（歌詞最優先） ── */}
+      {/* ── 主內容渲染區域（直接顯示歌詞） ── */}
       <div className="flex-1 flex flex-col min-h-[300px]">
-        {activeTab === 'lyrics' ? (
-          // 頁籤一：AI 雙語歌詞
-          isLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
-              <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
-              <p className="animate-pulse font-medium text-center text-xs">AI 正在取得歌詞與雙語翻譯...</p>
-            </div>
-          ) : lyricsData ? (
-            <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-2">
-              <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
-            </div>
-          ) : (
-            // 歌詞載入完成前的短暫過場
-            <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
-              <Sparkles size={32} className="text-spotify-green/40 animate-pulse" />
-              <p className="text-xs text-gray-500">正在準備 AI 雙語歌詞…</p>
-              <button
-                onClick={handleFetchLyrics}
-                className="text-xs text-gray-400 hover:text-spotify-green transition-colors underline underline-offset-4"
-              >
-                沒有自動載入？點此重新載入
-              </button>
-            </div>
-          )
+        {isLoading ? (
+          <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
+            <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
+            <p className="animate-pulse font-medium text-center text-xs">AI 正在取得歌詞與雙語翻譯...</p>
+          </div>
+        ) : lyricsData ? (
+          <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-2">
+            <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
+          </div>
         ) : (
-          // 頁籤二：歌曲 AI 賞析
-          analysisLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
-              <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
-              <p className="animate-pulse font-medium text-center text-xs">AI 樂評大腦正在深度分析編曲與音樂風格...</p>
-            </div>
-          ) : analysisData ? (
-            <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-2">
-              <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(analysisData) }} />
-            </div>
-          ) : (
-            <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">
-              <Sparkles size={48} className="text-gray-500 opacity-40 animate-pulse" />
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-gray-300">尚未進行單曲分析</h3>
-                <p className="text-xs text-gray-500 max-w-md">
-                  點擊下方按鈕，請資深 AI 樂評人為這首單曲起草一份精緻的音樂風格剖析與意境賞析報告。
-                </p>
-              </div>
-              <button
-                onClick={handleAnalyzeTrack}
-                className="bg-spotify-green text-black hover:scale-105 transition-all px-6 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-spotify-green/20"
-              >
-                <Sparkles size={16} />
-                開始歌曲 AI 賞析
-              </button>
-            </div>
-          )
+          // 歌詞載入完成前的短暫過場
+          <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
+            <Sparkles size={32} className="text-spotify-green/40 animate-pulse" />
+            <p className="text-xs text-gray-500">正在準備 AI 雙語歌詞…</p>
+            <button
+              onClick={handleFetchLyrics}
+              className="text-xs text-gray-400 hover:text-spotify-green transition-colors underline underline-offset-4"
+            >
+              沒有自動載入？點此重新載入
+            </button>
+          </div>
         )}
       </div>
 
@@ -199,7 +138,7 @@ const SongPanel = ({
 
           <button
             onClick={exportShareCard}
-            disabled={isExporting || isLoading || analysisLoading}
+            disabled={isExporting || isLoading}
             className="bg-white text-black hover:bg-spotify-green hover:scale-105 transition-all px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg w-full sm:w-auto"
           >
             {isExporting ? <AlertCircle size={16} className="animate-spin" /> : <Download size={16} />}
@@ -208,7 +147,7 @@ const SongPanel = ({
 
           <button
             onClick={handlePublishToSocial}
-            disabled={isPublishing || isLoading || analysisLoading}
+            disabled={isPublishing || isLoading}
             className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-400 hover:to-purple-500 hover:scale-105 transition-all px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg w-full sm:w-auto"
           >
             {isPublishing ? <AlertCircle size={16} className="animate-spin" /> : <Send size={16} />}

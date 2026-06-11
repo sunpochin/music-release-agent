@@ -172,6 +172,30 @@ async function findAlbumMetadataFromCache(albumId, cache) {
 }
 
 /**
+ * 背景非同步預載專輯內所有歌曲的歌詞原文並寫入快取，不影響 API 反應時間
+ * 讀取/快取原始歌詞 (LRCLIB)
+ */
+function triggerLyricsPreFetch(albumId, tracks, cache) {
+  if (!tracks || tracks.length === 0) return;
+  findAlbumMetadataFromCache(albumId, cache).then(async (meta) => {
+    const artistName = meta?.artistName;
+    if (!artistName || artistName === 'Unknown Artist') return;
+
+    try {
+      const { getRawLyrics } = await import('./services/lyrics-service.js');
+      console.log(`[Spotify/Client] 🚀 開始背景預載《${artistName}》專輯 [${albumId}] 的 ${tracks.length} 首歌詞原文...`);
+      // 順序執行，避免對 LRCLIB 發送過於密集的請求
+      for (const track of tracks) {
+        if (track.name.startsWith('Demo Track')) continue; // 忽略測試/模擬的 Demo 曲目
+        getRawLyrics({ artistName, trackName: track.name }).catch(() => {});
+      }
+    } catch (e) {
+      console.error('[Spotify/Client] 載入 lyrics-service 失敗:', e);
+    }
+  }).catch(() => {});
+}
+
+/**
  * 獲取特定專輯的所有歌曲，具備本地快取機制以防止 429 頻率限制，並在失敗時降級使用 MusicBrainz
  * @param {string} albumId - Spotify 專輯 ID
  * @returns {Promise<Array<object>>} 曲目清單
@@ -185,7 +209,9 @@ export async function getSpotifyAlbumTracks(albumId) {
 
   if (!bypass && cache.album_tracks[albumId] && cacheService.isValid(cache.album_tracks[albumId].timestamp)) {
     console.log(`[Spotify/Client] 💾 從本地快取載入專輯 [${albumId}] 的歌曲清單...`);
-    return cache.album_tracks[albumId].data;
+    const cachedData = cache.album_tracks[albumId].data;
+    triggerLyricsPreFetch(albumId, cachedData, cache);
+    return cachedData;
   }
 
   try {
@@ -204,6 +230,7 @@ export async function getSpotifyAlbumTracks(albumId) {
 
     cache.album_tracks[albumId] = { timestamp: now, data: mappedTracks };
     await cacheService.write(cache);
+    triggerLyricsPreFetch(albumId, mappedTracks, cache);
 
     console.log(`[Spotify/Client] ✅ 成功獲取專輯 [${albumId}] 的 ${mappedTracks.length} 首歌曲！`);
     return mappedTracks;
@@ -217,6 +244,7 @@ export async function getSpotifyAlbumTracks(albumId) {
       if (mbTracks && mbTracks.length > 0) {
         cache.album_tracks[albumId] = { timestamp: now, data: mbTracks };
         await cacheService.write(cache);
+        triggerLyricsPreFetch(albumId, mbTracks, cache);
         console.log(`[Spotify/Client] ✅ 成功透過 MusicBrainz 載入並快取專輯 [${albumId}] 的 ${mbTracks.length} 首歌曲。`);
         return mbTracks;
       }

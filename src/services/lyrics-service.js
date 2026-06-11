@@ -48,6 +48,51 @@ export async function translateWithOllama(artistName, trackName, sourceLyrics) {
 }
 
 /**
+ * 取得/快取原始歌詞 (LRCLIB)
+ * 讀寫本地原始歌詞快取，防範重複向 LRCLIB 發送 API 請求
+ * @returns {Promise<{ lyrics?: string, instrumental?: boolean, source: string }|null>}
+ */
+export async function getRawLyrics({ artistName, trackName, forceRefresh = false }) {
+  const cacheDir = resolveCacheDir();
+  const rawFileName = cacheFileName({ artistName, trackName, provider: 'raw', promptVersion: 0 });
+
+  if (!forceRefresh) {
+    const hit = await readCachedLyrics(cacheDir, rawFileName);
+    if (hit) {
+      if (hit.frontmatter.source === 'lrclib-instrumental') {
+        return { instrumental: true, source: 'lrclib-instrumental' };
+      }
+      return { lyrics: hit.body, source: 'lrclib' };
+    }
+  }
+
+  const sourced = await fetchLyricsFromSource(artistName, trackName);
+  if (!sourced) return null;
+
+  if (sourced.instrumental) {
+    const text = '### 歌曲介紹\n這是一首演奏曲（Instrumental），沒有歌詞，請直接聆聽音樂本身的故事。';
+    await persistCache(cacheDir, rawFileName, {
+      artistName,
+      trackName,
+      provider: 'raw',
+      source: 'lrclib-instrumental',
+      text
+    });
+    return { instrumental: true, source: 'lrclib-instrumental' };
+  }
+
+  await persistCache(cacheDir, rawFileName, {
+    artistName,
+    trackName,
+    provider: 'raw',
+    source: 'lrclib',
+    text: sourced.lyrics
+  });
+
+  return { lyrics: sourced.lyrics, source: 'lrclib' };
+}
+
+/**
  * 取得歌詞翻譯（快取優先）。
  * @returns {{ text: string, cached: boolean, provider: string }}
  */
@@ -70,7 +115,7 @@ export async function getLyricsWithCache({ artistName, trackName, forceRefresh =
   }
 
   // 2. miss → 先去歌詞圖書館（LRCLIB）借真實原文；借不到則降級為 LLM 記憶模式
-  const sourced = await fetchLyricsFromSource(artistName, trackName);
+  const sourced = await getRawLyrics({ artistName, trackName, forceRefresh });
 
   if (sourced?.instrumental) {
     const text = '### 歌曲介紹\n這是一首演奏曲（Instrumental），沒有歌詞，請直接聆聽音樂本身的故事。';
