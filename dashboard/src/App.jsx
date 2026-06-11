@@ -26,7 +26,6 @@ function App() {
   const [albumReview, setAlbumReview] = useState({ introduction: '', summary: '' })
 
   const [selectedTrack, setSelectedTrack] = useState(null)
-  const [activeTab, setActiveTab] = useState('lyrics') // 'lyrics' | 'analysis'
 
   const shareCardRef = useRef(null)
 
@@ -37,10 +36,7 @@ function App() {
   const {
     lyricsData,
     isLoading,
-    analysisData,
-    analysisLoading,
-    handleFetchLyrics,
-    handleAnalyzeTrack
+    handleFetchLyrics
   } = useTrackAi(selectedAlbum, selectedTrack)
 
   // 鍵盤導航：j/↓ 下一首、k/↑ 上一首（打字時自動停用）
@@ -142,7 +138,7 @@ function App() {
     } else {
       setShareFile(null)
     }
-  }, [selectedAlbum, selectedTrack, lyricsData, analysisData, albumReview, activeTab, generateShareFile])
+  }, [selectedAlbum, selectedTrack, lyricsData, albumReview, generateShareFile])
 
   // 僅選取專輯，使用 react-router 的 navigate 進行 URL 轉換
   // （歌詞與載入狀態的重設由 useTrackAi 的「換歌擦黑板」機制處理）
@@ -300,11 +296,6 @@ function App() {
                     publishResult={publishResult}
                     handleFetchLyrics={handleFetchLyrics}
                     exportShareCard={exportShareCard}
-                    analysisData={analysisData}
-                    analysisLoading={analysisLoading}
-                    handleAnalyzeTrack={handleAnalyzeTrack}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
                     handlePublishToSocial={handlePublishToSocial}
                     onBackToAlbum={() => navigate(`/album/${selectedAlbum.id}`)}
                   />
@@ -339,7 +330,7 @@ function App() {
             album={selectedAlbum} 
             track={selectedTrack}
             artistName={selectedAlbum?.artistName || 'Featured Artist'} 
-            lyrics={activeTab === 'lyrics' ? lyricsData : analysisData} 
+            lyrics={lyricsData} 
             introduction={albumReview?.introduction}
          />
       </div>

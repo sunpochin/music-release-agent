@@ -293,7 +293,7 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // （timeout 放寬：vite 冷啟動首次轉換模組可能觸發依賴重新最佳化與整頁重載）
     await expect(page.getByTestId('waveform')).toHaveAttribute('data-seed', 'deeplink-track-1', { timeout: 15000 });
     await expect(page.locator('text=深層連結的歌詞內容').first()).toBeVisible();
-    await expect(page.locator('button:has-text("Deep Link Track")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Deep Link Track")').first()).toBeVisible();
     // 不應出現 404 或骨架屏殘留
     await expect(page.getByTestId('track-not-found')).toHaveCount(0);
     await expect(page.getByTestId('song-page-skeleton')).toHaveCount(0);
@@ -373,7 +373,7 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
 
     // 歌曲頁：返回鍵顯示「返回專輯」
-    const backToAlbum = page.locator('button:has-text("返回專輯")');
+    const backToAlbum = page.locator('button[aria-label="返回專輯"]');
     await expect(backToAlbum).toBeVisible({ timeout: 15000 });
     await backToAlbum.click();
 
@@ -382,7 +382,7 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await expect(page.locator('text=專輯資訊')).toBeVisible();
 
     // 第二層：返回鍵變成「返回列表」，點擊回到專輯清單（手機上 Sidebar 重新出現）
-    const backToList = page.locator('button:has-text("返回列表")');
+    const backToList = page.locator('button[aria-label="返回列表"]');
     await expect(backToList).toBeVisible();
     await backToList.click();
     await expect(page).toHaveURL(/\/$/);
