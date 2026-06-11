@@ -147,4 +147,108 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // 12. 驗證發佈成功 Toast 訊息是否包含模擬的 JobId
     await expect(page.locator('text=發文已排程成功！JobId: mock-job').first()).toBeVisible();
   });
+
+  test('XSS: malicious lyrics payload must render as inert text, never execute', async ({ page }) => {
+    // 瀏覽器層級的 XSS 滲透驗證：把惡意 Markdown 餵進歌詞 API，
+    // 確認 (a) 注入腳本沒有執行、(b) 內容以「純文字」呈現、(c) DOM 中沒有危險元素。
+    // 單元測試（tests/markdown-renderer.test.js）鎖定轉譯器輸出字串；
+    // 這條測試鎖定「真的進了 DOM 之後」的最終行為。
+
+    // 任一 dialog（alert/confirm/prompt）出現都視為 XSS 成功 → 測試失敗
+    let dialogFired = false;
+    page.on('dialog', async (dialog) => {
+      dialogFired = true;
+      await dialog.dismiss();
+    });
+
+    await page.route('**/api/albums', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'mock-album-xss',
+            name: 'XSS Probe Album',
+            artistName: 'Evil Artist',
+            release_date: '2026-06-01',
+            image: 'https://example.com/cover.png'
+          }
+        ]),
+      });
+    });
+
+    await page.route('https://example.com/cover.png', async (route) => {
+      const transparentPng = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+        'base64'
+      );
+      await route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+    });
+
+    await page.route('**/api/albums/*/tracks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'mock-track-xss',
+            name: 'XSS Track',
+            track_number: 1,
+            duration_ms: 180000,
+            uri: 'spotify:track:xss1',
+            url: 'https://open.spotify.com/track/xss1'
+          }
+        ]),
+      });
+    });
+
+    await page.route('**/api/review*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ introduction: 'intro', summary: 'summary' }),
+      });
+    });
+
+    // 惡意 payload：涵蓋 script、事件處理器注入、Markdown 各格式分支內的注入
+    const maliciousMarkdown = [
+      '### 歌曲介紹',
+      '<script>window.__xssExecuted = true</script>',
+      '<img src=x onerror="window.__xssExecuted = true">',
+      '- **<svg onload="window.__xssExecuted = true">** list injection',
+      '**<iframe src="javascript:window.__xssExecuted=true"></iframe>**',
+      'normal line with <b onclick="window.__xssExecuted = true">bold</b>'
+    ].join('\n');
+
+    await page.route('**/api/lyrics', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ text: maliciousMarkdown }),
+      });
+    });
+
+    await page.goto('/');
+    await page.locator('aside button').first().click();
+    await page.locator('button:has-text("XSS Track")').click();
+    const fetchLyricsBtn = page.locator('text=尋找歌詞與 AI 翻譯');
+    await expect(fetchLyricsBtn).toBeVisible();
+    await fetchLyricsBtn.click();
+
+    // (a) 注入內容以「純文字」呈現在畫面上（轉義後的 <script> 是可見文字）
+    await expect(page.getByText('window.__xssExecuted', { exact: false }).first()).toBeVisible();
+
+    // (b) 注入的全域旗標不存在 → 沒有任何一條注入路徑被執行
+    const xssExecuted = await page.evaluate(() => window.__xssExecuted);
+    expect(xssExecuted).toBeUndefined();
+
+    // (c) DOM 中不存在任何危險元素（事件處理器屬性、iframe、svg onload）
+    const dangerousElementCount = await page.evaluate(
+      () => document.querySelectorAll('img[onerror], svg[onload], iframe, [onclick]').length
+    );
+    expect(dangerousElementCount).toBe(0);
+
+    // (d) 沒有任何 alert/confirm/prompt 出現
+    expect(dialogFired).toBe(false);
+  });
 });
