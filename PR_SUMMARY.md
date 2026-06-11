@@ -2,7 +2,18 @@
 
 ## 改了什麼（What Changed）
 
-### 0. 本輪（Round 2）：補齊最後的「宣稱 vs. 證明」落差
+### -1. 本輪（Round 3）：契約單一事實來源 + 瀏覽器層 XSS 證明
+
+實作前兩輪 PR summary 各自指出的「下一步最高 ROI」：
+
+1. **Handoff 契約變成單一 schema 檔**：新增 [`contracts/social-handoff.schema.json`](./contracts/social-handoff.schema.json)（JSON Schema draft-07：publishRequest / acceptedResponse / statusResponse / postResult / healthResponse / errorResponse）與零依賴子集驗證器 `src/services/contract-validator.js`（type union、required、enum、items、minLength、minItems、內部 $ref，錯誤訊息含欄位路徑）。四方消費同一份檔案：
+   - `server.js` proxy：轉發前驗證請求體，違約 400 不轉發（取代手寫的 `if (!caption)`）
+   - 內建 mock：以 schema 驗證請求 + 對自己每個回應做契約自我檢查（違約 500，fail-loud）
+   - `demo:verify:social`：對「真實或 mock」companion 的活回應做 schema 驗證 — 漂移偵測點
+   - `tests/contract/social-handoff.test.js`（17 案例）：schema 對合法/非法樣本的判定（正常/模糊/失敗），加上把 mock 真的跑起來驗證活回應與 400/404 錯誤體全部符合契約
+2. **瀏覽器層 XSS 滲透驗證**：`tests/e2e/dashboard.spec.js` 新增 XSS 案例 — 把含 `<script>`、`<img onerror>`、`<svg onload>`、`<iframe javascript:>`、`onclick` 的 Markdown payload 經攔截的歌詞 API 餵進真實 Chromium，驗證四件事：注入旗標 `window.__xssExecuted` 未被設置、payload 以純文字可見、DOM 無任何危險元素、無 dialog 彈出。已在本機 headless Chromium 實跑通過（2/2 e2e passed）。
+
+### 0. 前輪（Round 2）：補齊最後的「宣稱 vs. 證明」落差
 
 前一輪建立了 dry-run 核心、golden tests 與三條 verify 路徑；本輪掃描殘餘落差後做了四件事：
 
@@ -51,12 +62,15 @@
 
 ```bash
 npm install
-npm test                        # 54 個測試（單元 + golden + 前端 XSS），全離線確定性
+npm test                        # 71 個測試（單元 + golden + 契約 + 前端 XSS），全離線確定性
 npm run demo:verify             # 離線管線 + 產物 schema/內容驗證
-npm run demo:verify:social      # 跨服務 handoff（無姊妹 repo 自動用內建 mock）
+npm run demo:verify:social      # 跨服務 handoff，活回應過契約 schema（無姊妹 repo 自動用內建 mock）
 npm run demo:verify:social:down # 依賴失敗降級行為
+npx playwright test             # 2 個 e2e：完整使用者流程 + 瀏覽器層 XSS 滲透驗證
 cd dashboard && npm run build   # 驗證 markdown 轉譯器抽離後前端可編譯
 ```
+
+契約漂移的負面驗證：把 `tests/fixtures/mock-social-service.js` 的 202 回應 `status: 'queued'` 改成 `'ok'` 再跑 `npm run demo:verify:social` — mock 的自我檢查會以 500 fail-loud，verify 腳本以非零 exit code 失敗並列出違約欄位。
 
 全部不需網路與憑證。負面驗證（確認 fail-loud）：把 `data/mock-releases.json` 任一筆的 `name` 改成 `""` 再跑 `npm run demo:verify`，會在執行管線前以非零 exit code 失敗並指出 `releases[i].name`。
 
@@ -65,11 +79,12 @@ cd dashboard && npm run build   # 驗證 markdown 轉譯器抽離後前端可編
 - 內建 mock 只覆蓋 handoff 契約的 happy path 與基本 400/404，不模擬 companion 的佇列重試、Ayrshare 策略等內部行為（那些屬於姊妹 repo 的測試範圍）
 - 真實 `npm run scan`（Spotify + Gemini + Git push）仍無自動化整合測試 — 刻意取捨，避免 flaky 的外部 API 測試
 - Golden 比對鎖定樂評「模板」；若刻意改模板需重新生成 golden 檔（`getMockReview` 輸出寫回 `tests/golden/fixtures/expected-normal-review.golden.md`）
-- 契約是「兩份手寫的對齊」：內建 mock 與真實 companion 各自實作同一契約，尚無 single source of truth 的 schema 檔
-- XSS 測試鎖定的是「轉譯器輸出僅含白名單標籤」這個性質，不是完整的瀏覽器端滲透測試；e2e 層級的注入驗證（真的把 payload 餵進 lyrics API 再檢查 DOM）尚未涵蓋
-- Playwright e2e 與 Docker build 在本機沙箱未重跑（需要瀏覽器二進位與 Docker daemon），由 CI 覆蓋
-- 兩輪變更皆尚未 commit — 建議以本文件兩個 Round 為單位拆成兩個 commit
+- 契約驗證器是 JSON Schema 的**子集**實作（足夠覆蓋本契約所有規則）；姊妹 repo 若要消費 schema 檔，建議用 ajv 做完整驗證 — schema 檔本身是標準 draft-07，完全相容
+- 姊妹 repo `../social-post-service` 自己的 contract test 尚未建立（檔案在本 repo，引用方式已在 schema description 註明）；在它建立之前，「真實 companion 符合契約」只在 `demo:verify:social` 以真實服務執行時被驗證
+- 瀏覽器層 XSS 測試覆蓋歌詞 API 這條注入路徑；其他渲染入口（如專輯評論）走同一個轉譯器，但未逐一做 e2e 注入
+- Docker build 在本機沙箱未重跑（需要 Docker daemon），由 CI 覆蓋
+- 三輪變更皆尚未 commit — 建議以本文件三個 Round 為單位拆 commit
 
 ## 下一步最高 ROI（Next Highest ROI Step）
 
-把 handoff 契約變成**單一 schema 檔**（如 `contracts/social-handoff.json`，JSON Schema 格式），讓三方共同消費：核心服務的 proxy 驗證、內建 mock 的回應產生、以及姊妹 repo 的 contract test。這消除「mock 與真實服務悄悄漂移」這個目前唯一無法被測試抓到的失敗模式，成本約半天。
+在姊妹 repo `social-post-service` 加一個 contract test，直接讀取本 repo 的 `contracts/social-handoff.schema.json`（或以 git submodule / npm workspace 共享），用 ajv 驗證它的真實路由回應。完成後，契約三角（核心 proxy、真實 companion、內建 mock）的每一邊都有自動化防漂移證明，跨 repo 重構可以放心做。成本約 1-2 小時。

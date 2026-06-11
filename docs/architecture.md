@@ -108,10 +108,20 @@ Dashboard 不直接呼叫 `social-post-service`；一律經由核心服務代理
 }
 ```
 
-此契約有兩份可執行的證明：
+**契約的單一事實來源是 [`contracts/social-handoff.schema.json`](../contracts/social-handoff.schema.json)**（JSON Schema draft-07），由四方共同消費：
 
-1. `npm run demo:verify:social` — 若姊妹 repo `../social-post-service` 存在則用真實服務；不存在時自動退回 `tests/fixtures/mock-social-service.js`（零依賴、實作同一契約的內建 mock），所以本 repo 單獨 clone 也能驗證 handoff
+1. 核心服務 proxy（`server.js`）— 轉發前以 `publishRequest` definition 驗證請求體，違約直接 400 不轉發
+2. 內建 mock（`tests/fixtures/mock-social-service.js`）— 以同一 schema 驗證請求，並對自己的每個回應做契約自我檢查（違約回 500，fail-loud）
+3. `scripts/demo-verify-social-handoff.js` — 對「真實或 mock」companion 的活回應做 schema 驗證 — 這就是「mock 與真實服務悄悄漂移」的偵測點
+4. 契約測試（`tests/contract/social-handoff.test.js`）— schema 對合法/非法樣本的判定，加上把 mock 真的跑起來驗證活回應全部符合契約
+
+驗證器是零依賴的 JSON Schema 子集實作（`src/services/contract-validator.js`），姊妹 repo 可改用 ajv 消費同一份 schema 檔。
+
+可執行證明：
+
+1. `npm run demo:verify:social` — 若姊妹 repo `../social-post-service` 存在則用真實服務；不存在時自動退回內建 mock，所以本 repo 單獨 clone 也能驗證 handoff；兩種模式的回應都過同一份 schema
 2. `npm run demo:verify:social:down` — 驗證 companion 不可達時的降級行為
+3. `npx vitest run tests/contract` — 契約 schema 與 mock 實作的離線確定性驗證
 
 ### 3.2 掃描器 → 外部資料源（策略邊界）
 
@@ -122,7 +132,7 @@ Dashboard 不直接呼叫 `social-post-service`；一律經由核心服務代理
 
 ### 3.3 後端 → 前端（內容信任邊界）
 
-AI 生成的歌詞與分析以 Markdown 字串交付前端。前端視其為**不可信輸入**：`dashboard/src/utils/markdown.js` 先對整行做 HTML 轉義，再做格式解析，輸出僅含白名單標籤（h2/h3/hr/div/span/p/strong/br）。此邊界由 `tests/markdown-renderer.test.js` 以惡意 payload 鎖定。
+AI 生成的歌詞與分析以 Markdown 字串交付前端。前端視其為**不可信輸入**：`dashboard/src/utils/markdown.js` 先對整行做 HTML 轉義，再做格式解析，輸出僅含白名單標籤（h2/h3/hr/div/span/p/strong/br）。此邊界有兩層證明：單元層（`tests/markdown-renderer.test.js`，轉譯器輸出字串性質）與瀏覽器層（`tests/e2e/dashboard.spec.js` 的 XSS 測試 — 把含 `<script>`、`onerror`、`onload` 注入的 payload 餵進歌詞 API，驗證注入旗標未執行、內容以純文字呈現、DOM 無危險元素、無 dialog）。
 
 ---
 
