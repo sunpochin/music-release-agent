@@ -75,10 +75,11 @@ const MetadataPanel = ({
             ) : (!Array.isArray(tracks) || tracks.length === 0) ? (
               <p className="text-xs text-gray-500 py-2">無曲目資料</p>
             ) : (
-              <div className="overflow-y-auto space-y-1 pr-1 max-h-[220px]">
+              <div className="overflow-y-auto space-y-1 pr-1 max-h-[220px]" role="list" aria-label="專輯曲目清單（可用 j/k 或上下鍵切換）">
                 {tracks.map((track) => (
                   <button
                     key={track.id}
+                    aria-current={selectedTrack?.id === track.id ? 'true' : undefined}
                     onClick={() => {
                       // 使用 React Router navigate 跳轉，避免整頁重新整理
                       navigate(`/album/${selectedAlbum.id}/song/${track.id}`);
