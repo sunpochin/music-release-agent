@@ -3,6 +3,7 @@ import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle, Link2, Che
 // 安全的輕量 Markdown 轉譯器：抽成純模組（dashboard/src/utils/markdown.js），
 // 由根目錄 tests/markdown-renderer.test.js 做 XSS 防護與格式轉譯的確定性單元測試。
 import { parseMarkdownToHtml } from '../utils/markdown.js'
+import WaveformVisualizer from './WaveformVisualizer'
 
 // 複製目前頁面連結的小按鈕（桌面端分享體驗；行動端已有原生分享）
 // 【小朋友解釋法】：手機有「分享」魔法棒（navigator.share），但電腦常常沒有。
@@ -98,6 +99,13 @@ const AILyricsPanel = ({
         </div>
       </div>
 
+      {/* 每首歌專屬的確定性音波（同一首歌永遠同一條波形，離線、零外部依賴） */}
+      {selectedTrack && (
+        <div className="mb-4 px-1" title={`${selectedTrack.name} 的專屬音波`}>
+          <WaveformVisualizer seed={selectedTrack.id} />
+        </div>
+      )}
+
       {/* 發文結果通知 */}
       {publishResult && (
         <div className={`flex items-center gap-2 px-4 py-2 mb-4 rounded-lg text-xs font-medium ${
@@ -148,7 +156,7 @@ const AILyricsPanel = ({
             </div>
           ) : lyricsData ? (
             <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
-              <div dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
+              <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
             </div>
           ) : (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">
@@ -177,7 +185,7 @@ const AILyricsPanel = ({
             </div>
           ) : analysisData ? (
             <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[400px] pr-2">
-              <div dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(analysisData) }} />
+              <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(analysisData) }} />
             </div>
           ) : (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-6">

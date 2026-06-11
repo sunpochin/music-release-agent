@@ -21,3 +21,43 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-500;
 }
+
+/* 🌊 確定性音波的呼吸動畫（純 CSS，零依賴） */
+@keyframes waveformBreath {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.55); }
+}
+.waveform-bar {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: waveformBreath 2.4s ease-in-out infinite;
+}
+
+/* ✨ AI 內容逐行進場（純 CSS stagger，前 12 行依序淡入，其餘立即顯示） */
+@keyframes aiFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ai-stagger > * {
+  animation: aiFadeUp 0.45s ease both;
+}
+.ai-stagger > *:nth-child(1) { animation-delay: 0.03s; }
+.ai-stagger > *:nth-child(2) { animation-delay: 0.09s; }
+.ai-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.ai-stagger > *:nth-child(4) { animation-delay: 0.21s; }
+.ai-stagger > *:nth-child(5) { animation-delay: 0.27s; }
+.ai-stagger > *:nth-child(6) { animation-delay: 0.33s; }
+.ai-stagger > *:nth-child(7) { animation-delay: 0.39s; }
+.ai-stagger > *:nth-child(8) { animation-delay: 0.45s; }
+.ai-stagger > *:nth-child(9) { animation-delay: 0.51s; }
+.ai-stagger > *:nth-child(10) { animation-delay: 0.57s; }
+.ai-stagger > *:nth-child(11) { animation-delay: 0.63s; }
+.ai-stagger > *:nth-child(12) { animation-delay: 0.69s; }
+
+/* ♿ 偏好減少動態的使用者：尊重系統設定，全部動畫關閉 */
+@media (prefers-reduced-motion: reduce) {
+  .waveform-bar,
+  .ai-stagger > * {
+    animation: none;
+  }
+}

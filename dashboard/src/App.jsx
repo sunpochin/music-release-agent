@@ -9,6 +9,7 @@ import MetadataPanel from './components/MetadataPanel'
 import SongPage from './components/SongPage'
 import { useAlbumTracks } from './hooks/useAlbumTracks'
 import { useTrackAi } from './hooks/useTrackAi'
+import { useTrackKeyboardNav } from './hooks/useTrackKeyboardNav'
 
 // 【小朋友解釋法】：
 // App.jsx 以前是「什麼家具都堆在裡面的大客廳」。
@@ -41,6 +42,9 @@ function App() {
     handleFetchLyrics,
     handleAnalyzeTrack
   } = useTrackAi(selectedAlbum, selectedTrack)
+
+  // 鍵盤導航：j/↓ 下一首、k/↑ 上一首（打字時自動停用）
+  useTrackKeyboardNav({ selectedAlbum, tracks, selectedTrack })
 
   // 社群自動發文狀態
   const [isPublishing, setIsPublishing] = useState(false)
