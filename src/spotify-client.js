@@ -210,7 +210,7 @@ export async function getSpotifyAlbumTracks(albumId) {
   if (!bypass && cache.album_tracks[albumId] && cacheService.isValid(cache.album_tracks[albumId].timestamp)) {
     console.log(`[Spotify/Client] 💾 從本地快取載入專輯 [${albumId}] 的歌曲清單...`);
     const cachedData = cache.album_tracks[albumId].data;
-    triggerLyricsPreFetch(albumId, cachedData, cache);
+    // 取消背景預載，改為延遲載入 (Lazy Load)
     return cachedData;
   }
 
@@ -230,7 +230,7 @@ export async function getSpotifyAlbumTracks(albumId) {
 
     cache.album_tracks[albumId] = { timestamp: now, data: mappedTracks };
     await cacheService.write(cache);
-    triggerLyricsPreFetch(albumId, mappedTracks, cache);
+    // 取消背景預載，改為延遲載入 (Lazy Load)
 
     console.log(`[Spotify/Client] ✅ 成功獲取專輯 [${albumId}] 的 ${mappedTracks.length} 首歌曲！`);
     return mappedTracks;
