@@ -1,6 +1,6 @@
 import { AlertCircle, RotateCw, Music4 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import AILyricsPanel from './AILyricsPanel'
+import SongPanel from './SongPanel'
 
 /**
  * 🎤 SongPage — 單曲頁容器（三態 + 404 的決策中心）
@@ -106,9 +106,9 @@ const SongPage = ({
     return <TrackNotFound albumId={panelProps.selectedAlbum?.id} tracks={tracks} />
   }
 
-  // 4. 有選中的歌 → AI 歌詞面板
+  // 4. 有選中的歌 → 歌詞面板
   if (panelProps.selectedTrack) {
-    return <AILyricsPanel {...panelProps} />
+    return <SongPanel {...panelProps} />
   }
 
   // 5. 未選歌的情況由 App 層的專輯頁（AlbumInfo variant="full"）處理，這裡不渲染
