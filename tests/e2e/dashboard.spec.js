@@ -367,6 +367,28 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await expect(page).toHaveURL(/song\/deeplink-track-1/);
   });
 
+  test('mobile: two-level back navigation (song -> album -> list)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 }); // iPhone 級寬度
+    await mockAlbumApis(page);
+    await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
+
+    // 歌曲頁：返回鍵顯示「返回專輯」
+    const backToAlbum = page.locator('button:has-text("返回專輯")');
+    await expect(backToAlbum).toBeVisible({ timeout: 15000 });
+    await backToAlbum.click();
+
+    // 第一層：回到專輯頁（URL 不含 /song/，顯示置中的專輯資訊）
+    await expect(page).toHaveURL(/\/album\/deeplink-album-1$/);
+    await expect(page.locator('text=專輯資訊')).toBeVisible();
+
+    // 第二層：返回鍵變成「返回列表」，點擊回到專輯清單（手機上 Sidebar 重新出現）
+    const backToList = page.locator('button:has-text("返回列表")');
+    await expect(backToList).toBeVisible();
+    await backToList.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('text=Latest Releases')).toBeVisible();
+  });
+
   test('OG meta: backend share endpoint serves crawler-readable tags', async ({ request }) => {
     // 直接打後端（:3011）：爬蟲視角 — 不執行 JS，只看門口海報
     const response = await request.get('http://localhost:3011/album/og-unknown-album');
