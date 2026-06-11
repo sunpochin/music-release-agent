@@ -1,5 +1,10 @@
 # 🎤 Song Page 下一步規劃
 
+> **狀態更新（2026-06-12）：P0、P1、P2 全部完成並各自 commit。**
+> 證明：`npm test`（87 個含 share-meta 與 waveform 確定性測試）、`npx playwright test`（7 個 e2e，含 deep link、404、剪貼簿、鍵盤導航+音波、OG meta 爬蟲視角）。
+> 額外收穫：deep-link e2e 曝光並修復了原版 App.jsx 潛伏的「歌單永遠讀取中」race（詳見 kid_friendly_changelog.md Round 6）。
+> 「刻意不做」清單維持不變 — 面試時主動講這個取捨。
+
 目標：讓 `/album/:albumId/song/:trackId` 從「App.jsx 裡的一個面板」變成「值得被分享出去的頁面」。
 選題原則延續本 repo 哲學：**每個亮點都要有確定性的可執行證明，不做依賴外部 API 心情的 flaky 功能。**
 

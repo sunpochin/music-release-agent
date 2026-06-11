@@ -2,7 +2,16 @@
 
 ## 改了什麼（What Changed）
 
-### -1. 本輪（Round 3）：契約單一事實來源 + 瀏覽器層 XSS 證明
+### -2. 本輪（Round 4–6）：Song Page 三階段（P0 真頁面 / P1 分享 / P2 互動）
+
+依 [docs/song_page_plan.md](./docs/song_page_plan.md) 執行，每階段一個 commit：
+
+- **P0 真頁面**：從 App.jsx 巨石（471→336 行）抽出 `useAlbumTracks`、`useTrackAi` hooks 與 `SongPage` 容器；三態渲染（錯誤卡+重試 / 骨架屏 / 內容）+ 友善 404（過期分享連結推薦同專輯其他曲目）；新增 deep-link 直開與 404 e2e
+- **P1 分享**：`src/services/share-meta.js` + 後端 `GET /album/:id(/song/:id)` OG meta 端點（爬蟲看海報、真人被導向 SPA；外部字串全轉義；過期連結 404 但仍導向）；`CopyLinkButton` 剪貼簿複製；8 個單元測試 + 剪貼簿讀回/爬蟲視角 e2e
+- **P2 互動**：以 trackId 為 seed 的確定性音波（刻意不用已棄用的 preview/audio-features API）；j/k 鍵盤切歌（打字時停用、邊界不溢出、aria-current）；純 CSS 歌詞 stagger（尊重 prefers-reduced-motion）
+- **🐛 測試曝光的真 bug**：`useAlbumTracks` 的防重複標記在「fetch 未完成就被取消」（StrictMode 雙重 effect）時未撤銷，導致歌單永遠卡在讀取中 — 從原版 App.jsx 繼承的潛在 race，被 deep-link e2e 曝光後修復（cleanup 時未 settled 則重置標記），連續 3 次全套 e2e 全綠驗證
+
+### -1. 前輪（Round 3）：契約單一事實來源 + 瀏覽器層 XSS 證明
 
 實作前兩輪 PR summary 各自指出的「下一步最高 ROI」：
 
@@ -62,12 +71,12 @@
 
 ```bash
 npm install
-npm test                        # 71 個測試（單元 + golden + 契約 + 前端 XSS），全離線確定性
+npm test                        # 87 個測試（單元 + golden + 契約 + XSS + share-meta + waveform），全離線
 npm run demo:verify             # 離線管線 + 產物 schema/內容驗證
 npm run demo:verify:social      # 跨服務 handoff，活回應過契約 schema（無姊妹 repo 自動用內建 mock）
 npm run demo:verify:social:down # 依賴失敗降級行為
-npx playwright test             # 2 個 e2e：完整使用者流程 + 瀏覽器層 XSS 滲透驗證
-cd dashboard && npm run build   # 驗證 markdown 轉譯器抽離後前端可編譯
+npx playwright test             # 7 個 e2e：完整流程、XSS、deep link、404、剪貼簿、鍵盤+音波、OG meta
+cd dashboard && npm run build   # 前端可編譯
 ```
 
 契約漂移的負面驗證：把 `tests/fixtures/mock-social-service.js` 的 202 回應 `status: 'queued'` 改成 `'ok'` 再跑 `npm run demo:verify:social` — mock 的自我檢查會以 500 fail-loud，verify 腳本以非零 exit code 失敗並列出違約欄位。
