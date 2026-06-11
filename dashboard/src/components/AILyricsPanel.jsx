@@ -1,8 +1,43 @@
-import React from 'react'
-import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle, Link2, Check } from 'lucide-react'
 // 安全的輕量 Markdown 轉譯器：抽成純模組（dashboard/src/utils/markdown.js），
 // 由根目錄 tests/markdown-renderer.test.js 做 XSS 防護與格式轉譯的確定性單元測試。
 import { parseMarkdownToHtml } from '../utils/markdown.js'
+
+// 複製目前頁面連結的小按鈕（桌面端分享體驗；行動端已有原生分享）
+// 【小朋友解釋法】：手機有「分享」魔法棒（navigator.share），但電腦常常沒有。
+// 所以我們給電腦的客人一個「抄門牌」按鈕：按一下就把目前房間的門牌號碼
+// （URL）抄進口袋（剪貼簿），貼給朋友，朋友就能直接走到同一個房間。
+const CopyLinkButton = () => {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+    } catch {
+      // 剪貼簿 API 不可用（非 HTTPS 等）→ 退回選取提示
+      window.prompt('複製這個連結分享給朋友：', window.location.href)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      aria-label="複製歌曲頁連結"
+      className="bg-white/10 hover:bg-white/20 transition-all text-white px-4 py-2 rounded-full font-bold text-sm flex items-center justify-center gap-2 shadow-lg"
+    >
+      {copied ? <Check size={16} className="text-spotify-green" /> : <Link2 size={16} />}
+      {copied ? '已複製' : '複製連結'}
+    </button>
+  )
+}
 
 // AI 歌詞控制面板元件：負責歌詞抓取、單曲 AI 分析、雙頁籤切換與圖卡導出，並支援社群發文
 const AILyricsPanel = ({ 
@@ -38,6 +73,9 @@ const AILyricsPanel = ({
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
+          {/* 複製目前歌曲頁的深層連結 */}
+          <CopyLinkButton />
+
           {/* 匯出按鈕，在導出中或加載中時禁用 */}
           <button 
             onClick={exportShareCard}

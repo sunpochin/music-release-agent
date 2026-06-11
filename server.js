@@ -10,6 +10,7 @@ import { getSpotifyAlbumTracks } from './src/spotify-client.js';
 import { generateTrackAnalysis } from './src/album-reviewer.js';
 import { socialClient } from './src/services/social-client.js';
 import { loadHandoffSchema, validateAgainstDefinition } from './src/services/contract-validator.js';
+import { buildShareHtml, findAlbumInCache, findTrackName } from './src/services/share-meta.js';
 import { logger, log, requestStore } from './src/services/logger.js';
 
 dotenv.config();
@@ -110,8 +111,8 @@ if (isDev) {
   // 在開發模式下，將前端資源請求反向代理至 Vite 開發伺服器 (Port 5173)
   // 這樣透過 Cloudflare Tunnel 連結後端時，依然能享受 Vite 的熱更新與動態載入
   app.use((req, res, next) => {
-    // 排除後端 API、登入及健康檢查路由，其餘皆代理至 Vite
-    const excludes = ['/api', '/login', '/callback', '/healthz', '/readyz'];
+    // 排除後端 API、登入、健康檢查與 OG 分享 meta 路由，其餘皆代理至 Vite
+    const excludes = ['/api', '/login', '/callback', '/healthz', '/readyz', '/album'];
     if (excludes.some(path => req.path.startsWith(path))) {
       return next();
     }
@@ -125,6 +126,35 @@ if (isDev) {
   // 在生產模式下，直接提供編譯後的靜態檔案
   app.use(express.static(path.join(process.cwd(), 'dashboard/dist')));
 }
+
+// 社群分享連結的 OG meta 端點（爬蟲看門口海報，真人被重導向到 SPA）
+// 驗證：tests/share-meta.test.js（含 XSS 轉義與 fallback 行為）
+app.get(['/album/:albumId', '/album/:albumId/song/:trackId'], async (req, res) => {
+  const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:5173';
+  let found = null;
+  let trackName = null;
+
+  try {
+    const cache = JSON.parse(await fs.readFile(cacheDataPath, 'utf-8'));
+    found = findAlbumInCache(cache, req.params.albumId);
+    if (found && req.params.trackId) {
+      trackName = findTrackName(cache, req.params.albumId, req.params.trackId);
+    }
+  } catch {
+    // 快取缺失或壞掉 → 退回通用 meta，分享連結仍可導向 SPA
+  }
+
+  res
+    .status(found ? 200 : 404)
+    .type('html')
+    .send(buildShareHtml({
+      album: found?.album ?? null,
+      artistName: found?.artistName ?? '',
+      trackName,
+      dashboardUrl,
+      requestPath: req.path
+    }));
+});
 
 app.get('/api', (_req, res) => {
   res.json({
