@@ -1,6 +1,11 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { loadHandoffSchema, assertMatchesDefinition } from '../src/services/contract-validator.js';
+
+// 不論對面是真實 companion 還是內建 mock，回應都必須通過同一份契約 schema —
+// 這就是「mock 與真實服務悄悄漂移」的偵測點。
+const handoffSchema = loadHandoffSchema();
 
 const musicRepoDir = path.resolve('.');
 const socialRepoDir = path.resolve('..', 'social-post-service');
@@ -177,14 +182,15 @@ async function main() {
     }
 
     const queuedJob = await publishResponse.json();
-    if (!queuedJob.jobId) {
-      throw new Error('publish response did not include jobId');
-    }
+    // 契約驗證：202 回應必須符合 contracts/social-handoff.schema.json 的 acceptedResponse
+    assertMatchesDefinition(handoffSchema, 'acceptedResponse', queuedJob, '202 publish');
 
     console.log(`Queued job ${queuedJob.jobId}; polling status through music-release-agent...`);
 
     const completedJob = await waitForJobCompletion(queuedJob.jobId);
-    if (!Array.isArray(completedJob.results) || completedJob.results.length === 0) {
+    // 契約驗證：狀態回應必須符合 statusResponse（含 results 內每筆 postResult 的結構）
+    assertMatchesDefinition(handoffSchema, 'statusResponse', completedJob, 'job status');
+    if (completedJob.results.length === 0) {
       throw new Error('completed job did not include posting results');
     }
 
@@ -197,8 +203,8 @@ async function main() {
     console.log('- social-post-service became healthy on a dedicated test port');
     console.log('- readyz reported the app as fully ready with reachable dependency state');
     console.log('- music-release-agent forwarded publish requests to the companion service');
-    console.log('- publish endpoint returned 202 Accepted with a jobId');
-    console.log('- status polling through music-release-agent observed the job complete');
+    console.log('- publish endpoint returned 202 Accepted matching the handoff contract schema');
+    console.log('- status polling observed job completion matching the handoff contract schema');
     console.log('\ndemo:verify:social passed');
   } finally {
     await terminate(musicServer, 'music-release-agent');
