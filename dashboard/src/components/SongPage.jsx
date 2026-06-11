@@ -1,4 +1,4 @@
-import { Music, AlertCircle, RotateCw, Music4 } from 'lucide-react'
+import { AlertCircle, RotateCw, Music4 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AILyricsPanel from './AILyricsPanel'
 
@@ -83,18 +83,6 @@ const TrackNotFound = ({ albumId, tracks }) => {
   )
 }
 
-/** 尚未選歌的精緻佔位卡 */
-const SelectTrackPlaceholder = () => (
-  <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px] hover:border-white/20 transition-all duration-300">
-    <div className="w-16 h-16 rounded-full bg-spotify-green/10 flex items-center justify-center mb-4 text-spotify-green animate-pulse">
-      <Music size={32} />
-    </div>
-    <p className="text-xs text-gray-400 max-w-sm leading-relaxed">
-      請從左側曲目清單中選擇一首歌曲以開始 AI 雙語歌詞與音樂賞析
-    </p>
-  </div>
-)
-
 const SongPage = ({
   trackId,
   tracks,
@@ -123,8 +111,8 @@ const SongPage = ({
     return <AILyricsPanel {...panelProps} />
   }
 
-  // 5. 還沒選歌 → 佔位卡
-  return <SelectTrackPlaceholder />
+  // 5. 未選歌的情況由 App 層的專輯頁（AlbumInfo variant="full"）處理，這裡不渲染
+  return null
 }
 
 export default SongPage

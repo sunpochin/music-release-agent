@@ -1,5 +1,4 @@
-import React from 'react'
-import { Info, Calendar, Layers, ExternalLink, Music4, Loader2 } from 'lucide-react'
+import { Info, Calendar, Layers, ExternalLink, Music4, Loader2, AlertCircle, RotateCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 // 格式化歌曲長度（毫秒轉為分:秒）
@@ -10,40 +9,56 @@ const formatDuration = (ms) => {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
-// 本地資料面板元件：展示專輯發行屬性、AI 介紹、專輯歌曲清單，並內嵌系統診斷小工具與 Spotify 外部播放連結
-const MetadataPanel = ({ 
-  selectedAlbum, 
-  albumReview, 
-  shareFile,
+/**
+ * 💿 AlbumInfo — 專輯資訊元件（發行屬性、AI 介紹、曲目清單、Spotify 連結）
+ *
+ * 【小朋友解釋法】：
+ * 這是「專輯的名片」。點左邊選單選一張專輯，右邊就換上這張名片。
+ * 兩種擺法：
+ * - variant="full"（專輯頁）：名片置中、放大、曲目清單完整展開 —
+ *   專輯頁該做的事只有一件：好好展示專輯，不催促客人做別的事
+ * - variant="compact"（歌曲頁）：名片縮成側欄，把舞台讓給歌詞
+ * 以前名片上印著工程師的儀表板（系統偵錯資訊）— 那是後台的東西，
+ * 不該給客人看，已經收掉了。
+ */
+const AlbumInfo = ({
+  selectedAlbum,
+  albumReview,
   tracks = [],
   selectedTrack,
-  setSelectedTrack,
-  tracksLoading
+  tracksLoading,
+  tracksError,
+  retryTracks,
+  variant = 'compact'
 }) => {
   const navigate = useNavigate()
   if (!selectedAlbum) return null
 
+  const isFull = variant === 'full'
+
   return (
-    <div className="w-full lg:w-1/3 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col justify-between">
+    <div className={`w-full ${isFull ? 'max-w-2xl mx-auto' : 'lg:w-1/3'} bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col justify-between`}>
       <div>
         <h2 className="text-xl font-bold flex items-center gap-2 text-spotify-green mb-6 border-b border-white/10 pb-4">
-          <Info size={20} /> 本地資料庫簡介
+          <Info size={20} /> 專輯資訊
         </h2>
-        
-        <div className="space-y-4 text-sm text-gray-300">
-          <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
-            <Calendar size={18} className="text-spotify-green" />
-            <div>
-              <p className="text-xs text-gray-400">發行日期</p>
-              <p className="font-semibold">{selectedAlbum.release_date}</p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
-            <Layers size={18} className="text-spotify-green" />
-            <div>
-              <p className="text-xs text-gray-400">曲目總數</p>
-              <p className="font-semibold">{selectedAlbum.total_tracks} 首歌曲</p>
+        <div className="space-y-4 text-sm text-gray-300">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
+              <Calendar size={18} className="text-spotify-green shrink-0" />
+              <div>
+                <p className="text-xs text-gray-400">發行日期</p>
+                <p className="font-semibold">{selectedAlbum.release_date}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
+              <Layers size={18} className="text-spotify-green shrink-0" />
+              <div>
+                <p className="text-xs text-gray-400">曲目總數</p>
+                <p className="font-semibold">{selectedAlbum.total_tracks} 首歌曲</p>
+              </div>
             </div>
           </div>
 
@@ -55,27 +70,37 @@ const MetadataPanel = ({
                 albumReview.introduction
               ) : (
                 <>
-                  此發行作品由藝人 <strong className="text-spotify-green">{selectedAlbum.artistName || '未知藝人'}</strong> 創作，類型為 <strong className="text-white">{selectedAlbum.type === 'album' ? '專輯 (Album)' : '單曲 (Single)'}</strong>，共收錄 {selectedAlbum.total_tracks} 首曲目。這張作品於 {selectedAlbum.release_date} 正式發行，已成功自 Spotify 同步至我們的本地快取資料庫。
+                  此發行作品由藝人 <strong className="text-spotify-green">{selectedAlbum.artistName || '未知藝人'}</strong> 創作，類型為 <strong className="text-white">{selectedAlbum.type === 'album' ? '專輯 (Album)' : '單曲 (Single)'}</strong>，共收錄 {selectedAlbum.total_tracks} 首曲目。這張作品於 {selectedAlbum.release_date} 正式發行。
                 </>
               )}
             </p>
           </div>
 
           {/* 專輯曲目清單 */}
-          <div className="bg-white/5 p-4 rounded-xl space-y-3 flex flex-col max-h-[300px]">
+          <div className={`bg-white/5 p-4 rounded-xl space-y-3 flex flex-col ${isFull ? '' : 'max-h-[300px]'}`}>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
                <Music4 size={14} className="text-spotify-green" /> 專輯曲目清單
             </p>
-            
+
             {tracksLoading ? (
               <div className="flex items-center justify-center py-6 text-gray-400 gap-2">
                 <Loader2 size={16} className="animate-spin text-spotify-green" />
                 <span className="text-xs">讀取歌曲中...</span>
               </div>
+            ) : tracksError ? (
+              <div className="flex flex-col items-center py-4 gap-3">
+                <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={14} /> 曲目載入失敗</p>
+                <button
+                  onClick={retryTracks}
+                  className="text-xs bg-white/10 hover:bg-white/20 transition-all px-3 py-1.5 rounded-lg flex items-center gap-1"
+                >
+                  <RotateCw size={12} /> 再試一次
+                </button>
+              </div>
             ) : (!Array.isArray(tracks) || tracks.length === 0) ? (
               <p className="text-xs text-gray-500 py-2">無曲目資料</p>
             ) : (
-              <div className="overflow-y-auto space-y-1 pr-1 max-h-[220px]" role="list" aria-label="專輯曲目清單（可用 j/k 或上下鍵切換）">
+              <div className={`overflow-y-auto space-y-1 pr-1 ${isFull ? '' : 'max-h-[220px]'}`} role="list" aria-label="專輯曲目清單（可用 j/k 或上下鍵切換）">
                 {tracks.map((track) => (
                   <button
                     key={track.id}
@@ -111,21 +136,10 @@ const MetadataPanel = ({
         </div>
       </div>
 
-      <div className="mt-6 pt-4 border-t border-white/10 space-y-4">
-        {/* 僅在開發環境 (npm run dev) 渲染系統偵錯資訊 */}
-        {import.meta.env.DEV && (
-          <div className="bg-white/5 p-3 rounded-xl text-[11px] text-gray-400 font-mono space-y-1">
-            <p className="text-spotify-green font-bold text-[10px] uppercase tracking-wider mb-1">系統偵錯資訊</p>
-            <p>HTTPS 安全連線: {window.location.protocol === 'https:' ? '🟢 是' : '🔴 否 (不支援原生分享)'}</p>
-            <p>原生分享 API: {navigator.share ? '🟢 支援' : '🔴 否'}</p>
-            <p>原生檔案分享: {navigator.canShare && navigator.canShare({ files: [new File([], 'test.png', { type: 'image/png' })] }) ? '🟢 支援' : '🔴 否'}</p>
-            <p>分享圖卡狀態: {shareFile ? '🟢 已就緒' : '⏳ 生成中/失敗'}</p>
-          </div>
-        )}
-
-        <a 
-          href={selectedAlbum.url} 
-          target="_blank" 
+      <div className="mt-6 pt-4 border-t border-white/10">
+        <a
+          href={selectedAlbum.url}
+          target="_blank"
           rel="noopener noreferrer"
           className="w-full bg-white/10 hover:bg-white/20 transition-all text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md"
         >
@@ -137,4 +151,4 @@ const MetadataPanel = ({
   )
 }
 
-export default MetadataPanel
+export default AlbumInfo

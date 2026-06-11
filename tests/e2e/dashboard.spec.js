@@ -119,8 +119,9 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // 6. 驗證 URL 是否更新為帶有 /album/ 的路徑
     await expect(page).toHaveURL(/\/album\//);
 
-    // 7. 驗證專輯明細面板已載入，且右側顯示引導選擇單曲的佔位文字
-    await expect(page.locator('text=請從左側曲目清單中選擇一首歌曲以開始 AI 雙語歌詞與音樂賞析')).toBeVisible();
+    // 7. 驗證專輯頁：AlbumInfo 置中展示（不再有催促選歌的佔位卡）
+    await expect(page.locator('text=專輯資訊')).toBeVisible();
+    await expect(page.locator('text=專輯曲目清單')).toBeVisible();
 
     // 8. 點擊曲目清單的第一首歌曲以跳轉至單曲專屬路由
     const firstTrackBtn = page.locator('button:has-text("Test Track 1")');
@@ -130,12 +131,7 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // 8.5 驗證 URL 是否更新為帶有 /song/ 的路徑
     await expect(page).toHaveURL(/\/song\//);
 
-    // 9. 驗證「尋找歌詞與 AI 翻譯」按鈕已在右側面板顯示並點擊
-    const fetchLyricsBtn = page.locator('text=尋找歌詞與 AI 翻譯');
-    await expect(fetchLyricsBtn).toBeVisible();
-    await fetchLyricsBtn.click();
-
-    // 10. 驗證模擬的雙語歌詞內容是否渲染出來
+    // 9-10. 選歌即自動載入：模擬的雙語歌詞內容直接渲染，無需再按按鈕
     await expect(page.locator('text=這是一首測試歌曲的意境').first()).toBeVisible();
     await expect(page.locator('text=你好，世界').first()).toBeVisible();
 
@@ -231,9 +227,7 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await page.goto('/');
     await page.locator('aside button').first().click();
     await page.locator('button:has-text("XSS Track")').click();
-    const fetchLyricsBtn = page.locator('text=尋找歌詞與 AI 翻譯');
-    await expect(fetchLyricsBtn).toBeVisible();
-    await fetchLyricsBtn.click();
+    // 選歌即自動載入歌詞 — 惡意 payload 直接進入渲染管線
 
     // (a) 注入內容以「純文字」呈現在畫面上（轉義後的 <script> 是可見文字）
     await expect(page.getByText('window.__xssExecuted', { exact: false }).first()).toBeVisible();
@@ -284,6 +278,10 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await page.route('**/api/review*', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ introduction: 'intro', summary: 'sum' }) });
     });
+    // 選歌會自動載入歌詞，deep link 測試也要攔截
+    await page.route('**/api/lyrics', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: '### 自動載入\n深層連結的歌詞內容' }) });
+    });
   }
 
   test('deep link: opening /album/x/song/y directly renders the song page', async ({ page }) => {
@@ -291,9 +289,10 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await mockAlbumApis(page);
     await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
 
-    // 單曲面板渲染：抓歌詞按鈕可見，且側欄曲目清單高亮對應歌曲
+    // 單曲面板渲染：音波出現、歌詞自動載入，且側欄曲目清單高亮對應歌曲
     // （timeout 放寬：vite 冷啟動首次轉換模組可能觸發依賴重新最佳化與整頁重載）
-    await expect(page.locator('text=尋找歌詞與 AI 翻譯')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('waveform')).toHaveAttribute('data-seed', 'deeplink-track-1', { timeout: 15000 });
+    await expect(page.locator('text=深層連結的歌詞內容').first()).toBeVisible();
     await expect(page.locator('button:has-text("Deep Link Track")')).toBeVisible();
     // 不應出現 404 或骨架屏殘留
     await expect(page.getByTestId('track-not-found')).toHaveCount(0);
@@ -309,10 +308,10 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await expect(notFound).toBeVisible({ timeout: 15000 });
     await expect(notFound.locator('text=找不到這首歌')).toBeVisible();
 
-    // 推薦清單可點擊，導向存在的歌曲後正常渲染
+    // 推薦清單可點擊，導向存在的歌曲後正常渲染（歌詞自動載入）
     await notFound.locator('button:has-text("Deep Link Track")').click();
     await expect(page).toHaveURL(/song\/deeplink-track-1/);
-    await expect(page.locator('text=尋找歌詞與 AI 翻譯')).toBeVisible();
+    await expect(page.locator('text=深層連結的歌詞內容').first()).toBeVisible();
   });
 
   test('copy link: button copies the song deep link to clipboard', async ({ page, context }) => {
@@ -335,11 +334,10 @@ test.describe('Music Release Dashboard E2E Tests', () => {
   test('keyboard nav + waveform: j/k switches tracks, each track gets its own deterministic waveform', async ({ page }) => {
     await mockAlbumApis(page);
     await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
-    await expect(page.locator('text=尋找歌詞與 AI 翻譯')).toBeVisible({ timeout: 15000 });
 
     // 音波渲染，且記下第一首歌的波形（rect 高度序列）
     const waveform = page.getByTestId('waveform');
-    await expect(waveform).toHaveAttribute('data-seed', 'deeplink-track-1');
+    await expect(waveform).toHaveAttribute('data-seed', 'deeplink-track-1', { timeout: 15000 });
     const barsTrack1 = await waveform.locator('rect').evaluateAll(
       (rects) => rects.map((r) => r.getAttribute('height')).join(',')
     );
