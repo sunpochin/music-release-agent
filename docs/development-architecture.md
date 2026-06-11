@@ -56,3 +56,26 @@ Cloudflare 不需要分別設定多個子網域（如 `api.sunpochin.xyz` 與 `r
 
 ### 3. SEO 爬蟲友好（OG Metadata Pre-rendering）
 當 Facebook 或 LINE 爬蟲請求 `/album/123/song/456` 時，Express 會在 **3011** 優先攔截並回傳完整的 HTML 與 Meta Tags（而不是回傳空的 SPA 首頁），保證在通訊軟體上的卡片預覽完美呈現。
+
+---
+
+## 👶 小朋友解釋法：為什麼會發生「雙重 React 衝突」？
+
+### 故事背景
+想像一下，我們開了一家叫 **「音樂釋出特工 (Music Release Agent)」** 的餐廳。
+廚房裡有一位叫 **React** 的大廚，他有一本專門記點單和狀態的 **「神奇小筆記本 (useState/Hooks)」**。
+
+### 發生了什麼事？
+因為餐廳的門牌指引有點複雜（後端 3011 代理轉發到前端 5173，而且有兩層不同的 node_modules 資料夾），服務生們搞混了：
+- **服務生 A (App.jsx)** 跑去跟 **React 廚師 1 號** 點了一份「歌曲清單」。
+- **服務生 B (useAlbumTracks.js)** 卻跑去問 **React 廚師 2 號**：「剛剛點的歌曲清單好了嗎？」
+- **React 廚師 2 號** 翻開自己的神奇小筆記本，一臉困惑地說：「我的筆記本是空的啊！根本沒有這筆點單！(TypeError: Cannot read properties of null (reading 'useState'))」
+
+結果，服務生們在廚房撞成一團，盤子全摔碎了（網頁直接白屏報錯）。
+
+### 我們是怎麼治好它的？
+我們去找餐廳總經理（`vite.config.js`），在佈告欄上寫下一條鐵律：
+> 🚫 **「廚房裡只能有唯一的一位 React 大廚！不准有任何分身複製人！所有服務生如果要找 React 廚師，必須統一走到 `dashboard/node_modules/react` 這間辦公室，不准走錯！」** (resolve.alias & resolve.dedupe)
+
+現在，所有人都只會找同一位大廚，神奇小筆記本永遠能對得起來，餐廳就能順暢出菜囉！
+
