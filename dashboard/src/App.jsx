@@ -183,6 +183,23 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
     }
     document.body.removeChild(textArea)
 
+    // --- 自動背景發布到 Threads (僅發送單一發行連結以防字數超限) ---
+    const releaseUrl = selectedTrack
+      ? `https://release.sunpochin.xyz/album/${selectedAlbum.id}/song/${selectedTrack.id}`
+      : `https://release.sunpochin.xyz/album/${selectedAlbum.id}`
+
+    fetch('/api/social/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        caption: releaseUrl,
+        platforms: ['threads'],
+        imageBase64: null // 不包含圖片以節省字數與流量，僅分享純連結
+      })
+    }).catch(err => {
+      console.error("Auto publish to Threads failed", err)
+    })
+
     // --- 以下為圖卡匯出邏輯 ---
     // 如果預先產生的檔案已經在背景準備妥當，則「完全同步」呼叫 Web Share API
     if (shareFile) {
