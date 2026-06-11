@@ -13,7 +13,17 @@ async function getAccessToken(spDc) {
   const res = await fetch(url, {
     headers: {
       'Cookie': `sp_dc=${spDc}`,
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'referer': 'https://open.spotify.com/',
+      'origin': 'https://open.spotify.com',
+      'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"macOS"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
+      'spotify-app-version': '1.2.34.567',
+      'app-platform': 'WebPlayer'
     }
   });
 
@@ -24,6 +34,7 @@ async function getAccessToken(spDc) {
   const data = await res.json();
   return data.accessToken;
 }
+
 
 /**
  * 透過 Web Player session 嘗試取得歌詞 payload（非官方 API；實驗性本機專用）。
