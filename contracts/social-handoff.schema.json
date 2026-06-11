@@ -15,6 +15,10 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "minItems": 1
+        },
+        "mode": {
+          "description": "發佈模式：mock = companion 內模擬發佈；live（未指定時的預設）= 需真實平台 strategy，落到 mock strategy 會被 companion 以 503 拒絕",
+          "enum": ["mock", "live"]
         }
       }
     },
@@ -24,7 +28,10 @@
       "required": ["jobId", "status"],
       "properties": {
         "jobId": { "type": "string", "minLength": 1 },
-        "status": { "enum": ["queued"] }
+        "status": {
+          "description": "202 當下任務可能已被 in-process worker 撿走，故 queued 與 posting 皆合法",
+          "enum": ["queued", "posting"]
+        }
       }
     },
     "postResult": {
@@ -44,7 +51,10 @@
       "required": ["jobId", "status", "results"],
       "properties": {
         "jobId": { "type": "string", "minLength": 1 },
-        "status": { "enum": ["queued", "completed", "failed"] },
+        "status": {
+          "description": "任務生命週期：queued → posting → completed | partial（部分平台成功）| failed",
+          "enum": ["queued", "posting", "completed", "partial", "failed"]
+        },
         "results": {
           "type": "array",
           "items": { "$ref": "#/definitions/postResult" }

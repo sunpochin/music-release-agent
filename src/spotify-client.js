@@ -172,8 +172,9 @@ async function findAlbumMetadataFromCache(albumId, cache) {
 }
 
 /**
- * 背景非同步預載專輯內所有歌曲的歌詞原文並寫入快取，不影響 API 反應時間
- * 讀取/快取原始歌詞 (LRCLIB)
+ * 背景非同步預載專輯內所有歌曲的歌詞原文，不影響 API 反應時間。
+ * 歌詞抓取與快取已拆至 lyrics-vault-service companion —
+ * 這裡只發 fire-and-forget 請求；companion 不在線時靜默略過（核心不依賴歌詞功能）。
  */
 function triggerLyricsPreFetch(albumId, tracks, cache) {
   if (!tracks || tracks.length === 0) return;
@@ -181,16 +182,14 @@ function triggerLyricsPreFetch(albumId, tracks, cache) {
     const artistName = meta?.artistName;
     if (!artistName || artistName === 'Unknown Artist') return;
 
-    try {
-      const { getRawLyrics } = await import('./services/lyrics-service.js');
-      console.log(`[Spotify/Client] 🚀 開始背景預載《${artistName}》專輯 [${albumId}] 的 ${tracks.length} 首歌詞原文...`);
-      // 順序執行，避免對 LRCLIB 發送過於密集的請求
-      for (const track of tracks) {
-        if (track.name.startsWith('Demo Track')) continue; // 忽略測試/模擬的 Demo 曲目
-        getRawLyrics({ artistName, trackName: track.name }).catch(() => {});
-      }
-    } catch (e) {
-      console.error('[Spotify/Client] 載入 lyrics-service 失敗:', e);
+    const { lyricsClient } = await import('./services/lyrics-client.js');
+    if (!(await lyricsClient.isHealthy())) return; // companion 不在線 → 跳過預載，不報錯
+
+    console.log(`[Spotify/Client] 🚀 開始背景預載《${artistName}》專輯 [${albumId}] 的 ${tracks.length} 首歌詞原文...`);
+    // 順序觸發；節流與來源禮節由 lyrics-vault-service 負責
+    for (const track of tracks) {
+      if (track.name.startsWith('Demo Track')) continue; // 忽略測試/模擬的 Demo 曲目
+      lyricsClient.fetchLyrics({ artistName, trackName: track.name, translate: false }).catch(() => {});
     }
   }).catch(() => {});
 }

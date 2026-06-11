@@ -160,8 +160,10 @@ async function main() {
       validate: (json) => json.coreReady === true
     });
 
-    if (readyReport.status !== 'ok') {
-      throw new Error(`expected readyz status "ok", got "${readyReport.status}"`);
+    // 本驗證只起 social companion；lyrics companion 不在線會讓整體 status 為 degraded，
+    // 這是正確語義 — 此處斷言的是「social 這條依賴」的可達性，而非全部 companion
+    if (readyReport.status !== 'ok' && readyReport.status !== 'degraded') {
+      throw new Error(`expected readyz status "ok" or "degraded", got "${readyReport.status}"`);
     }
 
     if (readyReport.checks.socialPostService !== 'reachable') {
@@ -173,7 +175,10 @@ async function main() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         caption: 'Integration proof from music-release-agent to social-post-service',
-        platforms: ['threads']
+        platforms: ['threads'],
+        // 本驗證以 STRATEGY=mock 拉起 companion，必須明示 mock 模式 —
+        // 未指定時 companion 預設 live 並拒絕 mock strategy（503）
+        mode: 'mock'
       })
     });
 
@@ -202,7 +207,7 @@ async function main() {
 
     console.log('\nIntegration proof passed:');
     console.log('- social-post-service became healthy on a dedicated test port');
-    console.log('- readyz reported the app as fully ready with reachable dependency state');
+    console.log('- readyz reported coreReady with reachable social-post-service');
     console.log('- music-release-agent forwarded publish requests to the companion service');
     console.log('- publish endpoint returned 202 Accepted matching the handoff contract schema');
     console.log('- status polling observed job completion matching the handoff contract schema');

@@ -63,10 +63,11 @@ npm run demo:verify
 ### 2. Cross-service proof
 
 ```bash
-npm run demo:verify:social
+npm run demo:verify:social    # 核心 ↔ social-post-service
+npm run demo:verify:lyrics    # 核心 ↔ lyrics-vault-service
 ```
 
-暫時拉起 `music-release-agent` 與 `social-post-service`。**不需要姊妹 repo**：若 `../social-post-service` 不存在，會自動退回內建的 `tests/fixtures/mock-social-service.js`（零依賴、實作同一份 handoff 契約），因此單獨 clone 本 repo 也能完整驗證：
+暫時拉起 `music-release-agent` 與對應 companion。**不需要姊妹 repo**：若 `../social-post-service` / `../lyrics-vault-service` 不存在，會自動退回內建的 `tests/fixtures/mock-*-service.js`（零依賴、實作同一份 handoff 契約），因此單獨 clone 本 repo 也能完整驗證。以 social 為例：
 
 - `music-release-agent` 代理轉發 `POST /api/social/publish`
 - `social-post-service` 回傳 `202 Accepted`
@@ -77,13 +78,14 @@ npm run demo:verify:social
 
 ```bash
 npm run demo:verify:social:down
+npm run demo:verify:lyrics:down
 ```
 
-驗證 `social-post-service` 不可達時：
+驗證 companion service 不可達時：
 
-- `/api/social/health` 會回報 `reachable: false`
-- `/api/social/publish` 會穩定回 `502`
-- `/readyz` 會顯示 `degraded`
+- `/api/social/health`、`/api/lyrics/health` 會回報 `reachable: false`
+- `/api/social/publish`、`/api/lyrics` 會穩定回 `502`
+- `/readyz` 會顯示 `degraded` 並標明哪個 companion unreachable
 - 核心服務不會崩掉
 
 ---
@@ -134,7 +136,7 @@ npm run scan:dry
 ### Dashboard 體驗
 打開瀏覽器訪問 [http://localhost:5173](http://localhost:5173) 即可立即開始體驗：
 - 🌟 **音樂庫瀏覽**：流暢的毛玻璃卡片式導覽與最新發行清單。
-- 🔮 **AI 雙語歌詞**：點選任一曲目，即時獲取 Gemini 翻譯與賞析對照。
+- 🔮 **AI 雙語歌詞**：點選任一曲目，即時獲取翻譯對照（由 companion `lyrics-vault-service` 提供，翻譯落盤為 Obsidian 相容筆記）。
 - 🚀 **社群自動發佈**：點擊「發佈到社群」一鍵觸發非同步多平台發佈流。
 
 ### `social-post-service` 何時必須存在？
@@ -307,34 +309,20 @@ GITBOOK_PATH=../social-dancing-notes
 SOCIAL_SERVICE_URL=http://localhost:3012
 ```
 
-And for the experimental local-only lyrics adapter, add the cookie token to `.env.local`:
-針對實驗性本機專用歌詞轉接器，將 Cookie 憑證加入 `.env.local`：
+### 🎼 歌詞翻譯 Companion：lyrics-vault-service
 
-```ini
-SPOTIFY_SP_DC=your_sp_dc_cookie_here
-```
+歌詞翻譯與 Obsidian vault 落盤已拆分至獨立 companion service [`../lyrics-vault-service`](../lyrics-vault-service)（與 `social-post-service` 同一套 handoff-contract 模式）。本 repo 只保留 thin proxy（`/api/lyrics` → `LYRICS_SERVICE_URL`，預設 `http://localhost:3013`）與降級行為——companion 不在線時 `/api/lyrics` 穩定回 502、`/readyz` 顯示 degraded、核心功能不受影響。
 
-### 🔐 實驗性本機專用歌詞轉接器憑證獲取 (sp_dc) / Experimental Local-Only Spotify Web Lyrics Adapter (sp_dc)
+契約：[`contracts/lyrics-handoff.schema.json`](./contracts/lyrics-handoff.schema.json)（單一事實來源在 lyrics-vault-service，本 repo 副本以 drift test 比對）。
 
-本專案支援使用網頁會話憑證抓取 Spotify 歌詞作為本地開發測試的翻譯來源。**請注意：Spotify 官方公開 Web API 並不提供歌詞端點**，此功能僅作實驗性展示用途，使用者需自負帳號風險。
-This project supports fetching lyrics from Spotify Web Player sessions for local development and testing. **Note: The official public Spotify Web API does NOT expose a lyrics endpoint.** This feature is strictly experimental, and users assume all risks associated with account safety.
-
-如果您需要此功能，可以使用半自動腳本來獲取 `sp_dc` cookie 並自動寫入 `.env.local`：
-If you require this, you can run the semi-automated script to capture the `sp_dc` cookie and write it directly to `.env.local`:
+驗證指令（皆不需憑證）：
 
 ```bash
-npm run spotify:capture-cookie
+npm run demo:verify:lyrics        # 跨服務 handoff（無姊妹 repo 時自動退回內建 mock）
+npm run demo:verify:lyrics:down   # companion 不可達時的降級行為
 ```
 
-**運作原理與安全性說明 / How it Works & Security Details:**
-1. 該腳本會啟動一個隔離的沙盒 Chromium 瀏覽器（快取儲存於 `.local/`，此目錄與 `.env.local` 均已加入 `.gitignore`，確保不會被提交）。
-   The script launches an isolated sandbox Chromium instance (data is cached under `.local/`. Both `.local/` and `.env.local` are ignored in `.gitignore` to prevent leaks).
-2. 請在開啟的瀏覽器視窗中手動登入您的 Spotify 帳號。本專案**絕對不接觸、不保存**您的密碼。
-   You must manually log in to your Spotify account in the opened browser window. This project **never touches or saves** your password.
-3. 登入成功後，腳本會自動捕捉 `sp_dc` cookie，寫入您的 `.env.local` 檔案中，並遮罩顯示於終端機後自動關閉瀏覽器。
-   Upon successful login, the script captures the `sp_dc` cookie, writes it to `.env.local`, prints a masked value to the terminal, and closes the browser.
-4. **⚠️ 警告 / WARNING**：`sp_dc` 為個人登入敏感憑證，等同於密碼，請妥善保管，切勿分享、上傳或截圖。
-   `sp_dc` is a sensitive session credential equivalent to your password. Keep it secure and do NOT share, commit, or screenshot it.
+實驗性的 Spotify Web 歌詞轉接器（sp_dc）也一併移至 lyrics-vault-service，合規說明見[該 repo 的 README](../lyrics-vault-service/README.md)。
 
 
 ### 執行真實掃描與 GitOps 發布

@@ -6,12 +6,14 @@
 
 ## 1. 系統總覽
 
-本專案由兩個服務與一個前端組成：
+本專案由一個核心服務、兩個 companion services 與一個前端組成：
 
 ```mermaid
 graph LR
     Dashboard[React Dashboard :5173] -->|REST| Core[music-release-agent :3011]
     Core -->|代理轉發 POST /api/posts| Social[social-post-service :3012]
+    Core -->|代理轉發 POST /api/lyrics| Lyrics[lyrics-vault-service :3013]
+    Lyrics -->|落盤 Markdown| Vault[(Obsidian vault)]
     Core -->|讀寫| Data[(data/ 快取與狀態檔)]
     Scanner[掃描管線 scan-releases.js] -->|外部 API| Spotify[Spotify API]
     Scanner -->|降級| MB[MusicBrainz API]
@@ -23,9 +25,12 @@ graph LR
 
 | 元件 | 職責 | 不負責 |
 |---|---|---|
-| `music-release-agent`（核心服務） | 音樂庫 API、掃描管線、AI 樂評、GitBook 輸出、社群發文「代理」 | 實際對社群平台發文 |
+| `music-release-agent`（核心服務） | 音樂庫 API、掃描管線、AI 樂評、GitBook 輸出、companion「代理」 | 實際對社群平台發文、歌詞翻譯與落盤 |
 | `social-post-service`（companion） | 接收發文任務、入隊、依策略（Mock / Ayrshare）非同步發佈 | 音樂資料與內容生成 |
+| `lyrics-vault-service`（companion） | 歌詞取得（LRCLIB）、LLM 翻譯（Gemini/Ollama）、Obsidian 相容 Markdown 落盤 | 音樂庫與發佈流程 |
 | `dashboard`（React + Vite） | 瀏覽、歌詞翻譯展示、觸發發佈 | 任何商業邏輯與狀態持久化 |
+
+兩個 companion 走同一套模式：核心只持有 thin client（`src/services/social-client.js`、`src/services/lyrics-client.js`）+ handoff contract（`contracts/*.schema.json`）+ 降級行為；companion 不可達時對應 API 回 502、`/readyz` 標 degraded、核心不崩。
 
 ---
 
@@ -123,14 +128,32 @@ Dashboard 不直接呼叫 `social-post-service`；一律經由核心服務代理
 2. `npm run demo:verify:social:down` — 驗證 companion 不可達時的降級行為
 3. `npx vitest run tests/contract` — 契約 schema 與 mock 實作的離線確定性驗證
 
-### 3.2 掃描器 → 外部資料源（策略邊界）
+### 3.2 核心服務 → 歌詞服務
+
+歌詞翻譯與 Obsidian vault 落盤由 `lyrics-vault-service` 負責；核心同樣只做代理（`POST/DELETE /api/lyrics` → companion 同路徑）。
+
+**歌詞請求**（Dashboard → 核心 `POST /api/lyrics` → companion）：
+
+```json
+{ "artistName": "string", "trackName": "string", "trackId": "string|null", "translate": true, "refresh": false }
+```
+
+**回應**：
+
+```json
+{ "text": "string", "cached": false, "provider": "gemini|ollama|raw", "source": "lrclib|spotify|llm-recall|...", "translated": true }
+```
+
+契約單一事實來源在 `lyrics-vault-service/contracts/lyrics-handoff.schema.json`；本 repo 持有副本供內建 mock（`tests/fixtures/mock-lyrics-service.js`）與 `demo:verify:lyrics` 離線使用，`tests/contract/lyrics-handoff-drift.test.js` 比對兩檔內容一致。`source` 欄位是誠實標示機制：`lrclib` 為可驗證真實歌詞、`llm-recall` 為模型記憶（幻覺風險）、`*-untranslated` 為翻譯降級。
+
+### 3.3 掃描器 → 外部資料源（策略邊界）
 
 `src/strategies/` 實作 discovery strategy 介面，掃描器只依賴抽象：
 
 - `spotify-strategy.js` — 主要渠道
 - `musicbrainz-strategy.js` — 降級渠道，輸出動態轉換為 Spotify 相容 schema
 
-### 3.3 後端 → 前端（內容信任邊界）
+### 3.4 後端 → 前端（內容信任邊界）
 
 AI 生成的歌詞與分析以 Markdown 字串交付前端。前端視其為**不可信輸入**：`dashboard/src/utils/markdown.js` 先對整行做 HTML 轉義，再做格式解析，輸出僅含白名單標籤（h2/h3/hr/div/span/p/strong/br）。此邊界有兩層證明：單元層（`tests/markdown-renderer.test.js`，轉譯器輸出字串性質）與瀏覽器層（`tests/e2e/dashboard.spec.js` 的 XSS 測試 — 把含 `<script>`、`onerror`、`onload` 注入的 payload 餵進歌詞 API，驗證注入旗標未執行、內容以純文字呈現、DOM 無危險元素、無 dialog）。
 
@@ -144,6 +167,7 @@ AI 生成的歌詞與分析以 Markdown 字串交付前端。前端視其為**�
 | Spotify 被熔斷或連線失敗 | 自動降級 MusicBrainz（搜 MBID → 抓專輯 → 轉換 schema） | `tests/baseline.test.js`、`tests/strategies.test.js` |
 | MusicBrainz 也失敗 | 回傳 mock 預設曲目（最後防線），不讓管線崩潰 | `tests/baseline.test.js` |
 | `social-post-service` 不可達 | `/api/social/health` 回 `reachable: false`；`/api/social/publish` 回穩定 502（不 hang、不 crash）；`/readyz` 回 `degraded` | `npm run demo:verify:social:down` |
+| `lyrics-vault-service` 不可達 | `/api/lyrics/health` 回 `reachable: false`；`/api/lyrics` 回穩定 502；`/readyz` 回 `degraded` 並標明 `lyricsVaultService: unreachable`；歌詞預載靜默跳過 | `npm run demo:verify:lyrics:down` |
 | mock fixture 資料壞掉 | 管線非零 exit code + 列出每個壞欄位；`demo:verify` 在執行管線「之前」就擋下 | `tests/golden/dry-run-golden.test.js`（失敗情境） |
 | 生成的樂評內容不完整 | `demo:verify` 檢查封面圖、標題、評分、聆聽連結四個必要標記，缺一即 fail | `npm run demo:verify` |
 | SUMMARY.md 重複連結（冪等性破壞） | `demo:verify` 偵測同一連結出現超過一次即 fail | golden tests 冪等性案例 + `demo:verify` |
@@ -167,8 +191,8 @@ AI 生成的歌詞與分析以 Markdown 字串交付前端。前端視其為**�
 |---|---|---|---|
 | 1 | `npm test` | 否 | 全部單元 + golden + 前端安全測試（含正常/模糊/失敗情境） |
 | 2 | `npm run demo:verify` | 否 | 離線管線端到端 + 產物 schema 與內容完整性 |
-| 3 | `npm run demo:verify:social` | 否（自動退回內建 mock） | 跨服務 handoff 契約 |
-| 4 | `npm run demo:verify:social:down` | 否 | 依賴失敗時的降級行為 |
+| 3 | `npm run demo:verify:social` / `demo:verify:lyrics` | 否（自動退回內建 mock） | 跨服務 handoff 契約 |
+| 4 | `npm run demo:verify:social:down` / `demo:verify:lyrics:down` | 否 | 依賴失敗時的降級行為 |
 | 5 | `npm run scan` | 是（Spotify + Gemini 憑證） | 真實管線 |
 
 測試提示：golden e2e 測試透過 `DRY_RUN_FAST=1`、`DRY_RUN_DATA_PATH`、`DRY_RUN_OUTPUT_DIR` 環境變數把管線導向暫存目錄執行，輸出內容與正式 dry-run 完全相同，只是跳過模擬延遲。

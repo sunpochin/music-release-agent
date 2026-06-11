@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import pinoHttp from 'pino-http';
 import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js';
-import { getLyricsWithCache, clearTrackCache } from './src/services/lyrics-service.js';
+import { lyricsClient } from './src/services/lyrics-client.js';
 import { getSpotifyAlbumTracks } from './src/spotify-client.js';
 import { generateTrackAnalysis } from './src/album-reviewer.js';
 import { socialClient } from './src/services/social-client.js';
@@ -70,22 +70,21 @@ async function pathAccessible(targetPath) {
 
 async function buildReadinessReport() {
   const isDev = process.env.NODE_ENV === 'development';
-  const [dashboardBuilt, mockDataAvailable, cacheAvailable, socialReachable] = await Promise.all([
+  const [dashboardBuilt, mockDataAvailable, cacheAvailable, socialReachable, lyricsReachable] = await Promise.all([
     pathAccessible(dashboardIndexPath),
     pathAccessible(mockDataPath),
     pathAccessible(cacheDataPath),
-    // 【小朋友解釋法】：
-    // 打電話給特別嘉賓確認健康狀態時，如果電話線斷了（請求報錯），不要讓整個派對取消（Promise.all 崩潰回傳 500）。
-    // 我們加上保險絲 (.catch(() => false))，打不通就當他無法出席 (false) 就好，派對照常開門！
-    socialClient.isHealthy().catch(() => false)
+    // companion 健康檢查失敗只代表降級（degraded），不應讓 Promise.all 崩潰回傳 500
+    socialClient.isHealthy().catch(() => false),
+    lyricsClient.isHealthy().catch(() => false)
   ]);
 
   // 【小朋友解釋法】：
   // 在排練（開發環境）時，我們不需要真的把海報印好裝框（不需 npm run build 產生 index.html），
   // 所以如果是開發環境（isDev），我們就放寬限制，海報沒印好也算準備就緒，方便我們本地測試！
   const coreReady = (isDev || dashboardBuilt) && mockDataAvailable;
-  const dependencyStatus = socialReachable ? 'reachable' : 'unreachable';
-  const status = coreReady ? (socialReachable ? 'ok' : 'degraded') : 'not_ready';
+  const allCompanionsReachable = socialReachable && lyricsReachable;
+  const status = coreReady ? (allCompanionsReachable ? 'ok' : 'degraded') : 'not_ready';
 
   return {
     status,
@@ -94,11 +93,13 @@ async function buildReadinessReport() {
       dashboardBuilt,
       mockDataAvailable,
       cacheAvailable,
-      socialPostService: dependencyStatus
+      socialPostService: socialReachable ? 'reachable' : 'unreachable',
+      lyricsVaultService: lyricsReachable ? 'reachable' : 'unreachable'
     },
     ports: {
       app: Number(PORT),
-      socialServiceUrl: process.env.SOCIAL_SERVICE_URL || 'http://localhost:3012'
+      socialServiceUrl: process.env.SOCIAL_SERVICE_URL || 'http://localhost:3012',
+      lyricsServiceUrl: process.env.LYRICS_SERVICE_URL || 'http://localhost:3013'
     },
     timestamp: new Date().toISOString()
   };
@@ -276,9 +277,9 @@ app.get('/api/review', async (req, res) => {
   }
 });
 
-// 翻譯歌詞 API
-// 歌詞翻譯（快取優先）：cache hit 零 token；miss 才呼叫 LYRICS_PROVIDER（gemini|ollama）
-// 失效策略見 docs/lyrics_cache_design.md — 不可變內容無 TTL，promptVersion 改版自然 miss
+// 翻譯歌詞 API — 轉發至 lyrics-vault-service companion（歌詞翻譯 + Obsidian vault 落盤）
+// 快取邏輯（hit 零 token、promptVersion 失效）在 companion 內；本服務只轉發與降級。
+// 契約：contracts/lyrics-handoff.schema.json
 app.post('/api/lyrics', async (req, res) => {
   const { artistName, trackName, trackId, translate, refresh } = req.body;
   if (!artistName || !trackName) {
@@ -286,20 +287,21 @@ app.post('/api/lyrics', async (req, res) => {
   }
 
   try {
-    const result = await getLyricsWithCache({
+    const result = await lyricsClient.fetchLyrics({
       artistName,
       trackName,
       trackId,
       translate: Boolean(translate),
-      forceRefresh: Boolean(refresh)
+      refresh: Boolean(refresh)
     });
     res.json(result); // { text, cached, provider, source, translated }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    log.error('歌詞服務不可達', { error: err.message });
+    res.status(502).json({ error: `歌詞服務不可達: ${err.message}` });
   }
 });
 
-// 清除特定歌曲快取 API
+// 清除特定歌曲快取 API — 轉發至 lyrics-vault-service
 app.delete('/api/lyrics', async (req, res) => {
   const { artistName, trackName } = req.body;
   if (!artistName || !trackName) {
@@ -307,14 +309,22 @@ app.delete('/api/lyrics', async (req, res) => {
   }
 
   try {
-    const result = await clearTrackCache({ artistName, trackName });
-    if (!result.success) {
-      return res.status(500).json({ error: result.error });
-    }
+    const result = await lyricsClient.clearCache({ artistName, trackName });
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    log.error('歌詞快取清除失敗', { error: err.message });
+    res.status(502).json({ error: `歌詞服務不可達: ${err.message}` });
   }
+});
+
+// 歌詞服務健康檢查
+app.get('/api/lyrics/health', async (_req, res) => {
+  const isHealthy = await lyricsClient.isHealthy();
+  res.json({
+    service: 'lyrics-vault-service',
+    reachable: isHealthy,
+    url: process.env.LYRICS_SERVICE_URL || 'http://localhost:3013'
+  });
 });
 
 // 獲取專輯曲目 API (動態隨選載入)
@@ -348,12 +358,15 @@ app.post('/api/tracks/analyze', async (req, res) => {
 // 社群自動發文代理端點 — 轉發請求至 social-post-service 微服務
 // 請求驗證使用 contracts/social-handoff.schema.json（與內建 mock、verify 腳本共用同一份契約）
 app.post('/api/social/publish', async (req, res) => {
-  const { caption, platforms, imageBase64 } = req.body;
+  const { caption, platforms, imageBase64, mode } = req.body;
 
   const outboundBody = {
     image: imageBase64 || null,
     caption,
-    platforms: platforms || ['threads']
+    platforms: platforms || ['threads'],
+    // mode 語義（companion 的 post-manager）：'mock' = 模擬發佈；'live'（預設）= 真實平台
+    // 不轉發 mode 曾造成 verify 腳本與真實 companion 的 503 drift — 必須透傳
+    ...(mode ? { mode } : {})
   };
   const contractCheck = validateAgainstDefinition(handoffSchema, 'publishRequest', outboundBody);
   if (!contractCheck.valid) {
@@ -364,7 +377,8 @@ app.post('/api/social/publish', async (req, res) => {
     const result = await socialClient.publishPost({
       imageBase64,
       caption,
-      platforms: platforms || ['threads']
+      platforms: platforms || ['threads'],
+      mode
     });
     // 回傳 202 Accepted 與 jobId 供前端輪詢狀態
     res.status(202).json(result);

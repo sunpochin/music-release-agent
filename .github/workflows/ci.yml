@@ -44,6 +44,14 @@ jobs:
     - name: Verify Failure Mode (companion service down)
       run: npm run demo:verify:social:down
 
+    - name: Verify Lyrics Handoff (built-in mock)
+      run: npm run demo:verify:lyrics
+      env:
+        FORCE_MOCK_LYRICS: 'true'
+
+    - name: Verify Lyrics Failure Mode (companion service down)
+      run: npm run demo:verify:lyrics:down
+
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps chromium
 

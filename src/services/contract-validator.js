@@ -18,11 +18,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const HANDOFF_SCHEMA_PATH = path.resolve(__dirname, '..', '..', 'contracts', 'social-handoff.schema.json');
+const CONTRACTS_DIR = path.resolve(__dirname, '..', '..', 'contracts');
 
-/** 載入 handoff 契約 schema（單一事實來源檔案） */
+/** 載入 social handoff 契約 schema（單一事實來源檔案） */
 export function loadHandoffSchema() {
-  return JSON.parse(fs.readFileSync(HANDOFF_SCHEMA_PATH, 'utf-8'));
+  return JSON.parse(fs.readFileSync(path.join(CONTRACTS_DIR, 'social-handoff.schema.json'), 'utf-8'));
+}
+
+/** 載入 lyrics handoff 契約 schema（單一事實來源在 lyrics-vault-service，本檔為 drift test 比對的副本） */
+export function loadLyricsHandoffSchema() {
+  return JSON.parse(fs.readFileSync(path.join(CONTRACTS_DIR, 'lyrics-handoff.schema.json'), 'utf-8'));
 }
 
 function typeOf(value) {

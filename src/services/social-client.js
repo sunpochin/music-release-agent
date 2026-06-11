@@ -23,7 +23,7 @@ export class SocialClient {
    * @param {string[]} params.platforms - 目標平台陣列（如 ['threads', 'facebook']）
    * @returns {Promise<{jobId: string, status: string}>}
    */
-  async publishPost({ imageBase64, caption, platforms = ['threads'] }) {
+  async publishPost({ imageBase64, caption, platforms = ['threads'], mode }) {
     // 自非同步本地儲存空間讀取當前的 Request ID (Correlation ID)
     const store = requestStore.getStore();
     const requestId = store?.requestId;
@@ -39,7 +39,9 @@ export class SocialClient {
       body: JSON.stringify({
         image: imageBase64 || null,
         caption,
-        platforms
+        platforms,
+        // mode: 'mock'（模擬發佈）| 'live'（預設，需真實平台 strategy）— 透傳給 companion
+        ...(mode ? { mode } : {})
       })
     });
 
