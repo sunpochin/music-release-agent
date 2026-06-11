@@ -1,38 +1,46 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Disc3, Music, Sparkles, Share2, Download, AlertCircle, Info, Calendar, Layers, ExternalLink, Send } from 'lucide-react'
+import { Music } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import html2canvas from 'html2canvas'
 import ShareCard from './components/ShareCard'
 import Sidebar from './components/Sidebar'
 import HeaderBanner from './components/HeaderBanner'
 import MetadataPanel from './components/MetadataPanel'
-import AILyricsPanel from './components/AILyricsPanel'
+import SongPage from './components/SongPage'
+import { useAlbumTracks } from './hooks/useAlbumTracks'
+import { useTrackAi } from './hooks/useTrackAi'
 
+// 【小朋友解釋法】：
+// App.jsx 以前是「什麼家具都堆在裡面的大客廳」。
+// 現在歌單送貨員（useAlbumTracks）、AI 翻譯員（useTrackAi）
+// 和單曲房間的管家（SongPage）都搬進自己的房間，
+// 客廳只負責：路由同步、專輯選取、分享圖卡、社群發文。
 function App() {
   const [albums, setAlbums] = useState([])
   const [selectedAlbum, setSelectedAlbum] = useState(null)
-  const [lyricsData, setLyricsData] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   // 儲存預先產生的圖卡檔案，以利 iOS Safari 進行同步分享
   const [shareFile, setShareFile] = useState(null)
   // 儲存本地 AI 樂評之介紹與總結
   const [albumReview, setAlbumReview] = useState({ introduction: '', summary: '' })
-  
-  // 專輯曲目與單曲 AI 分析狀態
-  const [tracks, setTracks] = useState([])
+
   const [selectedTrack, setSelectedTrack] = useState(null)
-  const [tracksLoading, setTracksLoading] = useState(false)
-  const [analysisData, setAnalysisData] = useState('')
-  const [analysisLoading, setAnalysisLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('lyrics') // 'lyrics' | 'analysis'
-  
+
   const shareCardRef = useRef(null)
-  // 隨時追蹤當前選中的單曲，以防異步請求結束時選取已改變
-  const selectedTrackRef = useRef(selectedTrack)
-  useEffect(() => {
-    selectedTrackRef.current = selectedTrack
-  }, [selectedTrack])
+
+  // 專輯曲目清單（三態：loading / error / data）
+  const { tracks, tracksLoading, tracksError, retryTracks } = useAlbumTracks(selectedAlbum)
+
+  // 單曲 AI 歌詞翻譯與賞析（含防舊蓋新與換歌擦黑板）
+  const {
+    lyricsData,
+    isLoading,
+    analysisData,
+    analysisLoading,
+    handleFetchLyrics,
+    handleAnalyzeTrack
+  } = useTrackAi(selectedAlbum, selectedTrack)
 
   // 社群自動發文狀態
   const [isPublishing, setIsPublishing] = useState(false)
@@ -78,56 +86,6 @@ function App() {
     }
   }, [selectedAlbum])
 
-  // 當選取專輯時，自後端 API 取得專輯歌曲清單 (動態隨選載入)
-  // 【小朋友解釋法】：
-  // 當快速切換專輯時，舊的送貨員（舊的異步請求）可能會比較慢把歌單送來，不小心蓋掉最新點的歌單。
-  // 我們加一個「有效標記」(active)。每當切換專輯時，就把上一次的標記設成失效 (false)；
-  // 這樣就算舊的歌單送到了，我們也會因為它失效而直接丟掉，只留最新點的歌單！
-  // 使用 ref 紀錄上一次選取的專輯 ID，防止相同專輯因路由切換（例如從 /album/1 點選歌曲跳轉至 /album/1/song/2）重複觸發載入歌單
-  const prevAlbumIdRef = useRef(null)
-  
-  useEffect(() => {
-    let active = true
-    if (selectedAlbum) {
-      // 如果選取的專輯 ID 與上一次相同，代表只是單純切換單曲路由，不需重新獲取歌單與清空曲目
-      if (prevAlbumIdRef.current === selectedAlbum.id) {
-        return
-      }
-      prevAlbumIdRef.current = selectedAlbum.id
-      
-      setTracks([])
-      // 避免在此處將 selectedTrack 重設為 null，交給 trackId 同步機制決定，以防直接進入單曲 URL 時狀態衝突
-      setLyricsData('')
-      setAnalysisData('')
-      setTracksLoading(true)
-      fetch(`/api/albums/${selectedAlbum.id}/tracks`)
-        .then(res => res.json())
-        .then(data => {
-          if (!active) return
-          if (Array.isArray(data)) {
-            setTracks(data)
-          } else {
-            setTracks([])
-          }
-        })
-        .catch(err => {
-          if (active) console.error("Failed to fetch album tracks", err)
-        })
-        .finally(() => {
-          if (active) setTracksLoading(false)
-        })
-    } else {
-      prevAlbumIdRef.current = null
-      setTracks([])
-      setSelectedTrack(null)
-      setLyricsData('')
-      setAnalysisData('')
-    }
-    return () => {
-      active = false
-    }
-  }, [selectedAlbum])
-
   // 根據 URL 中的 trackId 參數同步選取的單曲狀態
   // 【小朋友解釋法】：
   // 我們裝了一個「導航監聽器」(useEffect 監聽 trackId 與 tracks)。
@@ -145,14 +103,9 @@ function App() {
     }
   }, [trackId, tracks])
 
-  // 當選取單曲改變時，重設歌詞與分析狀態以防顯示舊單曲的資料
-  // 【小朋友解釋法】：
-  // 當換歌曲時，為了不讓螢幕上還殘留著上一首歌的歌詞或分析，
-  // 我們一感應到換歌，就立刻「擦黑板」把舊內容擦乾淨，讓畫面呈現空白等待新內容！
+  // 切換歌曲時重設社群發佈狀態（歌詞/分析的「擦黑板」已由 useTrackAi 處理）
   useEffect(() => {
-    setLyricsData('')
-    setAnalysisData('')
-    setPublishResult(null) // 切換歌曲時一併重設社群發佈狀態
+    setPublishResult(null)
   }, [selectedTrack])
 
   // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
@@ -187,95 +140,13 @@ function App() {
     }
   }, [selectedAlbum, selectedTrack, lyricsData, analysisData, albumReview, activeTab, generateShareFile])
 
-  // 僅選取專輯並重設歌詞與載入狀態，使用 react-router 的 navigate 進行 URL 轉換
+  // 僅選取專輯，使用 react-router 的 navigate 進行 URL 轉換
+  // （歌詞與載入狀態的重設由 useTrackAi 的「換歌擦黑板」機制處理）
   const handleSelectAlbum = (album) => {
     if (album) {
       navigate(`/album/${album.id}`)
     } else {
       navigate('/')
-    }
-    setLyricsData('')
-    setIsLoading(false)
-  }
-
-// 手動觸發 AI 歌詞搜尋與翻譯 (綁定選中的單曲)
-  // 【小朋友解釋法】：
-  // 當我們去搜尋並翻譯歌詞時，如果翻譯期間使用者換了歌，
-  // 歌詞送來後就會不小心蓋掉新歌的歌詞！
-  // 所以我們在開始時用小紙條記下歌曲編號 (trackIdAtStart)，
-  // 翻譯送達後比對「監視器」(selectedTrackRef) 是否還是同一首，一樣才更新畫面！
-  const handleFetchLyrics = async () => {
-    if (!selectedAlbum || !selectedTrack) return
-    const trackIdAtStart = selectedTrack.id
-    setIsLoading(true)
-    setLyricsData('')
-    
-    try {
-      const res = await fetch('/api/lyrics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          artistName: selectedAlbum.artistName || 'Unknown Artist', 
-          trackName: selectedTrack.name 
-        })
-      })
-      const result = await res.json()
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        if (result.text) {
-          setLyricsData(result.text)
-        } else {
-          setLyricsData("無法取得歌詞翻譯。")
-        }
-      }
-    } catch (err) {
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setLyricsData("翻譯過程發生錯誤。")
-      }
-    } finally {
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setIsLoading(false)
-      }
-    }
-  }
-
-  // 手動觸發單曲 AI 賞析與分析
-  // 【小朋友解釋法】：
-  // 當我們叫倉庫（API）去寫某一首歌的分析時，如果寫報告期間使用者換了歌，
-  // 報告送來後就會不小心蓋掉新歌的分析內容！
-  // 所以我們要在開始時拿小紙條記下開始時的歌曲編號 (trackIdAtStart)，
-  // 報告送達後看一下「監視器」(selectedTrackRef) 當前顯示的歌是不是同一首，一模一樣才更新畫面！
-  const handleAnalyzeTrack = async () => {
-    if (!selectedAlbum || !selectedTrack) return
-    const trackIdAtStart = selectedTrack.id
-    setAnalysisLoading(true)
-    setAnalysisData('')
-    
-    try {
-      const res = await fetch('/api/tracks/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          artistName: selectedAlbum.artistName || 'Unknown Artist', 
-          trackName: selectedTrack.name,
-          albumName: selectedAlbum.name
-        })
-      })
-      const result = await res.json()
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        if (result.text) {
-          setAnalysisData(result.text)
-        } else {
-          setAnalysisData("無法取得歌曲分析。")
-        }
-      }
-    } catch (err) {
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setAnalysisData("分析過程發生錯誤。")
-      }
-    } finally {
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setAnalysisLoading(false)
-      }
     }
   }
 
@@ -411,35 +282,29 @@ function App() {
                   tracksLoading={tracksLoading}
                 />
 
-                {/* 當有選中歌曲時，顯示 AI 雙語歌詞與圖卡導出面板；否則顯示導引選擇歌曲的精緻佔位卡 */}
-                {selectedTrack ? (
-                  <AILyricsPanel 
-                    selectedAlbum={selectedAlbum}
-                    selectedTrack={selectedTrack}
-                    lyricsData={lyricsData}
-                    isLoading={isLoading}
-                    isExporting={isExporting}
-                    isPublishing={isPublishing}
-                    publishResult={publishResult}
-                    handleFetchLyrics={handleFetchLyrics}
-                    exportShareCard={exportShareCard}
-                    analysisData={analysisData}
-                    analysisLoading={analysisLoading}
-                    handleAnalyzeTrack={handleAnalyzeTrack}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    handlePublishToSocial={handlePublishToSocial}
-                  />
-                ) : (
-                  <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px] hover:border-white/20 transition-all duration-300">
-                    <div className="w-16 h-16 rounded-full bg-spotify-green/10 flex items-center justify-center mb-4 text-spotify-green animate-pulse">
-                      <Music size={32} />
-                    </div>
-                    <p className="text-xs text-gray-400 max-w-sm leading-relaxed">
-                      請從左側曲目清單中選擇一首歌曲以開始 AI 雙語歌詞與音樂賞析
-                    </p>
-                  </div>
-                )}
+                {/* 單曲頁容器：三態（loading / error / data）+ 友善 404 的決策都在 SongPage */}
+                <SongPage
+                  trackId={trackId}
+                  tracks={tracks}
+                  tracksLoading={tracksLoading}
+                  tracksError={tracksError}
+                  retryTracks={retryTracks}
+                  selectedAlbum={selectedAlbum}
+                  selectedTrack={selectedTrack}
+                  lyricsData={lyricsData}
+                  isLoading={isLoading}
+                  isExporting={isExporting}
+                  isPublishing={isPublishing}
+                  publishResult={publishResult}
+                  handleFetchLyrics={handleFetchLyrics}
+                  exportShareCard={exportShareCard}
+                  analysisData={analysisData}
+                  analysisLoading={analysisLoading}
+                  handleAnalyzeTrack={handleAnalyzeTrack}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  handlePublishToSocial={handlePublishToSocial}
+                />
 
               </div>
             </div>
