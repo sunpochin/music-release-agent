@@ -314,4 +314,31 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await expect(page).toHaveURL(/song\/deeplink-track-1/);
     await expect(page.locator('text=尋找歌詞與 AI 翻譯')).toBeVisible();
   });
+
+  test('copy link: button copies the song deep link to clipboard', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await mockAlbumApis(page);
+    await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
+
+    const copyBtn = page.locator('button:has-text("複製連結")');
+    await expect(copyBtn).toBeVisible({ timeout: 15000 });
+    await copyBtn.click();
+
+    // UI 回饋切換為「已複製」
+    await expect(page.locator('button:has-text("已複製")')).toBeVisible();
+
+    // 剪貼簿內容是完整的歌曲深層連結
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toContain('/album/deeplink-album-1/song/deeplink-track-1');
+  });
+
+  test('OG meta: backend share endpoint serves crawler-readable tags', async ({ request }) => {
+    // 直接打後端（:3011）：爬蟲視角 — 不執行 JS，只看門口海報
+    const response = await request.get('http://localhost:3011/album/og-unknown-album');
+    expect(response.status()).toBe(404); // 未知專輯 → 404 + 通用 meta
+    const html = await response.text();
+    expect(html).toContain('og:site_name');
+    expect(html).toContain('og:title');
+    expect(html).toContain('http-equiv="refresh"'); // 真人仍會被導向 SPA
+  });
 });
