@@ -10,6 +10,8 @@
  *        客人說「我要現做的！」（forceRefresh）才會跳過冷凍庫。
  * =====================================================================
  */
+import fs from 'fs/promises';
+import path from 'path';
 import { translateLyrics } from '../lyrics-translator.js';
 import { PROMPT_VERSION, SYSTEM_INSTRUCTION, buildLyricsPrompt } from './lyrics-prompt.js';
 import { fetchLyricsFromSource } from './lyrics-source.js';
@@ -18,7 +20,8 @@ import {
   resolveCacheDir,
   cacheFileName,
   readCachedLyrics,
-  writeCachedLyrics
+  writeCachedLyrics,
+  safeSlug
 } from './lyrics-cache.js';
 
 /** Ollama provider：本地模型，零 API 費用（需本機跑 Ollama） */
@@ -223,5 +226,24 @@ async function persistCache(cacheDir, fileName, { artistName, trackName, provide
     });
   } catch (error) {
     console.error('[LyricsService] 快取寫入失敗（不影響本次回應）:', error.message);
+  }
+}
+
+/**
+ * 清除特定單曲的所有快取檔案（包含原文與所有 provider 翻譯本）
+ */
+export async function clearTrackCache({ artistName, trackName }) {
+  const cacheDir = resolveCacheDir();
+  const prefix = `${safeSlug(artistName)}--${safeSlug(trackName)}`;
+  try {
+    const files = await fs.readdir(cacheDir);
+    const targets = files.filter(f => f.startsWith(prefix) && f.endsWith('.md'));
+    for (const file of targets) {
+      await fs.unlink(path.join(cacheDir, file));
+    }
+    return { success: true, clearedCount: targets.length };
+  } catch (err) {
+    console.error(`[LyricsService] ⚠️ 清除單曲快取失敗: ${err.message}`);
+    return { success: false, error: err.message };
   }
 }

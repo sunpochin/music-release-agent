@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import pinoHttp from 'pino-http';
 import { getSpotifyAuthUrl, handleSpotifyCallback } from './src/spotify-auth.js';
-import { getLyricsWithCache } from './src/services/lyrics-service.js';
+import { getLyricsWithCache, clearTrackCache } from './src/services/lyrics-service.js';
 import { getSpotifyAlbumTracks } from './src/spotify-client.js';
 import { generateTrackAnalysis } from './src/album-reviewer.js';
 import { socialClient } from './src/services/social-client.js';
@@ -291,6 +291,21 @@ app.post('/api/lyrics', async (req, res) => {
       forceRefresh: Boolean(refresh)
     });
     res.json(result); // { text, cached, provider, source, translated }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 清除特定歌曲快取 API
+app.delete('/api/lyrics', async (req, res) => {
+  const { artistName, trackName } = req.body;
+  if (!artistName || !trackName) {
+    return res.status(400).json({ error: 'Missing artistName or trackName' });
+  }
+
+  try {
+    const result = await clearTrackCache({ artistName, trackName });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

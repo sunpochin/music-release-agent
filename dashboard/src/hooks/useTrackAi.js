@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react'
  */
 export function useTrackAi(selectedAlbum, selectedTrack) {
   const [lyricsData, setLyricsData] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [rawLoading, setRawLoading] = useState(false)
   const [isTranslated, setIsTranslated] = useState(false)
   const [isTranslating, setIsTranslating] = useState(false)
 
@@ -40,21 +40,21 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
 
     const timer = setTimeout(() => {
       autoFetchedRef.current = selectedTrack.id
-      fetchLyricsFor(selectedTrack, false)
+      fetchLyricsFor(selectedTrack, { translate: false })
     }, 400)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAlbum, selectedTrack])
 
-  // AI 歌詞搜尋與隨選翻譯（自動載入、手動重試與隨選翻譯共用同一條路徑）
-  const fetchLyricsFor = async (track, translate = false) => {
+  // AI 歌詞搜尋與隨選翻譯主邏輯
+  const fetchLyricsFor = async (track, { translate = false, refresh = false } = {}) => {
     if (!selectedAlbum || !track) return
     const trackIdAtStart = track.id
     
     if (translate) {
       setIsTranslating(true)
     } else {
-      setIsLoading(true)
+      setRawLoading(true)
       setLyricsData('')
       setIsTranslated(false)
     }
@@ -67,13 +67,14 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
           artistName: selectedAlbum.artistName || 'Unknown Artist',
           trackName: track.name,
           trackId: track.id,
-          translate: Boolean(translate)
+          translate: Boolean(translate),
+          refresh: Boolean(refresh)
         })
       })
       const result = await res.json()
       if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setLyricsData(result.text || '無法取得歌詞。')
-        setIsTranslated(Boolean(result.translated))
+        setLyricsData(result?.text || '無法取得歌詞。')
+        setIsTranslated(Boolean(result?.translated))
       }
     } catch {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
@@ -81,24 +82,58 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
       }
     } finally {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setIsLoading(false)
+        setRawLoading(false)
         setIsTranslating(false)
       }
     }
   }
 
-  // 手動重試入口
-  const handleFetchLyrics = () => fetchLyricsFor(selectedTrack, false)
+  // 手動重試與重新載入原文
+  const handleFetchLyrics = () => fetchLyricsFor(selectedTrack, { translate: false })
 
   // 隨選翻譯入口
-  const handleTranslate = () => fetchLyricsFor(selectedTrack, true)
+  const handleTranslate = () => fetchLyricsFor(selectedTrack, { translate: true })
+
+  // 強制重新下載原文入口
+  const handleRedownloadRaw = () => fetchLyricsFor(selectedTrack, { translate: false, refresh: true })
+
+  // 清除快取並重新下載
+  const handleClearCache = async () => {
+    if (!selectedAlbum || !selectedTrack) return
+    const trackIdAtStart = selectedTrack.id
+    setRawLoading(true)
+    try {
+      await fetch('/api/lyrics', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artistName: selectedAlbum.artistName || 'Unknown Artist',
+          trackName: selectedTrack.name
+        })
+      })
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setLyricsData('')
+        setIsTranslated(false)
+        // 重新獲取最原始的歌詞
+        await fetchLyricsFor(selectedTrack, { translate: false })
+      }
+    } catch (err) {
+      console.error('清除快取發生錯誤:', err)
+    } finally {
+      if (selectedTrackRef.current?.id === trackIdAtStart) {
+        setRawLoading(false)
+      }
+    }
+  }
 
   return {
     lyricsData,
-    isLoading,
+    rawLoading,
     isTranslated,
     isTranslating,
     handleFetchLyrics,
-    handleTranslate
+    handleTranslate,
+    handleRedownloadRaw,
+    handleClearCache
   }
 }

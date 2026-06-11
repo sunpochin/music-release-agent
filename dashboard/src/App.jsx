@@ -35,11 +35,13 @@ function App() {
   // 單曲 AI 歌詞翻譯與賞析（含防舊蓋新與換歌擦黑板）
   const {
     lyricsData,
-    isLoading,
+    rawLoading,
     isTranslated,
     isTranslating,
     handleFetchLyrics,
-    handleTranslate
+    handleTranslate,
+    handleRedownloadRaw,
+    handleClearCache
   } = useTrackAi(selectedAlbum, selectedTrack)
 
   // 鍵盤導航：j/↓ 下一首、k/↑ 上一首（打字時自動停用）
@@ -293,7 +295,7 @@ function App() {
                     selectedAlbum={selectedAlbum}
                     selectedTrack={selectedTrack}
                     lyricsData={lyricsData}
-                    isLoading={isLoading}
+                    rawLoading={rawLoading}
                     isTranslated={isTranslated}
                     isTranslating={isTranslating}
                     isExporting={isExporting}
@@ -301,6 +303,8 @@ function App() {
                     publishResult={publishResult}
                     handleFetchLyrics={handleFetchLyrics}
                     handleTranslate={handleTranslate}
+                    handleRedownloadRaw={handleRedownloadRaw}
+                    handleClearCache={handleClearCache}
                     exportShareCard={exportShareCard}
                     handlePublishToSocial={handlePublishToSocial}
                     onBackToAlbum={() => navigate(`/album/${selectedAlbum.id}`)}
