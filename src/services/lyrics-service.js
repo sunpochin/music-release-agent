@@ -13,6 +13,7 @@
 import { translateLyrics } from '../lyrics-translator.js';
 import { PROMPT_VERSION, SYSTEM_INSTRUCTION, buildLyricsPrompt } from './lyrics-prompt.js';
 import { fetchLyricsFromSource } from './lyrics-source.js';
+import { fetchSpotifyLyrics } from './spotify-lyrics.js';
 import {
   resolveCacheDir,
   cacheFileName,
@@ -48,11 +49,11 @@ export async function translateWithOllama(artistName, trackName, sourceLyrics) {
 }
 
 /**
- * 取得/快取原始歌詞 (LRCLIB)
- * 讀寫本地原始歌詞快取，防範重複向 LRCLIB 發送 API 請求
+ * 取得/快取原始歌詞 (Spotify / LRCLIB)
+ * 讀寫本地原始歌詞快取，防範重複向 LRCLIB 或 Spotify 發送 API 請求
  * @returns {Promise<{ lyrics?: string, instrumental?: boolean, source: string }|null>}
  */
-export async function getRawLyrics({ artistName, trackName, forceRefresh = false }) {
+export async function getRawLyrics({ artistName, trackName, trackId, forceRefresh = false }) {
   const cacheDir = resolveCacheDir();
   const rawFileName = cacheFileName({ artistName, trackName, provider: 'raw', promptVersion: 0 });
 
@@ -62,11 +63,21 @@ export async function getRawLyrics({ artistName, trackName, forceRefresh = false
       if (hit.frontmatter.source === 'lrclib-instrumental') {
         return { instrumental: true, source: 'lrclib-instrumental' };
       }
-      return { lyrics: hit.body, source: 'lrclib' };
+      return { lyrics: hit.body, source: hit.frontmatter.source || 'lrclib' };
     }
   }
 
-  const sourced = await fetchLyricsFromSource(artistName, trackName);
+  // 優先嘗試使用 Spotify 官方歌詞 API
+  let sourced = null;
+  if (process.env.SPOTIFY_SP_DC && trackId) {
+    sourced = await fetchSpotifyLyrics(trackId, process.env.SPOTIFY_SP_DC);
+  }
+
+  // 降級使用 LRCLIB 歌詞庫
+  if (!sourced) {
+    sourced = await fetchLyricsFromSource(artistName, trackName);
+  }
+
   if (!sourced) return null;
 
   if (sourced.instrumental) {
@@ -85,23 +96,23 @@ export async function getRawLyrics({ artistName, trackName, forceRefresh = false
     artistName,
     trackName,
     provider: 'raw',
-    source: 'lrclib',
+    source: sourced.source || 'lrclib',
     text: sourced.lyrics
   });
 
-  return { lyrics: sourced.lyrics, source: 'lrclib' };
+  return { lyrics: sourced.lyrics, source: sourced.source || 'lrclib' };
 }
 
 /**
  * 取得歌詞翻譯（快取優先）。
- * @returns {{ text: string, cached: boolean, provider: string }}
+ * @returns {{ text: string, cached: boolean, provider: string, translated: boolean }}
  */
-export async function getLyricsWithCache({ artistName, trackName, forceRefresh = false }) {
+export async function getLyricsWithCache({ artistName, trackName, trackId, forceRefresh = false, translate = true }) {
   const provider = (process.env.LYRICS_PROVIDER || 'gemini').toLowerCase();
   const cacheDir = resolveCacheDir();
   const fileName = cacheFileName({ artistName, trackName, provider, promptVersion: PROMPT_VERSION });
 
-  // 1. 冷凍庫優先（forceRefresh 時跳過）
+  // 1. 冷凍庫優先：若有翻譯後的快取，直接回傳雙語對照
   if (!forceRefresh) {
     const hit = await readCachedLyrics(cacheDir, fileName);
     if (hit) {
@@ -109,59 +120,71 @@ export async function getLyricsWithCache({ artistName, trackName, forceRefresh =
         text: hit.body,
         cached: true,
         provider: String(hit.frontmatter.provider || provider),
-        source: hit.frontmatter.source ? String(hit.frontmatter.source) : undefined
+        source: hit.frontmatter.source ? String(hit.frontmatter.source) : undefined,
+        translated: true
       };
     }
   }
 
-  // 2. miss → 先去歌詞圖書館（LRCLIB）借真實原文；借不到則降級為 LLM 記憶模式
-  const sourced = await getRawLyrics({ artistName, trackName, forceRefresh });
+  // 2. miss → 先去取得真實原文（優先 Spotify，次之 LRCLIB）
+  const sourced = await getRawLyrics({ artistName, trackName, trackId, forceRefresh });
 
   if (sourced?.instrumental) {
     const text = '### 歌曲介紹\n這是一首演奏曲（Instrumental），沒有歌詞，請直接聆聽音樂本身的故事。';
     await persistCache(cacheDir, fileName, { artistName, trackName, provider, source: 'lrclib-instrumental', text });
-    return { text, cached: false, provider, source: 'lrclib-instrumental' };
+    return { text, cached: false, provider, source: 'lrclib-instrumental', translated: true };
   }
 
-  const source = sourced ? 'lrclib' : 'llm-recall';
+  // 3. 如果不要求進行翻譯，直接回傳原始歌詞（隨選翻譯產品設計）
+  if (!translate) {
+    if (!sourced) return null;
+    return {
+      text: `### 歌詞原文\n\n${sourced.lyrics}`,
+      cached: false,
+      provider: 'raw',
+      source: sourced.source,
+      translated: false
+    };
+  }
+
+  // 4. 要求翻譯，啟動 LLM 翻譯流程
+  const source = sourced ? (sourced.source || 'lrclib') : 'llm-recall';
   let text;
   let finalSource = source;
   let finalProvider = provider;
+  const rawLyrics = sourced?.lyrics;
 
   try {
     if (finalProvider === 'gemini' && !process.env.GEMINI_API_KEY) {
-      // 若沒有 API 金鑰，主動丟出錯誤以觸發降級
       throw new Error('Missing GEMINI_API_KEY in environment variables');
     }
 
-    // 3. 嘗試以設定的 provider 進行翻譯
     text = finalProvider === 'ollama'
-      ? await translateWithOllama(artistName, trackName, sourced?.lyrics)
-      : await translateLyrics(artistName, trackName, sourced?.lyrics);
+      ? await translateWithOllama(artistName, trackName, rawLyrics)
+      : await translateLyrics(artistName, trackName, rawLyrics);
   } catch (err) {
     // 若預設的 Gemini 翻譯失敗，嘗試降級到本地 Ollama
     if (finalProvider === 'gemini') {
       console.warn(`[LyricsService] ⚠️ Gemini 翻譯失敗 (${err.message})，嘗試降級至 Ollama...`);
       try {
-        text = await translateWithOllama(artistName, trackName, sourced?.lyrics);
+        text = await translateWithOllama(artistName, trackName, rawLyrics);
         finalProvider = 'ollama';
       } catch (ollamaErr) {
-        // 若 Ollama 也失敗且有 LRCLIB 原文，則優雅降級顯示原文
-        if (sourced?.lyrics) {
-          console.warn(`[LyricsService] ⚠️ Ollama 降級也失敗 (${ollamaErr.message})，退回顯示 LRCLIB 原文`);
-          text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${sourced.lyrics}`;
-          finalSource = 'lrclib-untranslated';
+        // 若 Ollama 也失敗且有原文，則退回顯示原始歌詞
+        if (rawLyrics) {
+          console.warn(`[LyricsService] ⚠️ Ollama 降級也失敗 (${ollamaErr.message})，退回顯示原始歌詞`);
+          text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${rawLyrics}`;
+          finalSource = `${source}-untranslated`;
         } else {
-          // 若無原文則拋出原始錯誤，以防測試無法捕捉 GEMINI_API_KEY 錯誤
           throw err;
         }
       }
     } else {
-      // 若本來就是 Ollama 且失敗，只要有原文就顯示原文
-      if (sourced?.lyrics) {
-        console.warn(`[LyricsService] ⚠️ Ollama 翻譯失敗 (${err.message})，退回顯示 LRCLIB 原文`);
-        text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${sourced.lyrics}`;
-        finalSource = 'lrclib-untranslated';
+      // 若本來就是 Ollama 且失敗，退回顯示原始歌詞
+      if (rawLyrics) {
+        console.warn(`[LyricsService] ⚠️ Ollama 翻譯失敗 (${err.message})，退回顯示原始歌詞`);
+        text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${rawLyrics}`;
+        finalSource = `${source}-untranslated`;
       } else {
         throw err;
       }

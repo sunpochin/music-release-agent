@@ -277,7 +277,7 @@ app.get('/api/review', async (req, res) => {
 // 歌詞翻譯（快取優先）：cache hit 零 token；miss 才呼叫 LYRICS_PROVIDER（gemini|ollama）
 // 失效策略見 docs/lyrics_cache_design.md — 不可變內容無 TTL，promptVersion 改版自然 miss
 app.post('/api/lyrics', async (req, res) => {
-  const { artistName, trackName, refresh } = req.body;
+  const { artistName, trackName, trackId, translate, refresh } = req.body;
   if (!artistName || !trackName) {
     return res.status(400).json({ error: 'Missing artistName or trackName' });
   }
@@ -286,9 +286,11 @@ app.post('/api/lyrics', async (req, res) => {
     const result = await getLyricsWithCache({
       artistName,
       trackName,
+      trackId,
+      translate: Boolean(translate),
       forceRefresh: Boolean(refresh)
     });
-    res.json(result); // { text, cached, provider, source }
+    res.json(result); // { text, cached, provider, source, translated }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
