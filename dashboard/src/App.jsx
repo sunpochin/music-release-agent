@@ -265,10 +265,17 @@ function App() {
       <main className={`flex-1 relative flex flex-col bg-gradient-to-b from-[#1e1e1e] to-spotify-dark ${selectedAlbum ? 'flex' : 'hidden lg:flex'}`}>
         {selectedAlbum ? (
           <>
-            {/* Header Banner 頂部專輯資訊橫幅 */}
-            <HeaderBanner 
+            {/* Header Banner 頂部專輯資訊橫幅（手機返回鍵：歌曲頁先回專輯頁，再回清單） */}
+            <HeaderBanner
               selectedAlbum={selectedAlbum}
-              setSelectedAlbum={() => handleSelectAlbum(null)}
+              backLabel={trackId ? '返回專輯' : '返回列表'}
+              onBack={() => {
+                if (trackId) {
+                  navigate(`/album/${selectedAlbum.id}`)
+                } else {
+                  handleSelectAlbum(null)
+                }
+              }}
             />
 
             {/* 主內容：mobile first 雙模式版面

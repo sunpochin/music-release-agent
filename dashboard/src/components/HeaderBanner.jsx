@@ -2,17 +2,21 @@ import React from 'react'
 import { Disc3 } from 'lucide-react'
 
 // 頂部專輯橫幅元件：展示專輯封面大圖、標題、歌手與發行類型，支援行動端返回按鈕
-const HeaderBanner = ({ selectedAlbum, setSelectedAlbum }) => {
+// 【小朋友解釋法】：以前手機上只有一顆「直接回大門」的按鈕。
+// 但客人在「歌曲房間」時，比較自然的是先回「專輯客廳」再回大門 —
+// 所以返回鍵現在是「回上一層」：歌曲頁 → 專輯頁 → 專輯清單，一層一層走。
+const HeaderBanner = ({ selectedAlbum, onBack, backLabel = '返回列表' }) => {
   if (!selectedAlbum) return null
 
   return (
     <div className="min-h-[256px] lg:h-64 p-6 lg:p-8 flex flex-col lg:flex-row items-center lg:items-end gap-6 relative overflow-hidden text-center lg:text-left pt-20 lg:pt-8">
-      {/* 手機版返回按鈕 */}
-      <button 
-        onClick={() => setSelectedAlbum(null)}
+      {/* 手機版返回按鈕（兩層導航：歌曲 → 專輯 → 清單） */}
+      <button
+        onClick={onBack}
+        aria-label={backLabel}
         className="absolute top-6 left-6 z-20 lg:hidden bg-black/60 hover:bg-black/80 hover:scale-105 active:scale-95 transition-all px-4 py-2 rounded-full font-bold text-xs flex items-center gap-1 border border-white/10 shadow-lg animate-fade-in"
       >
-        ← 返回列表
+        ← {backLabel}
       </button>
 
       {/* 背景高斯模糊效果 */}
