@@ -40,15 +40,17 @@ export function cacheFileName({ artistName, trackName, provider, promptVersion }
   return `${safeSlug(artistName)}--${safeSlug(trackName)}.${safeSlug(provider)}.v${Number(promptVersion)}.md`;
 }
 
-/** 序列化 frontmatter（YAML 子集：字串加引號轉義、數字原樣） */
+/** 序列化 frontmatter（YAML 子集：布林值與數字原樣、字串加引號轉義） */
 function serializeFrontmatter(meta) {
   const lines = Object.entries(meta).map(([key, value]) => {
+    if (typeof value === 'boolean') return `${key}: ${value}`;
     if (typeof value === 'number') return `${key}: ${value}`;
     const escaped = String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ');
     return `${key}: "${escaped}"`;
   });
   return `---\n${lines.join('\n')}\n---\n`;
 }
+
 
 /** 解析 frontmatter；格式不對回傳 null（壞快取視為 miss，不讓壞檔案毒死服務） */
 export function parseCacheFile(content) {
@@ -60,13 +62,18 @@ export function parseCacheFile(content) {
     const kv = /^([\w-]+):\s*(.*)$/.exec(line);
     if (!kv) continue;
     let value = kv[2].trim();
-    if (value.startsWith('"') && value.endsWith('"')) {
+    if (value === 'true') {
+      value = true;
+    } else if (value === 'false') {
+      value = false;
+    } else if (value.startsWith('"') && value.endsWith('"')) {
       value = value.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
     } else if (/^-?\d+(\.\d+)?$/.test(value)) {
       value = Number(value);
     }
     frontmatter[kv[1]] = value;
   }
+
 
   const body = match[2].trim();
   if (!body) return null;

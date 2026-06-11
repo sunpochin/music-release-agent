@@ -13,7 +13,10 @@ import { loadHandoffSchema, validateAgainstDefinition } from './src/services/con
 import { buildShareHtml, findAlbumInCache, findTrackName } from './src/services/share-meta.js';
 import { logger, log, requestStore } from './src/services/logger.js';
 
+// 優先載入本地開發專用環境變數（.env.local），隨後載入預設配置（.env）
+dotenv.config({ path: '.env.local' });
 dotenv.config();
+
 
 // 跨服務 handoff 契約（單一事實來源：contracts/social-handoff.schema.json）
 const handoffSchema = loadHandoffSchema();

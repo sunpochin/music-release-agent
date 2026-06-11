@@ -70,11 +70,12 @@ export async function getRawLyrics({ artistName, trackName, trackId, forceRefres
     }
   }
 
-  // 優先嘗試使用 Spotify 官方歌詞 API
+  // 優先嘗試使用 Spotify Web 歌詞轉接器 (實驗性本機專用轉接器)
   let sourced = null;
   if (process.env.SPOTIFY_SP_DC && trackId) {
     sourced = await fetchSpotifyLyrics(trackId, process.env.SPOTIFY_SP_DC);
   }
+
 
   // 降級使用 LRCLIB 歌詞庫
   if (!sourced) {
@@ -211,12 +212,17 @@ export async function getLyricsWithCache({ artistName, trackName, trackId, force
 
 async function persistCache(cacheDir, fileName, { artistName, trackName, provider, source, text }) {
   try {
+    const containsFullLyrics = (source !== 'llm-recall' && source !== 'lrclib-instrumental');
+    const verified = (source === 'lrclib' || source === 'spotify' || source === 'lrclib-instrumental');
+
     await writeCachedLyrics(cacheDir, fileName, {
       frontmatter: {
         artist: artistName,
         track: trackName,
         provider,
         source, // lrclib（真實歌詞）| llm-recall（模型記憶，幻覺風險誠實標示）
+        verified,
+        containsFullLyrics,
         promptVersion: PROMPT_VERSION,
         language: 'zh-Hant',
         createdAt: new Date().toISOString(),
@@ -228,6 +234,7 @@ async function persistCache(cacheDir, fileName, { artistName, trackName, provide
     console.error('[LyricsService] 快取寫入失敗（不影響本次回應）:', error.message);
   }
 }
+
 
 /**
  * 清除特定單曲的所有快取檔案（包含原文與所有 provider 翻譯本）

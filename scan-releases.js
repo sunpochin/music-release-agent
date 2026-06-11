@@ -13,7 +13,10 @@ import { generateAlbumReview } from './src/album-reviewer.js';
 import { publishToGitBook, gitPushChanges } from './src/gitbook-publisher.js';
 import dotenv from 'dotenv';
 
+// 優先載入本地開發專用環境變數（.env.local），隨後載入預設配置（.env）
+dotenv.config({ path: '.env.local' });
 dotenv.config();
+
 
 async function main() {
   console.log('🏁【開始執行 Spotify 關注藝人新發行掃描與 GitBook 同步管線】\n');

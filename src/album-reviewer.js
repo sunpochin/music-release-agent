@@ -13,7 +13,10 @@ import { GoogleGenAI } from '@google/genai';
 import { fetch, Agent } from 'undici';
 import dotenv from 'dotenv';
 
+// 優先載入本地開發專用環境變數（.env.local），隨後載入預設配置（.env）
+dotenv.config({ path: '.env.local' });
 dotenv.config();
+
 
 // 建立本地 Ollama 專屬的持久化 Agent，防止連線高頻握手耗損並防止大模型生成超時
 const ollamaAgent = new Agent({
