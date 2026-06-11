@@ -29,6 +29,7 @@ export function useAlbumTracks(selectedAlbum) {
 
   useEffect(() => {
     let active = true
+    let settled = false
 
     if (selectedAlbum) {
       // 同一張專輯只是切換單曲路由時，不重新獲取歌單
@@ -57,6 +58,7 @@ export function useAlbumTracks(selectedAlbum) {
           }
         })
         .finally(() => {
+          settled = true
           if (active) setTracksLoading(false)
         })
     } else {
@@ -67,6 +69,14 @@ export function useAlbumTracks(selectedAlbum) {
 
     return () => {
       active = false
+      // 【關鍵防卡死】這輪叫貨在「貨送到之前」就被取消（StrictMode 雙重 effect、
+      // selectedAlbum 物件 identity 變化等），結果會被 active 守門員丟棄 —
+      // 此時必須撤銷防重複標記，否則下一輪 effect 會以為「已經叫過貨」而
+      // 直接 early-return，畫面就永遠卡在「讀取歌曲中...」。
+      // （這是從原版 App.jsx 繼承的潛在 race，由 deep-link e2e 測試曝光）
+      if (!settled) {
+        prevAlbumIdRef.current = null
+      }
     }
   }, [selectedAlbum, reloadKey])
 
