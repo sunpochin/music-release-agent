@@ -121,18 +121,37 @@ describe('快取服務：失敗與 forceRefresh（failure scenario）', () => {
     ).rejects.toThrow(/GEMINI_API_KEY/);
   });
 
-  it('若沒有 API 金鑰但 LRCLIB 有原文，應優雅降級顯示原文並快取之', async () => {
-    // 測試若沒有 API 金鑰但 LRCLIB 有原文，應優雅降級顯示原文
+  it('若沒有 API 金鑰但 LRCLIB 有原文，且 Ollama 也失敗時，應優雅降級顯示原文並快取之', async () => {
+    // 測試若沒有 API 金鑰且 Ollama 也不可達，但 LRCLIB 有原文，應優雅降級顯示原文
     delete process.env.GEMINI_API_KEY;
     process.env.LYRICS_PROVIDER = 'gemini';
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ plainLyrics: 'My Raw Lyrics' })
-    })));
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (String(url).includes('/api/get')) {
+        return { ok: true, json: async () => ({ plainLyrics: 'My Raw Lyrics' }) };
+      }
+      return { ok: false, status: 503 }; // Ollama 也掛了
+    }));
 
     const result = await getLyricsWithCache({ artistName: 'Fallback', trackName: 'Test' });
     expect(result.source).toBe('lrclib-untranslated');
     expect(result.text).toContain('My Raw Lyrics');
+  });
+
+  it('若預設使用 gemini 但無金鑰，且 Ollama 可用時，應自動降級至 Ollama 並使用其翻譯', async () => {
+    // 測試從 Gemini 自動降級至 Ollama 的路徑
+    delete process.env.GEMINI_API_KEY;
+    process.env.LYRICS_PROVIDER = 'gemini';
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (String(url).includes('/api/get')) {
+        return { ok: true, json: async () => ({ plainLyrics: 'Raw Original Lyrics' }) };
+      }
+      return { ok: true, json: async () => ({ response: '### 歌曲介紹\nOllama Fallback Result' }) };
+    }));
+
+    const result = await getLyricsWithCache({ artistName: 'Dual', trackName: 'Fallback' });
+    expect(result.provider).toBe('ollama');
+    expect(result.source).toBe('lrclib');
+    expect(result.text).toContain('Ollama Fallback Result');
   });
 
   it('forceRefresh 跳過快取直接重生（證明：有快取但無金鑰 → 仍然 throw）', async () => {

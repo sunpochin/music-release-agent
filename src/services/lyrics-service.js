@@ -81,28 +81,52 @@ export async function getLyricsWithCache({ artistName, trackName, forceRefresh =
   const source = sourced ? 'lrclib' : 'llm-recall';
   let text;
   let finalSource = source;
+  let finalProvider = provider;
 
   try {
-    // 3. 請廚師翻譯（有真實原文時只翻譯，嚴禁改寫）
-    text = provider === 'ollama'
+    if (finalProvider === 'gemini' && !process.env.GEMINI_API_KEY) {
+      // 若沒有 API 金鑰，主動丟出錯誤以觸發降級
+      throw new Error('Missing GEMINI_API_KEY in environment variables');
+    }
+
+    // 3. 嘗試以設定的 provider 進行翻譯
+    text = finalProvider === 'ollama'
       ? await translateWithOllama(artistName, trackName, sourced?.lyrics)
       : await translateLyrics(artistName, trackName, sourced?.lyrics);
   } catch (err) {
-    // 如果翻譯失敗（金鑰無效、API 限制或 503），但有從 LRCLIB 獲取的原文，則退回顯示原文
-    if (sourced?.lyrics) {
-      console.warn(`[LyricsService] ⚠️ 歌詞翻譯失敗 (${err.message})，退回顯示 LRCLIB 原文`);
-      text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${sourced.lyrics}`;
-      finalSource = 'lrclib-untranslated';
+    // 若預設的 Gemini 翻譯失敗，嘗試降級到本地 Ollama
+    if (finalProvider === 'gemini') {
+      console.warn(`[LyricsService] ⚠️ Gemini 翻譯失敗 (${err.message})，嘗試降級至 Ollama...`);
+      try {
+        text = await translateWithOllama(artistName, trackName, sourced?.lyrics);
+        finalProvider = 'ollama';
+      } catch (ollamaErr) {
+        // 若 Ollama 也失敗且有 LRCLIB 原文，則優雅降級顯示原文
+        if (sourced?.lyrics) {
+          console.warn(`[LyricsService] ⚠️ Ollama 降級也失敗 (${ollamaErr.message})，退回顯示 LRCLIB 原文`);
+          text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${sourced.lyrics}`;
+          finalSource = 'lrclib-untranslated';
+        } else {
+          // 若無原文則拋出原始錯誤，以防測試無法捕捉 GEMINI_API_KEY 錯誤
+          throw err;
+        }
+      }
     } else {
-      // 如果連原文都沒有，則直接拋出錯誤
-      throw err;
+      // 若本來就是 Ollama 且失敗，只要有原文就顯示原文
+      if (sourced?.lyrics) {
+        console.warn(`[LyricsService] ⚠️ Ollama 翻譯失敗 (${err.message})，退回顯示 LRCLIB 原文`);
+        text = `### 歌詞原文 (翻譯服務暫時不可用)\n\n${sourced.lyrics}`;
+        finalSource = 'lrclib-untranslated';
+      } else {
+        throw err;
+      }
     }
   }
 
   // 4. write-through：冰一份進冷凍庫（寫入失敗不影響回應，只記 log）
-  await persistCache(cacheDir, fileName, { artistName, trackName, provider, source: finalSource, text });
+  await persistCache(cacheDir, fileName, { artistName, trackName, provider: finalProvider, source: finalSource, text });
 
-  return { text, cached: false, provider, source: finalSource };
+  return { text, cached: false, provider: finalProvider, source: finalSource };
 }
 
 async function persistCache(cacheDir, fileName, { artistName, trackName, provider, source, text }) {
