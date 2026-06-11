@@ -17,3 +17,7 @@ playwright-report/
 test-results/
 data/test-*.json
 data/lyrics-cache/
+.local/
+.env.local
+
+

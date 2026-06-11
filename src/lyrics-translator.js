@@ -3,7 +3,10 @@ import dotenv from 'dotenv';
 // prompt 與 system instruction 移至單一事實來源，與 Ollama provider 共用
 import { SYSTEM_INSTRUCTION, buildLyricsPrompt } from './services/lyrics-prompt.js';
 
+// 優先載入本地開發專用環境變數（.env.local），隨後載入預設配置（.env）
+dotenv.config({ path: '.env.local' });
 dotenv.config();
+
 
 export async function translateLyrics(artistName, trackName, sourceLyrics) {
   if (!process.env.GEMINI_API_KEY) {

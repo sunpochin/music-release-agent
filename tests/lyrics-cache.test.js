@@ -219,4 +219,54 @@ describe('快取服務：失敗與 forceRefresh（failure scenario）', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503 })));
     await expect(translateWithOllama('A', 'B')).rejects.toThrow(/Ollama/);
   });
+
+  it('當無原文降級時，Ollama 提示詞指示不捏造歌詞，且快取後設資料包含 verified=false 與 containsFullLyrics=false', async () => {
+    process.env.LYRICS_PROVIDER = 'ollama';
+    const fetchMock = vi.fn(async (url, options) => {
+      // 模擬 LRCLIB 找不到歌詞
+      if (String(url).includes('/api/get')) {
+        return { ok: false, status: 404 };
+      }
+
+      const body = JSON.parse(options.body);
+      // 驗證提示詞指示不生成/捏造歌詞
+      expect(body.prompt).toContain('不要自行生成或幻想任何歌詞');
+      expect(body.prompt).toContain('找不到本首歌曲的可驗證歌詞來源');
+      return {
+        ok: true,
+        json: async () => ({ response: '### 歌詞說明\n⚠️ 找不到本首歌曲的可驗證歌詞來源。\n### 歌曲介紹與短評\n無歌詞之分析。' })
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getLyricsWithCache({ artistName: 'NoLyrics', trackName: 'Test' });
+    expect(result).toMatchObject({ cached: false, provider: 'ollama', source: 'llm-recall' });
+
+    // 驗證快取檔案中的後設資料
+    const fileName = cacheFileName({ artistName: 'NoLyrics', trackName: 'Test', provider: 'ollama', promptVersion: PROMPT_VERSION });
+    const cached = await readCachedLyrics(tmpDir, fileName);
+    expect(cached.frontmatter.verified).toBe(false);
+    expect(cached.frontmatter.containsFullLyrics).toBe(false);
+  });
+
+  it('當 LRCLIB 命中時，快取後設資料包含 verified=true 與 containsFullLyrics=true', async () => {
+    process.env.LYRICS_PROVIDER = 'ollama';
+    const fetchMock = vi.fn(async (url, options) => {
+      if (String(url).includes('/api/get')) {
+        return { ok: true, json: async () => ({ plainLyrics: 'Real Lyrics' }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({ response: '### 歌曲介紹\n介紹\n### 歌詞對照\nReal Lyrics' })
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getLyricsWithCache({ artistName: 'HasLyrics', trackName: 'Test' });
+    const fileName = cacheFileName({ artistName: 'HasLyrics', trackName: 'Test', provider: 'ollama', promptVersion: PROMPT_VERSION });
+    const cached = await readCachedLyrics(tmpDir, fileName);
+    expect(cached.frontmatter.verified).toBe(true);
+    expect(cached.frontmatter.containsFullLyrics).toBe(true);
+  });
 });
+

@@ -293,9 +293,10 @@ npm run test:coverage
 
 ---
 
-## ⚙️ 生產環境變數配置
+## ⚙️ 生產環境變數配置 / Production Environment Configuration
 
 若要運行真實的 Spotify 聯網掃描與 Gemini AI 生成流程，請參閱 [.env.example](./.env.example) 建立您的 `.env` 檔案，填入以下金鑰：
+To run real Spotify network scans and Gemini AI generation flows, please refer to [.env.example](./.env.example) to create your `.env` and `.env.local` files:
 
 ```ini
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -305,6 +306,36 @@ REVIEWS_PATH=./data/mock-gitbook
 GITBOOK_PATH=../social-dancing-notes
 SOCIAL_SERVICE_URL=http://localhost:3012
 ```
+
+And for the experimental local-only lyrics adapter, add the cookie token to `.env.local`:
+針對實驗性本機專用歌詞轉接器，將 Cookie 憑證加入 `.env.local`：
+
+```ini
+SPOTIFY_SP_DC=your_sp_dc_cookie_here
+```
+
+### 🔐 實驗性本機專用歌詞轉接器憑證獲取 (sp_dc) / Experimental Local-Only Spotify Web Lyrics Adapter (sp_dc)
+
+本專案支援使用網頁會話憑證抓取 Spotify 歌詞作為本地開發測試的翻譯來源。**請注意：Spotify 官方公開 Web API 並不提供歌詞端點**，此功能僅作實驗性展示用途，使用者需自負帳號風險。
+This project supports fetching lyrics from Spotify Web Player sessions for local development and testing. **Note: The official public Spotify Web API does NOT expose a lyrics endpoint.** This feature is strictly experimental, and users assume all risks associated with account safety.
+
+如果您需要此功能，可以使用半自動腳本來獲取 `sp_dc` cookie 並自動寫入 `.env.local`：
+If you require this, you can run the semi-automated script to capture the `sp_dc` cookie and write it directly to `.env.local`:
+
+```bash
+npm run spotify:capture-cookie
+```
+
+**運作原理與安全性說明 / How it Works & Security Details:**
+1. 該腳本會啟動一個隔離的沙盒 Chromium 瀏覽器（快取儲存於 `.local/`，此目錄與 `.env.local` 均已加入 `.gitignore`，確保不會被提交）。
+   The script launches an isolated sandbox Chromium instance (data is cached under `.local/`. Both `.local/` and `.env.local` are ignored in `.gitignore` to prevent leaks).
+2. 請在開啟的瀏覽器視窗中手動登入您的 Spotify 帳號。本專案**絕對不接觸、不保存**您的密碼。
+   You must manually log in to your Spotify account in the opened browser window. This project **never touches or saves** your password.
+3. 登入成功後，腳本會自動捕捉 `sp_dc` cookie，寫入您的 `.env.local` 檔案中，並遮罩顯示於終端機後自動關閉瀏覽器。
+   Upon successful login, the script captures the `sp_dc` cookie, writes it to `.env.local`, prints a masked value to the terminal, and closes the browser.
+4. **⚠️ 警告 / WARNING**：`sp_dc` 為個人登入敏感憑證，等同於密碼，請妥善保管，切勿分享、上傳或截圖。
+   `sp_dc` is a sensitive session credential equivalent to your password. Keep it secure and do NOT share, commit, or screenshot it.
+
 
 ### 執行真實掃描與 GitOps 發布
 ```bash
@@ -316,6 +347,7 @@ npm run scan
 ```
 
 Environment template: [.env.example](./.env.example)
+
 
 ---
 
