@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
+import { fetchSpotifyLyrics } from '../src/services/spotify-lyrics.js';
 
 // 取得當前檔案路徑與根目錄
 const __filename = fileURLToPath(import.meta.url);
@@ -16,8 +17,11 @@ async function main() {
   console.log('==================================================');
   console.log('⚠️ 安全與合規提示 (Security & Compliance Notice)：');
   console.log('1. sp_dc 是您的個人登入憑證，等同於密碼，請勿洩漏或上傳至 GitHub。');
+  console.log('   sp_dc is a sensitive session credential. Do NOT share or commit it.');
   console.log('2. 本整合非官方 API，僅限本地測試使用，使用者需自負帳號限制或封鎖之風險。');
+  console.log('   This is an unofficial experimental tool. Use at your own risk.');
   console.log('3. 本工具使用獨立沙盒瀏覽器，絕不讀取或儲存您的密碼。');
+  console.log('   Runs in an isolated browser sandbox. Password is never saved.');
   console.log('==================================================\n');
 
   console.log('正在啟動安全沙盒瀏覽器視窗...');
@@ -85,6 +89,24 @@ async function main() {
 
       fs.writeFileSync(envPath, envContent, 'utf8');
       console.log('✅ 已成功將憑證寫入至根目錄的 .env.local 檔案中！');
+
+      // 進行歌詞抓取驗證測試
+      console.log('\n🔍 正在進行連線驗證測試 (Verifying connection)...');
+      const testTrackId = '4PTG3Z6ehGkBFmzsOhPEui'; // 使用熱門單曲 ID 進行驗證
+      try {
+        const result = await fetchSpotifyLyrics(testTrackId, spDcValue);
+        if (result && result.lyrics) {
+          console.log('✅ 連線驗證成功！該憑證可正常讀取 Spotify 歌詞。');
+          console.log('   Verification Success: Lyrics fetched successfully!');
+        } else {
+          console.log('⚠️ 連線驗證提示：雖然取得憑證，但無法抓取歌詞。');
+          console.log('   請確認您的 Spotify 帳號是否擁有 Premium 權限，或該測試曲目在該地區是否可用。');
+          console.log('   Verification Warning: Cookie saved, but lyrics fetch failed. Please check Premium status.');
+        }
+      } catch (testErr) {
+        console.log(`⚠️ 連線驗證出錯: ${testErr.message}`);
+      }
+
     } else {
       console.log('❌ 逾時未完成登入，或未能在瀏覽器中獲取到 sp_dc 憑證。');
     }
