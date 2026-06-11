@@ -22,7 +22,11 @@ export function useTrackKeyboardNav({ selectedAlbum, tracks, selectedTrack }) {
       const target = event.target
       if (
         target instanceof HTMLElement &&
-        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.tagName === 'BUTTON' ||
+          target.isContentEditable)
       ) {
         return
       }
