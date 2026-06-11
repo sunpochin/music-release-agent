@@ -36,7 +36,10 @@ function App() {
   const {
     lyricsData,
     isLoading,
-    handleFetchLyrics
+    isTranslated,
+    isTranslating,
+    handleFetchLyrics,
+    handleTranslate
   } = useTrackAi(selectedAlbum, selectedTrack)
 
   // 鍵盤導航：j/↓ 下一首、k/↑ 上一首（打字時自動停用）
@@ -291,10 +294,13 @@ function App() {
                     selectedTrack={selectedTrack}
                     lyricsData={lyricsData}
                     isLoading={isLoading}
+                    isTranslated={isTranslated}
+                    isTranslating={isTranslating}
                     isExporting={isExporting}
                     isPublishing={isPublishing}
                     publishResult={publishResult}
                     handleFetchLyrics={handleFetchLyrics}
+                    handleTranslate={handleTranslate}
                     exportShareCard={exportShareCard}
                     handlePublishToSocial={handlePublishToSocial}
                     onBackToAlbum={() => navigate(`/album/${selectedAlbum.id}`)}

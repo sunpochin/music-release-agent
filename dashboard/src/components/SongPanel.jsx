@@ -50,10 +50,13 @@ const SongPanel = ({
   selectedTrack,
   lyricsData,
   isLoading,
+  isTranslated,
+  isTranslating,
   isExporting,
   isPublishing,
   publishResult,
   handleFetchLyrics,
+  handleTranslate,
   exportShareCard,
   handlePublishToSocial,
   onBackToAlbum // 手機版「返回專輯資訊」的回調
@@ -63,12 +66,25 @@ const SongPanel = ({
   return (
     <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col gap-6">
 
-      {/* ── 歌曲標題與音波視覺化 ── */}
-      <div>
-        <h2 className="text-xl font-bold text-white leading-tight">
-          {selectedTrack?.name || selectedAlbum.name}
-        </h2>
-        <p className="text-sm text-gray-400 mt-0.5">{selectedAlbum.artistName}</p>
+      {/* ── 歌曲標題與隨選翻譯按鈕 ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-white leading-tight">
+            {selectedTrack?.name || selectedAlbum.name}
+          </h2>
+          <p className="text-sm text-gray-400 mt-0.5">{selectedAlbum.artistName}</p>
+        </div>
+
+        {lyricsData && !isTranslated && !isLoading && (
+          <button
+            onClick={handleTranslate}
+            disabled={isTranslating}
+            className="self-start sm:self-auto bg-gradient-to-r from-spotify-green/10 to-spotify-green/20 hover:from-spotify-green/20 hover:to-spotify-green/30 border border-spotify-green/30 hover:border-spotify-green/50 text-spotify-green hover:scale-105 active:scale-95 transition-all px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 shadow-lg shadow-spotify-green/5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Sparkles size={12} className="animate-pulse" />
+            🎵 AI 雙語對照翻譯
+          </button>
+        )}
 
         {selectedTrack && (
           <div className="hidden" title={`${selectedTrack.name} 的專屬音波`}>
@@ -87,6 +103,12 @@ const SongPanel = ({
         ) : lyricsData ? (
           <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-2">
             <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
+            {isTranslating && (
+              <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md animate-pulse flex items-center gap-3">
+                <Sparkles size={16} className="text-spotify-green animate-spin" />
+                <span className="text-xs text-spotify-green font-bold">AI 正在翻譯中，請稍候...</span>
+              </div>
+            )}
           </div>
         ) : (
           // 歌詞載入完成前的短暫過場

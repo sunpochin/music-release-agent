@@ -15,8 +15,8 @@ import { useEffect, useRef, useState } from 'react'
 export function useTrackAi(selectedAlbum, selectedTrack) {
   const [lyricsData, setLyricsData] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [analysisData, setAnalysisData] = useState('')
-  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [isTranslated, setIsTranslated] = useState(false)
+  const [isTranslating, setIsTranslating] = useState(false)
 
   // 隨時追蹤當前選中的單曲，以防異步請求結束時選取已改變
   const selectedTrackRef = useRef(selectedTrack)
@@ -27,16 +27,12 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   // 換歌先擦黑板
   useEffect(() => {
     setLyricsData('')
-    setAnalysisData('')
+    setIsTranslated(false)
+    setIsTranslating(false)
   }, [selectedTrack])
 
   // 🪄 選歌即自動載入歌詞（產品決策）：
-  // 【小朋友解釋法】：歌曲頁的「主菜」就是歌詞 — 客人坐下來就上菜，
-  // 不要再遞菜單要客人「按一下才出餐」。
-  // AI 賞析比較重（像甜點要現做），保留手動觸發，給客人明確的選擇權。
-  // autoFetchedRef 確保同一首歌只自動叫一次菜（StrictMode 雙重 effect 也不會重複）。
-  // Debounce 400ms：用 j/k 快速逛專輯時，路過的歌不叫菜 —
-  // 停下來的那首才真正呼叫 API（不浪費 token、不製造一串被丟棄的請求）。
+  // 歌曲頁的「主菜」就是歌詞 — 客人選中即上菜，載入原始歌詞。
   const autoFetchedRef = useRef(null)
   useEffect(() => {
     if (!selectedAlbum || !selectedTrack) return
@@ -44,18 +40,24 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
 
     const timer = setTimeout(() => {
       autoFetchedRef.current = selectedTrack.id
-      fetchLyricsFor(selectedTrack)
+      fetchLyricsFor(selectedTrack, false)
     }, 400)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAlbum, selectedTrack])
 
-  // AI 歌詞搜尋與翻譯（自動載入與手動重試共用同一條路徑）
-  const fetchLyricsFor = async (track) => {
+  // AI 歌詞搜尋與隨選翻譯（自動載入、手動重試與隨選翻譯共用同一條路徑）
+  const fetchLyricsFor = async (track, translate = false) => {
     if (!selectedAlbum || !track) return
     const trackIdAtStart = track.id
-    setIsLoading(true)
-    setLyricsData('')
+    
+    if (translate) {
+      setIsTranslating(true)
+    } else {
+      setIsLoading(true)
+      setLyricsData('')
+      setIsTranslated(false)
+    }
 
     try {
       const res = await fetch('/api/lyrics', {
@@ -63,65 +65,40 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           artistName: selectedAlbum.artistName || 'Unknown Artist',
-          trackName: track.name
+          trackName: track.name,
+          trackId: track.id,
+          translate: Boolean(translate)
         })
       })
       const result = await res.json()
       if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setLyricsData(result.text || '無法取得歌詞翻譯。')
+        setLyricsData(result.text || '無法取得歌詞。')
+        setIsTranslated(Boolean(result.translated))
       }
     } catch {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setLyricsData('翻譯過程發生錯誤。')
+        setLyricsData('載入過程發生錯誤。')
       }
     } finally {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
         setIsLoading(false)
+        setIsTranslating(false)
       }
     }
   }
 
-  // 手動重試入口（自動載入失敗時的「重新載入歌詞」按鈕用）
-  const handleFetchLyrics = () => fetchLyricsFor(selectedTrack)
+  // 手動重試入口
+  const handleFetchLyrics = () => fetchLyricsFor(selectedTrack, false)
 
-  // 手動觸發單曲 AI 賞析與分析
-  const handleAnalyzeTrack = async () => {
-    if (!selectedAlbum || !selectedTrack) return
-    const trackIdAtStart = selectedTrack.id
-    setAnalysisLoading(true)
-    setAnalysisData('')
-
-    try {
-      const res = await fetch('/api/tracks/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          artistName: selectedAlbum.artistName || 'Unknown Artist',
-          trackName: selectedTrack.name,
-          albumName: selectedAlbum.name
-        })
-      })
-      const result = await res.json()
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setAnalysisData(result.text || '無法取得歌曲分析。')
-      }
-    } catch {
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setAnalysisData('分析過程發生錯誤。')
-      }
-    } finally {
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setAnalysisLoading(false)
-      }
-    }
-  }
+  // 隨選翻譯入口
+  const handleTranslate = () => fetchLyricsFor(selectedTrack, true)
 
   return {
     lyricsData,
     isLoading,
-    analysisData,
-    analysisLoading,
+    isTranslated,
+    isTranslating,
     handleFetchLyrics,
-    handleAnalyzeTrack
+    handleTranslate
   }
 }
