@@ -71,6 +71,7 @@ npm run demo:verify:social
 - `music-release-agent` 代理轉發 `POST /api/social/publish`
 - `social-post-service` 回傳 `202 Accepted`
 - 任務可透過 `GET /api/social/status/:jobId` 查到並完成
+- 所有活回應（不論真實服務或 mock）皆通過契約 schema [`contracts/social-handoff.schema.json`](./contracts/social-handoff.schema.json) 驗證 — mock 與真實服務漂移會在此被抓到
 
 ### 3. Failure-mode proof
 
@@ -275,11 +276,12 @@ flowchart TD
 
 本專案實施嚴格的防禦性測試，後端核心模組（服務類別、策略模式實作與掃描協調器）之語句覆蓋率均達到 **80% - 100%**。
 
-測試分三類：
+測試分四類：
 
 - **單元 / 防禦測試**（`tests/*.test.js`）：服務類別、熔斷器、策略降級
 - **Golden 測試**（`tests/golden/`）：dry-run 管線的確定性驗收 — 正常情境（輸出與 golden 檔案逐字比對）、模糊輸入（slug 退化、重音字元、空 genres）、失敗情境（malformed fixture 必須以非零 exit code 大聲失敗）
-- **前端安全測試**（`tests/markdown-renderer.test.js`）：Markdown 轉譯器的 XSS 防護證明 — 惡意輸入（`<script>`、`onerror` 注入必須被轉義）、正常轉譯、模糊輸入
+- **契約測試**（`tests/contract/`）：跨服務 handoff 契約以 [`contracts/social-handoff.schema.json`](./contracts/social-handoff.schema.json) 為單一事實來源，核心 proxy、內建 mock、verify 腳本三方共用；測試同時驗證 schema 判定與 mock 的活回應
+- **前端安全測試**：單元層（`tests/markdown-renderer.test.js`）驗證 Markdown 轉譯器輸出僅含白名單標籤；瀏覽器層（`tests/e2e/dashboard.spec.js` XSS 案例）把惡意 payload 餵進歌詞 API，驗證注入腳本在真實 DOM 中不執行
 
 ```bash
 # 執行所有單元、防禦、golden 與前端安全測試
