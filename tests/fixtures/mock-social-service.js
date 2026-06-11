@@ -16,15 +16,34 @@
  */
 import http from 'http';
 import { randomUUID } from 'crypto';
+import {
+  loadHandoffSchema,
+  validateAgainstDefinition,
+  assertMatchesDefinition
+} from '../../src/services/contract-validator.js';
 
 const PORT = Number(process.env.PORT || 3412);
 const JOB_COMPLETION_DELAY_MS = Number(process.env.MOCK_JOB_DELAY_MS || 300);
+
+// 契約的單一事實來源：contracts/social-handoff.schema.json
+const handoffSchema = loadHandoffSchema();
 
 const jobs = new Map();
 
 function sendJson(res, statusCode, body) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
+}
+
+/** 自我檢查：mock 自己的回應若違反契約，立刻大聲失敗（500），而非默默漂移 */
+function sendContractJson(res, statusCode, definitionName, body) {
+  try {
+    assertMatchesDefinition(handoffSchema, definitionName, body, '[mock-social-service] 回應');
+  } catch (error) {
+    console.error(error.message);
+    return sendJson(res, 500, { error: `mock contract self-check failed: ${error.message}` });
+  }
+  sendJson(res, statusCode, body);
 }
 
 function readJsonBody(req) {
@@ -46,7 +65,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === 'GET' && url.pathname === '/healthz') {
-    return sendJson(res, 200, { status: 'ok', service: 'social-post-service', mode: 'bundled-mock' });
+    return sendContractJson(res, 200, 'healthResponse', { status: 'ok', service: 'social-post-service', mode: 'bundled-mock' });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/posts') {
@@ -57,8 +76,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 400, { error: 'invalid JSON body' });
     }
 
-    if (!body.caption) {
-      return sendJson(res, 400, { error: 'missing required field: caption' });
+    // 請求驗證走同一份契約 schema，與核心服務 proxy、verify 腳本共用規則
+    const requestCheck = validateAgainstDefinition(handoffSchema, 'publishRequest', body);
+    if (!requestCheck.valid) {
+      return sendJson(res, 400, { error: `publish request violates contract: ${requestCheck.errors.join('; ')}` });
     }
 
     const jobId = randomUUID();
@@ -81,7 +102,7 @@ const server = http.createServer(async (req, res) => {
       });
     }, JOB_COMPLETION_DELAY_MS);
 
-    return sendJson(res, 202, { jobId, status: 'queued' });
+    return sendContractJson(res, 202, 'acceptedResponse', { jobId, status: 'queued' });
   }
 
   const statusMatch = url.pathname.match(/^\/api\/posts\/([\w-]+)$/);
@@ -90,7 +111,7 @@ const server = http.createServer(async (req, res) => {
     if (!job) {
       return sendJson(res, 404, { error: `unknown jobId: ${statusMatch[1]}` });
     }
-    return sendJson(res, 200, job);
+    return sendContractJson(res, 200, 'statusResponse', job);
   }
 
   sendJson(res, 404, { error: `no route for ${req.method} ${url.pathname}` });
