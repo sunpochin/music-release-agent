@@ -9,9 +9,13 @@ import { translateLyrics } from './src/lyrics-translator.js';
 import { getSpotifyAlbumTracks } from './src/spotify-client.js';
 import { generateTrackAnalysis } from './src/album-reviewer.js';
 import { socialClient } from './src/services/social-client.js';
+import { loadHandoffSchema, validateAgainstDefinition } from './src/services/contract-validator.js';
 import { logger, log, requestStore } from './src/services/logger.js';
 
 dotenv.config();
+
+// 跨服務 handoff 契約（單一事實來源：contracts/social-handoff.schema.json）
+const handoffSchema = loadHandoffSchema();
 
 const app = express();
 
@@ -283,11 +287,18 @@ app.post('/api/tracks/analyze', async (req, res) => {
 });
 
 // 社群自動發文代理端點 — 轉發請求至 social-post-service 微服務
+// 請求驗證使用 contracts/social-handoff.schema.json（與內建 mock、verify 腳本共用同一份契約）
 app.post('/api/social/publish', async (req, res) => {
   const { caption, platforms, imageBase64 } = req.body;
 
-  if (!caption) {
-    return res.status(400).json({ error: '缺少必要欄位: caption（發文文案）' });
+  const outboundBody = {
+    image: imageBase64 || null,
+    caption,
+    platforms: platforms || ['threads']
+  };
+  const contractCheck = validateAgainstDefinition(handoffSchema, 'publishRequest', outboundBody);
+  if (!contractCheck.valid) {
+    return res.status(400).json({ error: `發文請求違反 handoff 契約: ${contractCheck.errors.join('; ')}` });
   }
 
   try {

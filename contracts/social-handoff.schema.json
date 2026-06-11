@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/sunpochin/music-release-agent/contracts/social-handoff.schema.json",
+  "title": "Social Handoff Contract",
+  "description": "music-release-agent ↔ social-post-service 跨服務交接契約的單一事實來源（single source of truth）。三方消費：核心服務 proxy 的請求驗證、內建 mock（tests/fixtures/mock-social-service.js）的自我檢查、以及 demo:verify:social 對「真實或 mock」companion 回應的驗證。姊妹 repo 的 contract test 也應直接引用本檔。",
+  "definitions": {
+    "publishRequest": {
+      "description": "POST /api/posts 請求體（核心服務 → companion）",
+      "type": "object",
+      "required": ["caption"],
+      "properties": {
+        "caption": { "type": "string", "minLength": 1 },
+        "image": { "type": ["string", "null"] },
+        "platforms": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
+      }
+    },
+    "acceptedResponse": {
+      "description": "POST /api/posts 的 202 回應（companion → 核心服務）",
+      "type": "object",
+      "required": ["jobId", "status"],
+      "properties": {
+        "jobId": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["queued"] }
+      }
+    },
+    "postResult": {
+      "description": "單一平台的發文結果",
+      "type": "object",
+      "required": ["platform", "success"],
+      "properties": {
+        "platform": { "type": "string", "minLength": 1 },
+        "success": { "type": "boolean" },
+        "postedAt": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+    "statusResponse": {
+      "description": "GET /api/posts/:jobId 的 200 回應",
+      "type": "object",
+      "required": ["jobId", "status", "results"],
+      "properties": {
+        "jobId": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["queued", "completed", "failed"] },
+        "results": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/postResult" }
+        }
+      }
+    },
+    "healthResponse": {
+      "description": "GET /healthz 的 200 回應",
+      "type": "object",
+      "required": ["status", "service"],
+      "properties": {
+        "status": { "enum": ["ok"] },
+        "service": { "enum": ["social-post-service"] }
+      }
+    },
+    "errorResponse": {
+      "description": "4xx/5xx 錯誤回應",
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
