@@ -251,4 +251,67 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     // (d) 沒有任何 alert/confirm/prompt 出現
     expect(dialogFired).toBe(false);
   });
+
+  // 共用的 API 攔截設定：讓 deep link 測試不依賴真實快取資料
+  async function mockAlbumApis(page) {
+    const album = {
+      id: 'deeplink-album-1',
+      name: 'Deep Link Album',
+      artistName: 'Deep Link Artist',
+      release_date: '2026-06-01',
+      image: 'https://example.com/cover.png'
+    };
+    await page.route('**/api/albums', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([album]) });
+    });
+    await page.route('https://example.com/cover.png', async (route) => {
+      const transparentPng = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+        'base64'
+      );
+      await route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+    });
+    await page.route('**/api/albums/*/tracks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'deeplink-track-1', name: 'Deep Link Track', track_number: 1, duration_ms: 200000, uri: 'spotify:track:dl1', url: 'https://open.spotify.com/track/dl1' },
+          { id: 'deeplink-track-2', name: 'Second Track', track_number: 2, duration_ms: 180000, uri: 'spotify:track:dl2', url: 'https://open.spotify.com/track/dl2' }
+        ]),
+      });
+    });
+    await page.route('**/api/review*', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ introduction: 'intro', summary: 'sum' }) });
+    });
+  }
+
+  test('deep link: opening /album/x/song/y directly renders the song page', async ({ page }) => {
+    // 把分享連結貼給朋友：直接打開單曲 URL（不經過首頁點擊）必須能渲染
+    await mockAlbumApis(page);
+    await page.goto('/album/deeplink-album-1/song/deeplink-track-1');
+
+    // 單曲面板渲染：抓歌詞按鈕可見，且側欄曲目清單高亮對應歌曲
+    // （timeout 放寬：vite 冷啟動首次轉換模組可能觸發依賴重新最佳化與整頁重載）
+    await expect(page.locator('text=尋找歌詞與 AI 翻譯')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('button:has-text("Deep Link Track")')).toBeVisible();
+    // 不應出現 404 或骨架屏殘留
+    await expect(page.getByTestId('track-not-found')).toHaveCount(0);
+    await expect(page.getByTestId('song-page-skeleton')).toHaveCount(0);
+  });
+
+  test('deep link 404: unknown trackId shows friendly fallback with other tracks', async ({ page }) => {
+    // 過期/錯誤的分享連結：不能白屏，要推薦同專輯其他曲目
+    await mockAlbumApis(page);
+    await page.goto('/album/deeplink-album-1/song/this-track-does-not-exist');
+
+    const notFound = page.getByTestId('track-not-found');
+    await expect(notFound).toBeVisible({ timeout: 15000 });
+    await expect(notFound.locator('text=找不到這首歌')).toBeVisible();
+
+    // 推薦清單可點擊，導向存在的歌曲後正常渲染
+    await notFound.locator('button:has-text("Deep Link Track")').click();
+    await expect(page).toHaveURL(/song\/deeplink-track-1/);
+    await expect(page.locator('text=尋找歌詞與 AI 翻譯')).toBeVisible();
+  });
 });
