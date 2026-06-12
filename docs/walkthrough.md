@@ -82,5 +82,17 @@ npm run dev
 - **問題**：原本 PM2 啟動服務時，未在 `ecosystem.config.cjs` 中為 `server` 與 `dashboard` 注入 `NODE_ENV: 'development'`，導致後端 Express 預設以生產模式運行並嘗試讀取 `dist/` 目錄的舊靜態檔。當強制開啟開發代理時又會因為連接埠衝突而陷入無限迴圈，造成修改前端 React 程式碼時無法即時熱重載（HMR），必須每次手動 `npm run build`。
 - **修正**：在 `ecosystem.config.cjs` 內明確為這兩個服務加上 `env: { NODE_ENV: 'development' }`。現在修改完程式碼，PM2 將會自動啟用 Vite 開發伺服器代理，所有前端 React 變更都無需再次手動編譯，即時生效。
 
+## 最新修復：解決換歌時的歌詞載入雙欄閃爍問題 (Double-Loading Flash Fix)
+
+- **問題**：
+  先前使用者在前端切換歌曲時，會看見右側歌詞面板「閃爍兩次」：
+  1. 點擊切換歌曲時，`useTrackAi` 立即清空歌詞並觸發畫面重繪。但因為此時載入狀態 `rawLoading` 依然是舊歌載入完後的 `false`，UI 會誤判為非載入狀態，短暫顯示「正在準備 AI 雙語歌詞…」的靜態提示（約 400ms  debounce 延遲）。
+  2. 400ms 延遲結束後，系統啟動 API 抓取並呼叫 `setRawLoading(true)`，UI 此時又切換成旋轉載入動畫（Spinner）。
+  3. API 回傳後，UI 第三次重繪，顯示最終歌詞。
+  這造成了 **「舊歌詞 ➡️ 準備卡 (400ms) ➡️ 旋轉載入動畫 ➡️ 新歌詞」** 的四步跳動，影響使用者體驗。
+- **修正**：
+  在 [`useTrackAi.js`](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/hooks/useTrackAi.js) 的「換歌擦黑板」`useEffect` 中，一旦切換單曲，立刻同步調用 `setRawLoading(true)`。
+  現在切換歌曲時，右側面板會**立即顯示載入動畫**，並流暢地在載入結束後呈現新歌詞，實現了 **「舊歌詞 ➡️ 載入動畫 ➡️ 新歌詞」** 的單一平滑轉場。
+
 > [!TIP]
 > 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開曲目清單選擇歌曲，此時網址將會更新為獨立的單曲路由，並展現右側的歌詞翻譯 loading 細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！

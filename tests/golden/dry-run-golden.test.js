@@ -9,7 +9,7 @@
  * 全部離線、確定性執行，不碰任何外部 API。
  * =====================================================================
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';

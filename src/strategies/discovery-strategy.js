@@ -15,7 +15,7 @@ export class ReleaseDiscoveryStrategy {
    * @param {number} days - 追溯天數
    * @returns {Promise<Array<object>>} 正規化後的 NormalizedAlbum 陣列
    */
-  async execute(artist, days) {
+  async execute(_artist, _days) {
     throw new Error('execute() must be implemented by concrete strategies');
   }
 }

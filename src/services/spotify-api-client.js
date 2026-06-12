@@ -137,7 +137,7 @@ export class SpotifyApiClient {
       try {
         const errJson = JSON.parse(text);
         errorDetail = errJson.error?.message || text;
-      } catch (e) {}
+      } catch {}
       
       if (response.status === 403 && errorDetail.includes('NO_ACTIVE_DEVICE')) {
         throw new Error('找不到可用的 Spotify 播放設備！請先在手機、電腦或 iPad 開啟 Spotify App 並播放任意歌曲。');

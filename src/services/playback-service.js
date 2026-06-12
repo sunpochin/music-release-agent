@@ -68,7 +68,7 @@ export class PlaybackService {
           durationMs: data.item.duration_ms
         }
       };
-    } catch (err) {
+    } catch {
       return null;
     }
   }

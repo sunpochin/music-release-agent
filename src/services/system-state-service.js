@@ -24,7 +24,7 @@ export class SystemStateService {
     try {
       const data = await fs.readFile(this.systemStatePath, 'utf8');
       return JSON.parse(data);
-    } catch (err) {
+    } catch {
       return {
         lastScanCommandTime: 0,
         spotify429ErrorHistory: [],
@@ -54,7 +54,7 @@ export class SystemStateService {
     try {
       const data = await fs.readFile(this.scannerStatePath, 'utf8');
       return JSON.parse(data);
-    } catch (err) {
+    } catch {
       return {};
     }
   }

@@ -22,7 +22,7 @@ export class CacheService {
     try {
       const data = await fs.readFile(this.cacheFilePath, 'utf8');
       return JSON.parse(data);
-    } catch (err) {
+    } catch {
       // 檔案不存在或損毀，回傳預設結構
       return {
         followed_artists: null,
