@@ -69,7 +69,12 @@ vi.mock('undici', () => ({
 }));
 
 // 載入待測模組
-import { scanRecentNewReleases, getSpotifyAlbumTracks } from '../src/spotify-client.js';
+import { scanRecentNewReleases, getSpotifyAlbumTracks, __spotifyApiClientTestSeam } from '../src/spotify-client.js';
+
+// 把限速與 429 重試的真實等待換成 no-op：
+// 「等了多久」不是本檔要驗的行為，「降級鏈走對」才是 — 測試從秒級降到毫秒級
+__spotifyApiClientTestSeam.minIntervalMs = 0;
+__spotifyApiClientTestSeam.sleep = async () => {};
 
 describe('scanRecentNewReleases 基準測試', () => {
   beforeEach(async () => {

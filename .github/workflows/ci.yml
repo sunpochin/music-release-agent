@@ -32,6 +32,9 @@ jobs:
     - name: Build Dashboard
       run: cd dashboard && npm run build
 
+    - name: Verify Docs Reference Real Commands
+      run: npm run verify:readme
+
     - name: Run Unit Tests
       run: npm run test
 

@@ -21,7 +21,9 @@ describe('SpotifyApiClient 單元測試', () => {
 
     client = new SpotifyApiClient(mockStateService, {
       tokenProvider: async () => 'fake-token',
-      minIntervalMs: 0 // 測試時關閉時間延遲以加快執行速度
+      minIntervalMs: 0, // 測試時關閉時間延遲以加快執行速度
+      // sleep 注入為可斷言的 no-op：等待行為驗「呼叫與參數」而非消耗真實時鐘
+      sleep: vi.fn(async () => {})
     });
   });
 
@@ -74,6 +76,8 @@ describe('SpotifyApiClient 單元測試', () => {
     expect(res).toEqual({ success: true });
     expect(mockStateService.recordSpotify429).toHaveBeenCalled();
     expect(mockFetch).toHaveBeenCalledTimes(2);
+    // 等待行為的確定性斷言：依 Retry-After=1 秒換算為 1000ms 呼叫 sleep
+    expect(client.sleep).toHaveBeenCalledWith(1000);
   });
 
   it('遭遇重度 429 (Retry-After > 10s) 時，應直接拋出錯誤以觸發降級，不進行重試', async () => {

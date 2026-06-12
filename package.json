@@ -17,7 +17,8 @@
     "test:coverage": "vitest run --coverage && node generate-badge.js",
     "test:e2e": "playwright test",
     "demo:verify:lyrics": "node scripts/demo-verify-lyrics-handoff.js",
-    "demo:verify:lyrics:down": "node scripts/demo-verify-lyrics-down.js"
+    "demo:verify:lyrics:down": "node scripts/demo-verify-lyrics-down.js",
+    "verify:readme": "node scripts/verify-readme-commands.js"
   },
   "dependencies": {
     "@google/genai": "^2.3.0",

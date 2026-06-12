@@ -12,11 +12,15 @@ export class SpotifyApiClient {
    * @param {object} options - 其他設定
    * @param {function} [options.tokenProvider] - 獲取 Access Token 的函式
    * @param {number} [options.minIntervalMs] - 請求最小間隔限制 (毫秒)
+   * @param {function} [options.sleep] - 延遲函式注入點。測試時注入 no-op
+   *        即可把「等了多久」變成「有沒有呼叫、參數是多少」的確定性斷言，
+   *        測試不再消耗真實時鐘（429 重試與限速測試從秒級降到毫秒級）
    */
   constructor(stateService, options = {}) {
     this.stateService = stateService;
     this.tokenProvider = options.tokenProvider || getSpotifyAccessToken;
     this.minIntervalMs = options.minIntervalMs !== undefined ? options.minIntervalMs : 1000;
+    this.sleep = options.sleep || sleep;
     this.lastSpotifyRequestTime = 0;
     this.spotifyLock = Promise.resolve();
   }
@@ -29,7 +33,7 @@ export class SpotifyApiClient {
     const elapsed = now - this.lastSpotifyRequestTime;
     if (elapsed < this.minIntervalMs) {
       const delay = this.minIntervalMs - elapsed;
-      await sleep(delay);
+      await this.sleep(delay);
     }
     this.lastSpotifyRequestTime = Date.now();
   }
@@ -120,7 +124,7 @@ export class SpotifyApiClient {
       
       console.warn(`[SpotifyApiClient] 🚨 觸發微量頻率限制 (HTTP 429)，將依照指示等待 ${retryAfter} 秒後進行重試... (剩餘重試次數: ${retries})`);
       if (retries > 0) {
-        await sleep(retryAfter * 1000);
+        await this.sleep(retryAfter * 1000);
         return this.requestDirect(endpoint, method, body, params, retries - 1);
       }
       throw new Error(`Spotify 伺服器頻率限制 (HTTP 429) 且已耗盡重試次數，請稍後再試。`);

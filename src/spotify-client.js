@@ -25,6 +25,13 @@ const SCANNER_STATE_FILE = 'data/scanner-state.json';
 const cacheService = new CacheService(CACHE_FILE);
 const stateService = new SystemStateService(SYSTEM_STATE_FILE, SCANNER_STATE_FILE);
 const apiClient = new SpotifyApiClient(stateService);
+
+/**
+ * 測試專用 seam：讓測試把 minIntervalMs 歸零、sleep 換成 no-op，
+ * 使限速與 429 重試測試不消耗真實時鐘（確定性、毫秒級完成）。
+ * 生產程式碼不應 import 此符號。
+ */
+export const __spotifyApiClientTestSeam = apiClient;
 const playbackService = new PlaybackService(apiClient);
 
 const spotifyStrategy = new SpotifyDiscoveryStrategy(apiClient);
