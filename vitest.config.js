@@ -13,20 +13,20 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'json-summary'],
-      // 僅包含核心 SOLID 重構的後端程式碼
+      // 誠實的分母：核心敘事的每一個模組都計入（樂評生成與 GitBook 輸出
+      // 是 pipeline 的一半，不可被排除在覆蓋率之外）
       include: [
         'src/scanner/**/*.js',
         'src/services/**/*.js',
         'src/strategies/**/*.js',
+        'src/routes/**/*.js',
+        'src/dry-run/**/*.js',
+        'src/app.js',
+        'src/album-reviewer.js',
+        'src/gitbook-publisher.js',
         'src/spotify-client.js',
         'src/spotify-auth.js',
         'src/musicbrainz-client.js'
-      ],
-      // 排除非核心或未重構的外部整合模組
-      exclude: [
-        'src/album-reviewer.js',
-        'src/gitbook-publisher.js',
-        'src/lyrics-translator.js'
       ],
       // 設定覆蓋率門檻（可選，用於確保程式碼品質）
       thresholds: {

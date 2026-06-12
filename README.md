@@ -8,11 +8,13 @@
 
 `music-release-agent` 是一個自動化音樂內容系統：追蹤新發行、生成 AI 樂評、輸出 GitBook 內容，並透過 companion service 處理非同步社群發文。
 
+**一句話定位**：追蹤新發行並自動產出「可驗證」樂評內容的 pipeline。
+
 這個 repo 的重點不是單一 UI 或單一 API，而是三件事一起成立：
 
-- 可重現的 dry-run 驗證路徑
-- 明確的核心服務 / 發文服務邊界
-- 對外部依賴失敗的可驗證降級行為
+- 可重現的 dry-run 驗證路徑（零憑證、零網路）
+- 明確的服務邊界：核心 pipeline 與兩個 companion（social-post-service、lyrics-vault-service）以 handoff contract 交接
+- 對外部依賴失敗的可驗證降級行為（每一種失敗模式都對應一個 verify 指令）
 
 快速導覽：
 
@@ -276,11 +278,13 @@ flowchart TD
 
 ## 🧪 單元測試與程式碼覆蓋率
 
-本專案實施嚴格的防禦性測試，後端核心模組（服務類別、策略模式實作與掃描協調器）之語句覆蓋率均達到 **80% - 100%**。
+本專案實施嚴格的防禦性測試。覆蓋率分母**誠實計入後端全部核心模組**（含樂評生成、GitBook 發布器、API 路由層 — 不挑分母）：整體語句覆蓋率約 **72%**，其中服務類別、策略實作與掃描協調器多在 80–100%。確切數字以 `npm run test:coverage` 的輸出為準。
 
-測試分四類：
+- **單元 / 防禦測試**（`tests/*.test.js`）：服務類別、熔斷器、策略降級、樂評生成（mock LLM）、GitBook 發布器（暫存目錄 + SUMMARY 冪等）
+- **API 層測試**（`tests/server-routes.test.js`）：以 ephemeral port 啟動真實 HTTP，驗證缺欄位 400、companion 不可達 502、readyz degraded
 
-- **單元 / 防禦測試**（`tests/*.test.js`）：服務類別、熔斷器、策略降級
+其餘測試類別：
+
 - **Golden 測試**（`tests/golden/`）：dry-run 管線的確定性驗收 — 正常情境（輸出與 golden 檔案逐字比對）、模糊輸入（slug 退化、重音字元、空 genres）、失敗情境（malformed fixture 必須以非零 exit code 大聲失敗）
 - **契約測試**（`tests/contract/`）：跨服務 handoff 契約以 [`contracts/social-handoff.schema.json`](./contracts/social-handoff.schema.json) 為單一事實來源，核心 proxy、內建 mock、verify 腳本三方共用；測試同時驗證 schema 判定與 mock 的活回應
 - **前端安全測試**：單元層（`tests/markdown-renderer.test.js`）驗證 Markdown 轉譯器輸出僅含白名單標籤；瀏覽器層（`tests/e2e/dashboard.spec.js` XSS 案例）把惡意 payload 餵進歌詞 API，驗證注入腳本在真實 DOM 中不執行
