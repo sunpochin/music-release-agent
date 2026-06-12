@@ -15,10 +15,10 @@ vi.mock('undici', () => ({
   Agent: class MockAgent {}
 }));
 
-// 確保走本地路徑（無雲端金鑰）
-delete process.env.GEMINI_API_KEY;
-
 const { generateAlbumReview, generateTrackAnalysis } = await import('../src/album-reviewer.js');
+
+// 確保走本地路徑（無雲端金鑰），在 import 後刪除以防 dotenv.config() 重新寫入
+delete process.env.GEMINI_API_KEY;
 
 const sampleAlbum = {
   name: 'Test Album',

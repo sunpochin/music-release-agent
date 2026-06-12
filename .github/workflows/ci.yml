@@ -35,8 +35,14 @@ jobs:
     - name: Verify Docs Reference Real Commands
       run: npm run verify:readme
 
-    - name: Run Unit Tests
-      run: npm run test
+    - name: Run Verification and Generate Report
+      run: npm run verify:report
+
+    - name: Archive Verification Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: verify-report
+        path: verify-report.json
 
     - name: Verify Dry Run Sandbox
       run: npm run demo:verify

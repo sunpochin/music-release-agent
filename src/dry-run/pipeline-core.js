@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * =====================================================================
  * 🧩 Dry-run 管線共用核心 (Pipeline Core)
@@ -17,8 +18,9 @@ export function generateSlug(text) {
     .toLowerCase()
     .trim()
     .replace(/\s+/g, '-')
-    .replace(/[^\w\-一-龥]+/g, '')
-    .replace(/\-\-+/g, '-');
+    // 繁體中文註解：將減號置於字元類別末尾以代表字面減號，避免範圍解讀與不必要的斜線轉義
+    .replace(/[^\w一-龥-]+/g, '')
+    .replace(/--+/g, '-');
 }
 
 /**
@@ -56,6 +58,8 @@ export function getMockReview(album) {
 }
 
 /** 單筆 release 的必填欄位與型別規則 */
+// 繁體中文註解：定義驗證規格的 JSDoc 元組型別，使 TypeScript 能正確推導 check 函式
+/** @type {Array<[string, (v: any) => boolean, string]>} */
 const RELEASE_FIELD_RULES = [
   ['id', (v) => typeof v === 'string' && v.length > 0, '必須是非空字串'],
   ['name', (v) => typeof v === 'string' && v.trim().length > 0, '必須是非空字串'],

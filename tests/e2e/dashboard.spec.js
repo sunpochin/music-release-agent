@@ -1,3 +1,4 @@
+/* global window, document */
 import { test, expect } from '@playwright/test';
 
 test.describe('Music Release Dashboard E2E Tests', () => {

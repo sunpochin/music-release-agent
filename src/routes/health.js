@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Health / Readiness 路由 — liveness 與含依賴狀態的 readiness 報告。
  * readyz 語意：ok（全部 companion 可達）/ degraded（核心 ready、companion 掛）/ not_ready（503）。

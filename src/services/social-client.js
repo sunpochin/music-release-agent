@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 📡 SocialClient — 社群發文服務客戶端
  *
@@ -21,6 +22,7 @@ export class SocialClient {
    * @param {string} [params.imageBase64] - Base64 編碼的圖片資料
    * @param {string} params.caption - 發文文案
    * @param {string[]} params.platforms - 目標平台陣列（如 ['threads', 'facebook']）
+   * @param {string} [params.mode] - 繁體中文註解：發布模式（'mock' | 'live'）
    * @returns {Promise<{jobId: string, status: string}>}
    */
   async publishPost({ imageBase64, caption, platforms = ['threads'], mode }) {

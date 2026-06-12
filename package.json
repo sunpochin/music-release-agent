@@ -16,6 +16,9 @@
     "test:golden": "vitest run tests/golden",
     "test:coverage": "vitest run --coverage && node generate-badge.js",
     "test:e2e": "playwright test",
+    "typecheck": "tsc -p jsconfig.json",
+    "lint": "eslint src/**/*.js server.js tests/**/*.js",
+    "verify:report": "node scripts/generate-report.js",
     "demo:verify:lyrics": "node scripts/demo-verify-lyrics-handoff.js",
     "demo:verify:lyrics:down": "node scripts/demo-verify-lyrics-down.js",
     "verify:readme": "node scripts/verify-readme-commands.js"
@@ -30,8 +33,12 @@
     "undici": "^8.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.60.0",
     "@vitest/coverage-v8": "^3.2.6",
+    "eslint": "^9.39.4",
+    "globals": "^17.6.0",
+    "typescript": "^6.0.3",
     "vitest": "^3.2.6"
   }
 }

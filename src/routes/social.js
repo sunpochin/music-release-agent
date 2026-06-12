@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Social 路由 — 轉發至 social-post-service companion。
  * 請求驗證使用 contracts/social-handoff.schema.json（與內建 mock、verify 腳本共用同一份契約）。

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Core 路由 — 音樂庫 API：albums、tracks、本地樂評擷取、歌曲 AI 分析。
  */
@@ -15,8 +16,9 @@ function generateSlug(text) {
     .toLowerCase()
     .trim()
     .replace(/\s+/g, '-')
-    .replace(/[^\w\-一-龥]+/g, '')
-    .replace(/\-\-+/g, '-');
+    // 繁體中文註解：將減號置於字元類別末尾以代表字面減號，避免範圍解讀與不必要的斜線轉義
+    .replace(/[^\w一-龥-]+/g, '')
+    .replace(/--+/g, '-');
 }
 
 // 輔助函式：解析 AI 樂評 markdown 檔案，擷取作品介紹與精選總結
@@ -97,8 +99,8 @@ export function coreRoutes() {
         }
       }
 
-      // 依照發行日期反向排序
-      allAlbums.sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
+      // 繁體中文註解：依照發行日期反向排序，呼叫 getTime() 進行型別安全相減
+      allAlbums.sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime());
 
       res.json(allAlbums);
     } catch (err) {

@@ -7,7 +7,10 @@ export default defineConfig({
     pool: 'forks',
     // 設定全域測試環境變數
     env: {
-      NODE_ENV: 'test'
+      NODE_ENV: 'test',
+      // 設定不可達的微服務位址，確保路由降級 (502) 測試的穩定性，避免受本地運行服務干擾
+      SOCIAL_SERVICE_URL: 'http://127.0.0.1:39998',
+      LYRICS_SERVICE_URL: 'http://127.0.0.1:39999'
     },
     // 設置測試覆蓋率配置
     coverage: {

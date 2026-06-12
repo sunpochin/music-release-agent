@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Lyrics 路由 — 轉發至 lyrics-vault-service companion（歌詞翻譯 + Obsidian vault 落盤）。
  * 快取邏輯（hit 零 token、promptVersion 失效）在 companion 內；本服務只轉發與降級。
