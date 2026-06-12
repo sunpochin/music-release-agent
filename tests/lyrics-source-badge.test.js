@@ -43,12 +43,13 @@ describe('Lyrics source provenance：高風險來源必須誠實標示', () => {
     expect(meta.label).toContain('無歌詞原文');
   });
 
-  it('spotify 轉接器標為 experimental，不偽裝成官方', () => {
+  it('spotify 轉接器標為 experimental，但預設隱藏', () => {
     const meta = lyricsSourceMeta('spotify');
     expect(meta.verified).toBe(false);
     expect(meta.tone).toBe('experimental');
     expect(meta.label).toContain('實驗性');
     expect(meta.label).not.toContain('官方');
+    expect(meta.show).toBe(false);
   });
 
   it('未翻譯的記憶模式同樣保持 neutral', () => {
