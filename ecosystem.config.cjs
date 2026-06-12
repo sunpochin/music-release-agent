@@ -42,6 +42,20 @@ module.exports = {
       out_file: '../music-release-agent/logs/social-out.log'
     },
     {
+      // 歌詞翻譯 + Obsidian vault 落盤微服務
+      // 未啟動時核心不受影響：/api/lyrics 回 502、/readyz 標 degraded、前端顯示離線訊息
+      name: 'lyrics-vault-service',
+      script: 'server.js',
+      cwd: '../lyrics-vault-service',
+      exec_mode: 'fork',
+      watch: false,
+      error_file: '../music-release-agent/logs/lyrics-err.log',
+      out_file: '../music-release-agent/logs/lyrics-out.log',
+      env: {
+        PORT: 3013
+      }
+    },
+    {
       // Spotify 定時發行掃描器 (每 3 小時執行一次)
       name: 'spotify-release-scanner',
       script: 'scan-releases.js',

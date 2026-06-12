@@ -31,6 +31,10 @@ export function lyricsSourceMeta(source) {
     case 'llm-recall-untranslated':
       return { label: 'AI 背景分析（未翻譯，無歌詞原文）', tone: 'neutral', verified: false, show: true };
 
+    case 'service-down':
+      // companion 不可達是基礎設施狀態而非內容可信度問題 → 中性徽章
+      return { label: '歌詞服務離線', tone: 'neutral', verified: false, show: true };
+
     case 'none':
     case undefined:
     case null:

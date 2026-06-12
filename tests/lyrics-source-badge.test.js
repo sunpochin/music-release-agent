@@ -9,6 +9,16 @@
 import { describe, it, expect } from 'vitest';
 import { lyricsSourceMeta, TONE_CLASS } from '../dashboard/src/utils/lyricsSource.js';
 
+describe('Lyrics source provenance：服務離線（基礎設施狀態）', () => {
+  it('service-down 顯示中性徽章，不誤標為不可信內容', () => {
+    const meta = lyricsSourceMeta('service-down');
+    expect(meta.tone).toBe('neutral');
+    expect(meta.verified).toBe(false);
+    expect(meta.show).toBe(true);
+    expect(meta.label).toContain('離線');
+  });
+});
+
 describe('Lyrics source provenance：可信來源（verified）', () => {
   it('lrclib 標示為已驗證、verified tone', () => {
     const meta = lyricsSourceMeta('lrclib');

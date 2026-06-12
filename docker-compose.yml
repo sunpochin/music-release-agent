@@ -15,6 +15,7 @@ services:
       # - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
       # - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
       # - SOCIAL_SERVICE_URL=http://social-post-service:3012
+      # - LYRICS_SERVICE_URL=http://lyrics-vault-service:3013
     volumes:
       - ./data:/usr/src/app/data
       - ./spotify_tokens.json:/usr/src/app/spotify_tokens.json
@@ -37,3 +38,15 @@ services:
   #   container_name: social-post-service
   #   ports:
   #     - "3012:3012"
+
+  # Optional: lyrics-vault-service if it's cloned adjacently
+  # （未啟動時 /api/lyrics 回 502、前端顯示「歌詞服務暫時離線」，核心不受影響）
+  # lyrics-vault-service:
+  #   build:
+  #     context: ../lyrics-vault-service
+  #     dockerfile: Dockerfile
+  #   container_name: lyrics-vault-service
+  #   ports:
+  #     - "3013:3013"
+  #   volumes:
+  #     - ./data/lyrics-vault:/usr/src/app/data/lyrics-vault
