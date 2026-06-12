@@ -33,6 +33,11 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     setIsTranslated(false)
     setIsTranslating(false)
     setLyricsSource(undefined)
+    if (selectedTrack) {
+      setRawLoading(true)
+    } else {
+      setRawLoading(false)
+    }
   }, [selectedTrack])
 
   // 🪄 選歌即自動載入歌詞（產品決策）：
