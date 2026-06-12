@@ -31,7 +31,7 @@ module.exports = {
       }
     },
     {
-      // 社群貼文自動發布微服務
+      // 社群貼文自動發布微服務（選用 companion — 獨立的貼文服務，核心不受影響）
       name: 'social-post-service',
       script: 'npm',
       args: 'run dev',
@@ -42,7 +42,7 @@ module.exports = {
       out_file: '../music-release-agent/logs/social-out.log'
     },
     {
-      // 歌詞翻譯 + Obsidian vault 落盤微服務
+      // 歌詞翻譯 + Obsidian vault 落盤微服務（選用 companion — 歌詞功能的微服務，獨立 repo，不影響核心功能）
       // 未啟動時核心不受影響：/api/lyrics 回 502、/readyz 標 degraded、前端顯示離線訊息
       name: 'lyrics-vault-service',
       script: 'server.js',

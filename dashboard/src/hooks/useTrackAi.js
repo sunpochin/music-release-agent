@@ -80,11 +80,11 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
           refresh: Boolean(refresh)
         })
       })
-      // 502 = lyrics-vault-service companion 不可達（核心服務的明確降級回應）
+      // 502 = 歌詞翻譯 companion 不可達（核心服務的明確降級回應）
       // 顯示可行動的訊息而非通用錯誤 — 音樂庫等核心功能不受影響
       if (res.status === 502) {
         if (selectedTrackRef.current?.id === trackIdAtStart) {
-          setLyricsData('### 歌詞服務暫時離線\n\n歌詞翻譯由獨立的 lyrics-vault-service 提供，目前未啟動或不可達。\n\n音樂庫瀏覽與其他功能不受影響；服務恢復後點擊「重新載入歌詞」即可。')
+          setLyricsData('### 歌詞服務暫時離線\n\n歌詞翻譯服務目前暫時離線。\n\n音樂庫瀏覽與其他功能不受影響；服務恢復後點擊「重新載入歌詞」即可。')
           setIsTranslated(false)
           setLyricsSource('service-down')
         }
