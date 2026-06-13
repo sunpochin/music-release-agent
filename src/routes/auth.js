@@ -2,7 +2,7 @@
  * Auth 路由 — Spotify OAuth 登入與 callback。
  */
 import { Router } from 'express';
-import { getSpotifyAuthUrl, handleSpotifyCallback, getSpotifyAccessToken } from '../spotify-auth.js';
+import { getSpotifyAuthUrl, handleSpotifyCallback, getSpotifyAccessToken, clearSpotifyTokens } from '../spotify-auth.js';
 
 export function authRoutes() {
   const router = Router();
@@ -49,6 +49,18 @@ export function authRoutes() {
         return res.status(401).json({ error: 'not_authorized', loginUrl: '/api/auth/login/spotify' });
       }
       return res.json({ access_token: token });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * 清除憑證實作登出
+   */
+  router.post('/api/auth/logout', async (_req, res) => {
+    try {
+      await clearSpotifyTokens();
+      return res.json({ success: true });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

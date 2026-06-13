@@ -191,3 +191,16 @@ export async function getSpotifyAccessToken() {
     return null;
   }
 }
+
+/**
+ * 清除本地儲存的 Spotify 授權憑證檔案 (實作登出)
+ */
+export async function clearSpotifyTokens() {
+  try {
+    await fs.rm(TOKEN_FILE_PATH, { force: true });
+    console.log('[Spotify/Auth] 🧹 本地 Spotify Token 憑證已成功清除！');
+  } catch (err) {
+    console.error('[Spotify/Auth] ❌ 清除本地 Token 失敗:', err.message || err);
+  }
+}
+
