@@ -40,6 +40,8 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   // 只要 lyricsForTrackId !== selectedTrack.id，就當作「正在載入」，直接顯示 spinner。
   const [lyricsForTrackId, setLyricsForTrackId] = useState(null)
 
+  const [lrcData, setLrcData] = useState<{ timeMs: number; text: string }[] | null>(null)
+
   // 隨時追蹤當前選中的單曲，以防異步請求結束時選取已改變
   const selectedTrackRef = useRef(selectedTrack)
   useEffect(() => {
@@ -47,20 +49,13 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   }, [selectedTrack])
 
   // 🪄 選歌即自動載入歌詞（產品決策）：
-  // 【小朋友解釋法】：
-  // 當使用者點進一首新歌時，我們：
-  // 1. 先把「舊的翻譯狀態」清掉（避免新歌顯示舊歌的「已翻譯」標籤）
-  // 2. 延遲 400ms 再開始載入（避免「邊點邊搜尋」時發太多請求）
-  // 3. 由 fetchLyricsFor 統一負責清空歌詞、設置 loading 狀態
-  // 「閃兩次」分兩個來源各自處理：
-  //   - 內容殘留（新歌顯示舊歌詞）→ 由下方 isStale 在 render 階段擋掉
-  //   - 進場動畫重播（同份歌詞淡入兩次）→ 由下方 shouldAnimateLyrics「每首只播一次」擋掉
   const autoFetchedRef = useRef(null)
   useEffect(() => {
     // 只清除「翻譯狀態」，不清除歌詞內容（交給 fetchLyricsFor 處理）
     setIsTranslated(false)
     setIsTranslating(false)
     setLyricsSource(undefined)
+    setLrcData(null)
 
     if (!selectedAlbum || !selectedTrack) {
       setRawLoading(false)
@@ -94,11 +89,25 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     } else {
       setRawLoading(true)
       setLyricsData('')
+      setLrcData(null)
       setIsTranslated(false)
     }
 
     try {
-      const res = await fetch('/api/lyrics', {
+      // 並行抓取 LRCLIB 與自家的 API
+      const lrclibPromise = !translate ? fetch(`https://lrclib.net/api/search?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(selectedAlbum.artistName || '')}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.length > 0 && data[0].syncedLyrics) {
+            import('../utils/lrcParser').then(({ parseLrc }) => {
+              if (selectedTrackRef.current?.id === trackIdAtStart) {
+                setLrcData(parseLrc(data[0].syncedLyrics));
+              }
+            });
+          }
+        }).catch(() => null) : Promise.resolve();
+
+      const apiPromise = fetch('/api/lyrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,7 +117,10 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
           translate: Boolean(translate),
           refresh: Boolean(refresh)
         })
-      })
+      });
+
+      const [res] = await Promise.all([apiPromise, lrclibPromise]);
+      
       // 502 = 歌詞翻譯 companion 不可達（核心服務的明確降級回應）
       // 顯示可行動的訊息而非通用錯誤 — 音樂庫等核心功能不受影響
       if (res.status === 502) {
@@ -220,6 +232,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
 
   return {
     lyricsData: isStale ? '' : lyricsData,
+    lrcData: isStale ? null : lrcData,
     lyricsSource,
     rawLoading: effectiveLoading,
     isTranslated,

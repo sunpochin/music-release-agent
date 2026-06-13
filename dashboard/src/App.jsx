@@ -29,6 +29,7 @@ function App() {
   // 單曲 AI 歌詞翻譯與賞析（含防舊蓋新與換歌擦黑板）
   const {
     lyricsData,
+    lrcData,
     lyricsSource,
     rawLoading,
     isTranslated,
@@ -83,6 +84,9 @@ function App() {
     }
   }, [selectedAlbum])
 
+  // Web Playback SDK 播放器狀態與控制，提升到 App 層讓 SongPanel 也能取得進度來做 KTV 同步
+  const playerControls = useSpotifyPlayer()
+
   // 根據 URL 中的 trackId 參數同步選取的單曲狀態
   // 【小朋友解釋法】：
   // 我們裝了一個「導航監聽器」(useEffect 監聽 trackId 與 tracks)。
@@ -99,6 +103,17 @@ function App() {
       setSelectedTrack(null)
     }
   }, [trackId, tracks])
+
+  // 當選取的歌曲或專輯改變時，通知播放器播放
+  useEffect(() => {
+    if (playerControls.isReady) {
+      if (selectedTrack) {
+        playerControls.playUri(`spotify:track:${selectedTrack.id}`)
+      } else if (selectedAlbum) {
+        playerControls.playUri(`spotify:album:${selectedAlbum.id}`)
+      }
+    }
+  }, [selectedTrack, selectedAlbum, playerControls.isReady, playerControls.playUri])
 
   // 僅選取專輯，使用 react-router 的 navigate 進行 URL 轉換
   // （歌詞與載入狀態的重設由 useTrackAi 的「換歌擦黑板」機制處理）
@@ -176,6 +191,8 @@ function App() {
                     selectedAlbum={selectedAlbum}
                     selectedTrack={selectedTrack}
                     lyricsData={lyricsData}
+                    lrcData={lrcData}
+                    playerControls={playerControls}
                     lyricsSource={lyricsSource}
                     rawLoading={rawLoading}
                     shouldAnimateLyrics={shouldAnimateLyrics}
@@ -214,9 +231,7 @@ function App() {
 
       {/* 懸浮式 Spotify Web Playback SDK 播放器：自動跟隨選取的歌曲或專輯切換 */}
       {(selectedTrack || selectedAlbum) && (
-        <SpotifyPlayer 
-          uri={selectedTrack ? `spotify:track:${selectedTrack.id}` : `spotify:album:${selectedAlbum?.id}`}
-        />
+        <SpotifyPlayer playerControls={playerControls} />
       )}
     </div>
   )

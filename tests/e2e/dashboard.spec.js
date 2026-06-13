@@ -113,7 +113,8 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     await expect(page.locator('text=請從左側選擇一張最新專輯')).toBeVisible();
 
     // 5. 點擊側邊欄的第一張專輯卡片
-    const firstAlbumButton = page.locator('aside button').first();
+    // 注意：因為側邊欄增加了 Spotify 登入按鈕，所以要精準抓取帶有圖片的專輯按鈕
+    const firstAlbumButton = page.locator('aside .flex-1 button').first();
     await expect(firstAlbumButton).toBeVisible();
     await firstAlbumButton.click();
 
@@ -226,7 +227,7 @@ test.describe('Music Release Dashboard E2E Tests', () => {
     });
 
     await page.goto('/');
-    await page.locator('aside button').first().click();
+    await page.locator('aside .flex-1 button').first().click();
     await page.locator('button:has-text("XSS Track")').click();
     // 選歌即自動載入歌詞 — 惡意 payload 直接進入渲染管線
 

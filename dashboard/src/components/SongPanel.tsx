@@ -53,6 +53,8 @@ const SongPanel = ({
   selectedAlbum,
   selectedTrack,
   lyricsData,
+  lrcData,
+  playerControls,
   lyricsSource,
   rawLoading,
   shouldAnimateLyrics = true,
@@ -64,8 +66,9 @@ const SongPanel = ({
   handleRedownloadRaw,
   handleClearCache,
   onBackToAlbum // 手機版「返回專輯資訊」的回調
-}) => {
+}: any) => {
   const [menuOpen, setMenuOpen] = useState(false)
+  const lyricsContainerRef = useRef<HTMLDivElement>(null)
 
   // 1. 社群分享與發佈之本機狀態 (SOLID: 狀態局部化)
   const [isExporting, setIsExporting] = useState(false)
@@ -361,14 +364,50 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
             <p className="animate-pulse font-light tracking-widest text-center text-sm">聆聽中...</p>
           </div>
-        ) : lyricsData ? (
-          <div className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20">
+        ) : lyricsData || lrcData ? (
+          <div 
+            ref={lyricsContainerRef}
+            className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 relative"
+          >
             {/* 歌詞來源徽章：誠實標示可信度（真實來源 / 實驗性 / AI 記憶模式可能不準確） */}
-            <div className="not-prose mb-3">
-              <LyricsSourceBadge source={lyricsSource} />
+            <div className="not-prose mb-3 sticky top-0 bg-black/20 backdrop-blur-md z-10 p-2 rounded-lg">
+              <LyricsSourceBadge source={lrcData ? 'LRCLIB (動態同步)' : lyricsSource} />
             </div>
-            {/* ai-stagger 進場動畫只在首次顯示某首歌歌詞時掛上；之後若父層 remount 則不帶動畫，避免重播閃爍（見 useTrackAi 的 shouldAnimateLyrics） */}
-            <div className={shouldAnimateLyrics ? 'ai-stagger' : ''} dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
+            
+            {/* 動態 KTV 歌詞模式 */}
+            {lrcData ? (
+              <div className="flex flex-col gap-6 py-32 transition-all duration-500">
+                {lrcData.map((line: any, idx: number) => {
+                  const isCurrent = playerControls?.position >= line.timeMs && 
+                    (idx === lrcData.length - 1 || playerControls?.position < lrcData[idx + 1].timeMs);
+                  
+                  // 自動置中滾動
+                  if (isCurrent && lyricsContainerRef.current) {
+                    const el = document.getElementById(`lrc-line-${idx}`);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }
+
+                  return (
+                    <p 
+                      key={idx} 
+                      id={`lrc-line-${idx}`}
+                      onClick={() => {
+                        if (playerControls?.seek) playerControls.seek(line.timeMs);
+                      }}
+                      className={`m-0 cursor-pointer transition-all duration-500 ${isCurrent ? 'text-white text-2xl font-bold shadow-white drop-shadow-lg scale-105' : 'text-white/30 blur-[0.5px] hover:text-white/60 hover:blur-none'}`}
+                    >
+                      {line.text || '...'}
+                    </p>
+                  );
+                })}
+              </div>
+            ) : (
+              /* 純文字/Markdown 降級模式 */
+              <div className={shouldAnimateLyrics ? 'ai-stagger' : ''} dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
+            )}
+
             {isTranslating && (
               <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md animate-pulse flex items-center gap-3">
                 <Sparkles size={16} className="text-spotify-green animate-spin" />
