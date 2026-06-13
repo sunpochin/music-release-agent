@@ -106,7 +106,9 @@ function App() {
   }, [trackId, tracks])
 
   // 當選取的歌曲或專輯改變時，通知播放器播放
+  // (2026-06-13) 用戶要求取消自動播放，改為手動點擊 Spotify 的 Play 按鈕
   useEffect(() => {
+    /*
     if (playerControls.isReady) {
       if (selectedTrack) {
         playerControls.playUri(`spotify:track:${selectedTrack.id}`)
@@ -114,6 +116,7 @@ function App() {
         playerControls.playUri(`spotify:album:${selectedAlbum.id}`)
       }
     }
+    */
   }, [selectedTrack, selectedAlbum, playerControls.isReady, playerControls.playUri])
 
   // 僅選取專輯，使用 react-router 的 navigate 進行 URL 轉換
