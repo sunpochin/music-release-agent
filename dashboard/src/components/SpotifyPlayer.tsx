@@ -5,24 +5,31 @@ interface SpotifyPlayerProps {
   /** 要播放的 Spotify URI (e.g. 'spotify:track:xxx' 或 'spotify:album:xxx') */
   uri?: string
   playerControls: any
+  fallbackTrackName?: string
+  fallbackArtistName?: string
 }
 
 /**
  * SpotifyPlayer — 懸浮式 Spotify Web Playback SDK 播放器元件
  *
  * 接受 playerControls 作為 prop，不自己呼叫 hook，避免多重初始化。
- * 當 uri prop 改變時自動切換播放目標。
+ * 當 uri prop 改變時不再自動播放，而是等待使用者按下 Play。
  * 降級處理：非 Premium 帳號顯示引導訊息而非崩潰。
  */
-const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri, playerControls }) => {
+const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri, playerControls, fallbackTrackName, fallbackArtistName }) => {
   const { isReady, isPlaying, currentTrack, position, duration, error, playUri, togglePlay } = playerControls
 
-  // 當 uri 或播放器就緒狀態改變時，自動播放新的曲目
-  useEffect(() => {
-    if (isReady && uri) {
+  // (2026-06-13) 用戶要求取消自動播放，故移除此處的 useEffect 自動 playUri 邏輯
+
+  // 處理播放/暫停按鈕點擊
+  const handlePlayClick = () => {
+    if (!currentTrack && uri) {
+      // 如果目前播放器內無曲目，則主動加載選取的 uri
       playUri(uri)
+    } else {
+      togglePlay()
     }
-  }, [uri, isReady, playUri])
+  }
 
   // 格式化毫秒為 mm:ss 顯示
   const formatTime = (ms: number): string => {
@@ -92,16 +99,16 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri, playerControls }) =>
         {/* 曲名與藝人 */}
         <div className="flex-1 overflow-hidden">
           <p className="text-white text-sm font-semibold truncate">
-            {currentTrack?.name ?? '尚未播放'}
+            {currentTrack?.name ?? fallbackTrackName ?? '尚未播放'}
           </p>
           <p className="text-gray-400 text-xs truncate mt-0.5">
-            {currentTrack?.artists.map((a: { name: string }) => a.name).join(', ') ?? '請在左側選擇歌曲'}
+            {currentTrack?.artists.map((a: { name: string }) => a.name).join(', ') ?? fallbackArtistName ?? '請在左側選擇歌曲'}
           </p>
         </div>
 
         {/* 播放 / 暫停按鈕 */}
         <button
-          onClick={togglePlay}
+          onClick={handlePlayClick}
           className="w-10 h-10 bg-spotify-green hover:bg-green-400 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-[0_0_20px_rgba(29,185,84,0.4)] shrink-0"
           aria-label={isPlaying ? '暫停' : '播放'}
         >

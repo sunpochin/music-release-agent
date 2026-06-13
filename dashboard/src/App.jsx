@@ -233,9 +233,14 @@ function App() {
         )}
       </main>
 
-      {/* 懸浮式 Spotify Web Playback SDK 播放器：自動跟隨選取的歌曲或專輯切換 */}
+      {/* 懸浮式 Spotify Web Playback SDK 播放器：手動播放控制，顯示備用元資料 */}
       {(selectedTrack || selectedAlbum) && (
-        <SpotifyPlayer playerControls={playerControls} />
+        <SpotifyPlayer
+          uri={selectedTrack ? `spotify:track:${selectedTrack.id}` : `spotify:album:${selectedAlbum.id}`}
+          fallbackTrackName={selectedTrack?.name}
+          fallbackArtistName={selectedTrack?.artists?.map(a => a.name).join(', ') ?? selectedAlbum?.artistName}
+          playerControls={playerControls}
+        />
       )}
     </div>
   )
