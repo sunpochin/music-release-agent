@@ -51,8 +51,7 @@ const TracksError = ({ error, onRetry }) => (
   </div>
 )
 
-/** 友善 404：trackId 不在這張專輯 → 推薦同專輯其他曲目，舊分享連結不會死 */
-const TrackNotFound = ({ albumId, tracks }) => {
+const TrackNotFound = ({ albumId, tracks, playerControls }) => {
   const navigate = useNavigate()
   return (
     <div
@@ -71,7 +70,10 @@ const TrackNotFound = ({ albumId, tracks }) => {
         {tracks.slice(0, 5).map((track) => (
           <button
             key={track.id}
-            onClick={() => navigate(`/album/${albumId}/song/${track.id}`)}
+            onClick={() => {
+              navigate(`/album/${albumId}/song/${track.id}`);
+              playerControls?.playUri?.(`spotify:track:${track.id}`);
+            }}
             className="w-full text-left px-4 py-2.5 rounded-xl bg-white/5 hover:bg-spotify-green/20 transition-all text-xs text-gray-300 hover:text-white flex items-center gap-2"
           >
             <span className="text-spotify-green font-mono w-4 text-center">{track.track_number}</span>
@@ -103,7 +105,7 @@ const SongPage = ({
 
   // 3. 門票過期：URL 有 trackId、歌單已載入、但找不到對應的歌 → 友善 404
   if (trackId && !panelProps.selectedTrack && tracks.length > 0) {
-    return <TrackNotFound albumId={panelProps.selectedAlbum?.id} tracks={tracks} />
+    return <TrackNotFound albumId={panelProps.selectedAlbum?.id} tracks={tracks} playerControls={panelProps.playerControls} />
   }
 
   // 4. 有選中的歌 → 歌詞面板

@@ -23,9 +23,10 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri, playerControls, fall
 
   // 處理播放/暫停按鈕點擊
   const handlePlayClick = () => {
-    if (!currentTrack && uri) {
-      // 如果目前播放器內無曲目，則主動加載選取的 uri
-      playUri(uri)
+    const isDifferentTrack = uri && currentTrack?.uri !== uri
+    if (!currentTrack || isDifferentTrack) {
+      // 如果目前播放器內無曲目，或者選擇了另一首歌，則主動加載選取的 uri
+      if (uri) playUri(uri)
     } else {
       togglePlay()
     }

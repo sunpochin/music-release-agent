@@ -26,7 +26,8 @@ const AlbumPanel = ({
   tracksLoading,
   tracksError,
   retryTracks,
-  variant = 'compact'
+  variant = 'compact',
+  onPlayTrack
 }) => {
   const navigate = useNavigate()
   if (!selectedAlbum) return null
@@ -103,8 +104,9 @@ const AlbumPanel = ({
                     key={track.id}
                     aria-current={selectedTrack?.id === track.id ? 'true' : undefined}
                     onClick={() => {
-                      // 使用 React Router navigate 跳轉，避免整頁重新整理
+                      // Spotify mobile style: 單擊立即切換頁面並開始播放
                       navigate(`/album/${selectedAlbum.id}/song/${track.id}`);
+                      onPlayTrack?.(`spotify:track:${track.id}`);
                     }}
                     className={`w-full text-left p-2 rounded-lg transition-all text-xs flex items-center justify-between gap-3 group ${
                       selectedTrack?.id === track.id

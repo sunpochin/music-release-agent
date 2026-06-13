@@ -220,6 +220,7 @@ function App() {
                   tracksLoading={tracksLoading}
                   tracksError={tracksError}
                   retryTracks={retryTracks}
+                  onPlayTrack={playerControls.playUri}
                 />
               )}
             </div>
