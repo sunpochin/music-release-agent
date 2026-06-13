@@ -134,6 +134,14 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
       initPlayer()
     } else {
       window.onSpotifyWebPlaybackSDKReady = initPlayer
+      // 動態載入 SDK script
+      if (!document.getElementById('spotify-player-sdk')) {
+        const script = document.createElement('script')
+        script.id = 'spotify-player-sdk'
+        script.src = 'https://sdk.scdn.co/spotify-player.js'
+        script.async = true
+        document.body.appendChild(script)
+      }
     }
 
     return () => {
