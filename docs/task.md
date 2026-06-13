@@ -8,3 +8,9 @@
 - `[x]` 建立/更新 walkthrough.md 紀錄變更
 - `[x]` 實作 MusicBrainz 專輯曲目備用探索路由與 Mock 最後防線
 - `[x]` 修復 PM2 `NODE_ENV: 'development'` 開發模式配置，啟用 Vite HMR 即時熱重載
+- `[x]` 將 `lyrics-vault-service` 中的 `lyrics-prompt.ts`、`pipeline.ts` 與 `translate-provider.ts` 遷移至 TypeScript。
+- `[x]` 升級 Translation Prompt 至 V9，要求保留 `[mm:ss.xx]` 時間戳。
+- `[x]` 修正 `translationMatcher.ts` 與 `lrcParser.ts` 支援時間戳精準比對與全域清除多重標籤。
+- `[x]` 支援「雙語全文」與「KTV 動態」歌詞點擊時間戳即可自動播放與定位秒數。
+- `[x]` 修復 Spotify Player 單一控制權與播放 Album 產生的 400 Bad Request 錯誤。
+- `[x]` 修復 KTV 捲動的 React 副作用，將其放進 `useEffect` 控制中。

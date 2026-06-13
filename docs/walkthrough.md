@@ -103,5 +103,74 @@ npm run dev
 - **TypeScript 型別安全**：全新的 `SpotifyAuthButton.tsx` 完美通過 TypeScript 型別檢查，確保高可靠度。
 
 > [!TIP]
-> 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開曲目清單選擇歌曲，此時網址將會更新為獨立的單曲路由，並展現右側的歌詞翻譯 loading 細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！
+> 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開曲目清單選擇歌曲，此時網址將會更新為獨立 the 單曲路由，並展現右側的歌詞翻譯 loading 細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！
+
+---
+
+## 最新修復與 KTV 動態歌詞擴充 (LRC Synced Lyrics & TS Migration)
+
+### 1. `lyrics-vault-service` 全面 TypeScript 遷移
+我們新開了 `feature/preserve-lrc-timecodes` 分支，完成了以下 TS 遷移：
+- **TS 專案初始化**：在 `lyrics-vault-service` 中新增 `tsconfig.json` 並安裝 `typescript` 與 `tsx`。
+- **程式碼強型別化**：將核心服務如 `lyrics-prompt.ts`、`pipeline.ts` 與 `translate-provider.ts` 均修改為 `.ts` 副檔名，並通過靜態型別分析。
+- **PM2 進程控制**：更新了 `ecosystem.config.cjs` 以呼叫 `npm start` 執行 `tsx server.js`，使整個服務能夠在開發環境進行無縫熱重載。
+
+### 2. 歌詞時間標籤精準保留與對齊
+- **AI Prompt 提示詞升級**：升級歌詞處理 Prompt 至 `V9`，極力強調「翻譯中必須保留 `[mm:ss.xx]` 時間標籤」。
+- **基於時間戳對齊雙語**：廢棄了原本依賴 `**加粗字**` 與標點匹配的模糊算法，重構 `translationMatcher.ts`。現在直接利用 `[mm:ss.xx]` 作為絕對 key 對齊原文與中文翻譯，保證翻譯在 KTV 滾動時完美顯示。
+
+### 3. 全文歌詞點擊時間跳轉
+- **時間徽章解析**：在 `utils/markdown.ts` 中解析 Markdown 時，會將 `[mm:ss.xx]` 格式轉化為精美可點擊的時間徽章。
+- **點擊播放與跳轉**：`MarkdownLyricsView` 與 `KtvLyricsView` 會監聽點擊，如果點擊時間徽章且音樂未啟動，則發出帶有 `position_ms` 的 `playUri` 請求直接於指定秒數開播；若已開播，則執行 `seek` 瞬間跳轉。
+
+### 4. 健壯性與細節打磨
+- **雙重 SDK 執行緒與 Play 400 錯誤修復**：修改為單一 `playerControls` 控制，並在 `playUri` 檢測並分別處理 `uris` 與 `context_uri`（解決 Album 導致 400 Bad Request 的 Spotify 原生問題）。
+- **KTV 多次渲染閃爍**：在 `SongPanel.tsx` 引入 `useRef` 以阻擋無謂的狀態頻繁變更引起的 UI 跳動。
+- **AI 程式碼審查改進**：修復了 `lrcParser.ts` 對多重標籤的全域替換 (`/g`)、優化 `useTrackAi.ts` 效能（移除了動態 `import()` 為靜態引入，並檢查了 API 的 `res.ok` 確保其健康性）、並將 `KtvLyricsView.tsx` 中 Render 階段的滾動副作用轉化為 React 的 `useEffect` 控制。
+
+
+---
+
+## 3分鐘快速 Demo 展示導覽 (3-Minute Portfolio Demo Guide)
+
+這份導覽專門為評估者設計，讓你能用最快的速度理解本專案的核心技術與演示流程，而不需要立刻進行完整的專案操作。
+
+### 1. 離線/無金鑰驗證 (Repo-only Proof)
+在不安裝任何 API Key 的狀態下，評估者可以在專案根目錄直接下達：
+```bash
+npm install
+npm run demo:verify
+```
+**預期結果：**
+* 離線音樂庫掃描管線會自動跑完，讀取本地 Fixtures。
+* 自動在 `data/mock-gitbook/new-releases/` 下產生 Mock GitBook 專屬的 Markdown 檔案。
+* 自動解析並驗證 `SUMMARY.md` 中所有連結的完整性。
+
+### 2. 跨服務交接驗證 (Cross-service Handoff Proof)
+專案核心與社群發布 Companion 服務的交接測試：
+```bash
+npm run demo:verify:social
+```
+**預期結果：**
+* 同時啟動 `music-release-agent` 核心與 `social-post-service` (Port 3012)。
+* 發送並順利將發文任務透過 Proxy 端點轉交給 Companion 服務。
+* 通過 Correlation ID (`x-request-id`) 與非同步入隊，輪詢確認貼文順利產出。
+
+### 3. 服務降級防護驗證 (Failure-mode Proof)
+如果 Companion 服務當機或關閉，核心服務依然能安全降級：
+```bash
+npm run demo:verify:social:down
+```
+**預期結果：**
+* 前端/後端主動探測到 `social-post-service` 處於 Unreachable 狀態。
+* 呼叫 `/readyz` 回應為 HTTP 200 OK，但內部的 ready 狀態標記為 `degraded`。
+* 此時若發送發文請求，會被 Proxy 機制攔截，並回傳安全降級的 `502 Bad Gateway` 錯誤，而核心 Express 伺服器絕不當機崩潰。
+
+### 4. 三分鐘面試說法 (Suggested 3-Minute Interview Talk Track)
+1. 先執行 `npm run demo:verify` 展現**確定性與可複現性管線**。
+2. 開啟產生的 GitBook Markdown 檔，說明專案如何完成 AI 樂評生成、以及為什麼要為 Markdown 設計結構化逐行解析器。
+3. 執行 `npm run demo:verify:social` 說明將「讀多寫少」的內容管線與「寫多且常失敗」的社群發佈 Companion 服務解耦的架構考量。
+4. 執行 `npm run demo:verify:social:down` 來證明你在系統設計中對於**依賴關係失效 (Failure Mode)** 與**健康探針 (/readyz)** 的健壯性考量。
+
+
 
