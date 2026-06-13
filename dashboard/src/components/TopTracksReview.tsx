@@ -22,7 +22,7 @@ export default function TopTracksReview() {
         return;
       }
 
-      const res = await fetch('/api/review/top-tracks', {
+      const res = await fetch('/api/review/top-tracks-review', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
