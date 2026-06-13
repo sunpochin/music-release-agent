@@ -23,8 +23,9 @@ import { coreRoutes } from './routes/core.js';
 import { lyricsRoutes } from './routes/lyrics.js';
 import { socialRoutes } from './routes/social.js';
 import { shareRoutes } from './routes/share.js';
-import { authRoutes } from './routes/auth.js';
+import { authRoutes } from './routes/auth.ts';
 import { healthRoutes } from './routes/health.js';
+import { aiRoutes } from './routes/ai.ts';
 
 export function createApp() {
   const app = express();
@@ -86,6 +87,7 @@ export function createApp() {
   app.use(lyricsRoutes());
   app.use(socialRoutes());
   app.use(healthRoutes());
+  app.use('/api/review', aiRoutes);
   app.use(authRoutes());
 
   // 5. SPA fallback：API 未匹配回 404，其餘交給前端 router

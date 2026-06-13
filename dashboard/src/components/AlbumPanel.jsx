@@ -34,15 +34,15 @@ const AlbumPanel = ({
   const isFull = variant === 'full'
 
   return (
-    <div className={`w-full ${isFull ? 'max-w-2xl mx-auto' : 'lg:w-1/3'} bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col justify-between`}>
+    <div className={`w-full ${isFull ? 'max-w-2xl mx-auto' : 'lg:w-1/3'} bg-black/20 border border-white/5 rounded-[32px] p-8 backdrop-blur-[60px] shadow-2xl shadow-black/50 flex flex-col justify-between`}>
       <div>
-        <h2 className="text-xl font-bold flex items-center gap-2 text-spotify-green mb-6 border-b border-white/10 pb-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2 text-white/90 mb-8">
           <Info size={20} /> 專輯資訊
         </h2>
 
         <div className="space-y-4 text-sm text-gray-300">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
+            <div className="flex items-center gap-3 bg-black/20 p-4 rounded-2xl">
               <Calendar size={18} className="text-spotify-green shrink-0" />
               <div>
                 <p className="text-xs text-gray-400">發行日期</p>
@@ -50,7 +50,7 @@ const AlbumPanel = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
+            <div className="flex items-center gap-3 bg-black/20 p-4 rounded-2xl">
               <Layers size={18} className="text-spotify-green shrink-0" />
               <div>
                 <p className="text-xs text-gray-400">曲目總數</p>
@@ -59,7 +59,7 @@ const AlbumPanel = ({
             </div>
           </div>
 
-          <div className="bg-white/5 p-4 rounded-xl space-y-2">
+          <div className="bg-black/20 p-5 rounded-2xl space-y-2">
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">作品介紹</p>
             <p className="leading-relaxed text-gray-200">
               {/* 若有從本地 AI 樂評載入介紹，則優先顯示，否則回退至預設元數據描述 */}
@@ -74,7 +74,7 @@ const AlbumPanel = ({
           </div>
 
           {/* 專輯曲目清單 */}
-          <div className={`bg-white/5 p-4 rounded-xl space-y-3 flex flex-col ${isFull ? '' : 'max-h-[300px]'}`}>
+          <div className={`bg-black/20 p-5 rounded-2xl space-y-3 flex flex-col ${isFull ? '' : 'max-h-[300px]'}`}>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
                <Music4 size={14} className="text-spotify-green" /> 專輯曲目清單
             </p>
@@ -133,12 +133,12 @@ const AlbumPanel = ({
         </div>
       </div>
 
-      <div className="mt-6 pt-4 border-t border-white/10">
+      <div className="mt-8">
         <a
           href={selectedAlbum.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full bg-white/10 hover:bg-white/20 transition-all text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md"
+          className="w-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-all duration-300 text-white px-4 py-4 rounded-2xl font-medium text-sm flex items-center justify-center gap-2 shadow-lg"
         >
           <ExternalLink size={16} />
           在 Spotify 上聆聽

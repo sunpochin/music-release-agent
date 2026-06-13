@@ -8,6 +8,7 @@ import SongPage from './components/SongPage'
 import { useAlbumTracks } from './hooks/useAlbumTracks'
 import { useTrackAi } from './hooks/useTrackAi'
 import { useTrackKeyboardNav } from './hooks/useTrackKeyboardNav'
+import SpotifyPlayer from './components/SpotifyPlayer'
 
 // 【小朋友解釋法】：
 // App.jsx 以前是「什麼家具都堆在裡面的大客廳」。
@@ -109,6 +110,17 @@ function App() {
     }
   }
 
+  // Simple hash to generate a consistent hue for each album
+  const getAlbumHue = (id) => {
+    if (!id) return 150;
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash) % 360;
+  }
+  const albumHue = selectedAlbum ? getAlbumHue(selectedAlbum.id) : 200;
+
   return (
     <div className="flex h-screen bg-spotify-dark text-white overflow-hidden font-sans selection:bg-spotify-green selection:text-black">
       {/* Sidebar 側邊欄 */}
@@ -119,7 +131,19 @@ function App() {
       />
 
       {/* Main Content 主內容區 */}
-      <main className={`flex-1 relative flex flex-col bg-gradient-to-b from-[#1e1e1e] to-spotify-dark ${selectedAlbum ? 'flex' : 'hidden lg:flex'}`}>
+      <main className={`flex-1 relative flex flex-col bg-transparent z-0 overflow-hidden transition-colors duration-1000 ${selectedAlbum ? 'flex' : 'hidden lg:flex'}`}>
+        {/* ✨ Ambient Background Orbs */}
+        <div className="absolute inset-0 pointer-events-none transition-all duration-1000 z-[-1] overflow-hidden">
+          <div 
+            className="absolute top-[-20%] left-[-10%] w-[60%] h-[70%] rounded-full mix-blend-screen filter blur-[120px] opacity-40 animate-ambient-pulse transition-colors duration-1000"
+            style={{ backgroundColor: `hsl(${albumHue}, 70%, 40%)` }}
+          />
+          <div 
+            className="absolute top-[30%] right-[-10%] w-[50%] h-[60%] rounded-full mix-blend-screen filter blur-[140px] opacity-30 animate-ambient-pulse transition-colors duration-1000"
+            style={{ backgroundColor: `hsl(${(albumHue + 50) % 360}, 80%, 30%)`, animationDelay: '3s' }}
+          />
+        </div>
+
         {selectedAlbum ? (
           <>
             {/* Header Banner 頂部專輯資訊橫幅（手機返回鍵：歌曲頁先回專輯頁，再回清單） */}
@@ -187,6 +211,13 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* 懸浮式 Spotify Web Playback SDK 播放器：自動跟隨選取的歌曲或專輯切換 */}
+      {(selectedTrack || selectedAlbum) && (
+        <SpotifyPlayer 
+          uri={selectedTrack ? `spotify:track:${selectedTrack.id}` : `spotify:album:${selectedAlbum?.id}`}
+        />
+      )}
     </div>
   )
 }

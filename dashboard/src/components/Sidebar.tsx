@@ -1,16 +1,23 @@
 import React from 'react'
 import { Music } from 'lucide-react'
+import SpotifyAuthButton from './SpotifyAuthButton'
+import TopTracksReview from './TopTracksReview'
 
-// 側邊欄元件：展示關注藝人的最新專輯列表
-const Sidebar = ({ albums, selectedAlbum, handleSelectAlbum }) => {
+// 側邊欄元件：展示關注藝人的最新專輯列表，以及 Spotify 帳號登入/登出狀態
+const Sidebar = ({ albums, selectedAlbum, handleSelectAlbum }: any) => {
   return (
-    <aside className={`w-full lg:w-80 bg-black flex flex-col border-r border-white/5 z-10 ${selectedAlbum ? 'hidden lg:flex' : 'flex'}`}>
-      <div className="p-6 flex items-center gap-3 border-b border-white/5">
-        <div className="w-10 h-10 bg-spotify-green rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
-          <Music className="text-black" size={24} />
+    <aside className={`w-full lg:w-80 bg-black/40 backdrop-blur-[40px] flex flex-col border-r border-white/5 z-10 ${selectedAlbum ? 'hidden lg:flex' : 'flex'}`}>
+      <div className="p-6 flex flex-col gap-4 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-spotify-green rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
+            <Music className="text-black" size={24} />
+          </div>
+          <h1 className="text-xl font-bold tracking-tight">Music Release</h1>
         </div>
-        <h1 className="text-xl font-bold tracking-tight">Music Release</h1>
+        <SpotifyAuthButton />
+        <TopTracksReview />
       </div>
+
       
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4 px-2">Latest Releases</h2>

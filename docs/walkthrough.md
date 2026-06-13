@@ -92,7 +92,16 @@ npm run dev
   這造成了 **「舊歌詞 ➡️ 準備卡 (400ms) ➡️ 旋轉載入動畫 ➡️ 新歌詞」** 的四步跳動，影響使用者體驗。
 - **修正**：
   在 [`useTrackAi.js`](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/hooks/useTrackAi.js) 的「換歌擦黑板」`useEffect` 中，一旦切換單曲，立刻同步調用 `setRawLoading(true)`。
-  現在切換歌曲時，右側面板會**立即顯示載入動畫**，並流暢地在載入結束後呈現新歌詞，實現了 **「舊歌詞 ➡️ 載入動畫 ➡️ 新歌詞」** 的單一平滑轉場。
+## 最新更新：Spotify OAuth 登入/登出按鈕實作
+
+為了提供面試官更好的操作體驗，不用手動訪問認證 URL 或是手動輸入 token，我們在側邊欄最上方整合了 **Spotify 帳號授權狀態按鈕**：
+- **後端登出支援**：新增 `POST /api/auth/logout` API，呼叫後會直接刪除本地 `spotify_tokens.json` 以登出。
+- **使用者狀態同步**：
+  - 登入前：顯示「連結 Spotify 帳號」綠色按鈕。
+  - 登入後：會自動向 Spotify API 查詢使用者的頭像與顯示名稱，並直接在按鈕區域展示，給予面試官身歷其境的整合感。
+  - 提供一鍵登出按鈕，點擊後會即時清空本機憑證並刷新播放器。
+- **TypeScript 型別安全**：全新的 `SpotifyAuthButton.tsx` 完美通過 TypeScript 型別檢查，確保高可靠度。
 
 > [!TIP]
 > 面試小技巧：在 Demo 時，可以先用左側邊欄隨意切換專輯展示 UI 的流暢度，接著點開曲目清單選擇歌曲，此時網址將會更新為獨立的單曲路由，並展現右側的歌詞翻譯 loading 細節。最後，一定要在面試官面前點擊「匯出 IG/TikTok 限動卡」，打開那張產生的直式圖片，絕對能讓他們眼睛一亮！
+
