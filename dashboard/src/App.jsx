@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Music } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import html2canvas from 'html2canvas'
-import ShareCard from './components/ShareCard'
 import Sidebar from './components/Sidebar'
 import HeaderBanner from './components/HeaderBanner'
 import AlbumPanel from './components/AlbumPanel'
@@ -18,16 +16,10 @@ import { useTrackKeyboardNav } from './hooks/useTrackKeyboardNav'
 // 客廳只負責：路由同步、專輯選取、分享圖卡、社群發文。
 function App() {
   const [albums, setAlbums] = useState([])
-  const [selectedAlbum, setSelectedAlbum] = useState(null)
-  const [isExporting, setIsExporting] = useState(false)
-  // 儲存預先產生的圖卡檔案，以利 iOS Safari 進行同步分享 (使用 useRef 避免背景生成時觸發不必要的整頁重畫)
-  const shareFileRef = useRef(null)
   // 儲存本地 AI 樂評之介紹與總結
   const [albumReview, setAlbumReview] = useState({ introduction: '', summary: '' })
 
   const [selectedTrack, setSelectedTrack] = useState(null)
-
-  const shareCardRef = useRef(null)
 
   // 專輯曲目清單（三態：loading / error / data）
   const { tracks, tracksLoading, tracksError, retryTracks } = useAlbumTracks(selectedAlbum)
@@ -46,15 +38,11 @@ function App() {
     handleClearCache
   } = useTrackAi(selectedAlbum, selectedTrack)
 
-  // 鍵盤導航：j/↓ 下一首、k/↑ 上一首（打字時自動停用）
-  useTrackKeyboardNav({ selectedAlbum, tracks, selectedTrack })
-
-  // 社群自動發文狀態
-  const [isPublishing, setIsPublishing] = useState(false)
-  const [publishResult, setPublishResult] = useState(null)
-
   const navigate = useNavigate()
   const { albumId, trackId } = useParams()
+
+  // 鍵盤導航：j/↓ 下一首、k/↑ 上一首（打字時自動停用）
+  useTrackKeyboardNav({ selectedAlbum, tracks, selectedTrack })
 
   useEffect(() => {
     fetch('/api/albums')
@@ -109,43 +97,6 @@ function App() {
       setSelectedTrack(null)
     }
   }, [trackId, tracks])
-
-  // 切換歌曲時重設社群發佈狀態（歌詞/分析的「擦黑板」已由 useTrackAi 處理）
-  useEffect(() => {
-    setPublishResult(null)
-  }, [selectedTrack])
-
-  // 背景預先產生圖片檔以解決 Safari 必須同步呼叫 navigator.share 的安全限制
-  const generateShareFile = useCallback(async () => {
-    if (!shareCardRef.current || !selectedAlbum) return
-    try {
-      const canvas = await html2canvas(shareCardRef.current, {
-        scale: 2,
-        backgroundColor: '#121212',
-        useCORS: true
-      })
-      // 優化：直接使用 HTML5 Canvas toBlob API，避免 Base64 序列化的記憶體與 CPU 開銷
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-      if (!blob) throw new Error('Canvas to Blob conversion failed')
-      const file = new File([blob], `share-${selectedTrack ? selectedTrack.name : selectedAlbum.name}.png`, { type: 'image/png' })
-      shareFileRef.current = file
-    } catch (err) {
-      console.error("Failed to pre-generate share file", err)
-    }
-  }, [selectedAlbum, selectedTrack])
-
-  // 當選取專輯、歌曲、歌詞、歌曲分析或頁籤更新時，在背景非同步預先產生圖卡檔案
-  useEffect(() => {
-    if (selectedAlbum) {
-      shareFileRef.current = null // 先清空舊檔案
-      const timer = setTimeout(() => {
-        generateShareFile()
-      }, 600) // 延遲 600ms 確保 ShareCard DOM 已渲染完畢
-      return () => clearTimeout(timer)
-    } else {
-      shareFileRef.current = null
-    }
-  }, [selectedAlbum, selectedTrack, lyricsData, albumReview, generateShareFile])
 
   // 僅選取專輯，使用 react-router 的 navigate 進行 URL 轉換
   // （歌詞與載入狀態的重設由 useTrackAi 的「換歌擦黑板」機制處理）
@@ -342,15 +293,11 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
                     shouldAnimateLyrics={shouldAnimateLyrics}
                     isTranslated={isTranslated}
                     isTranslating={isTranslating}
-                    isExporting={isExporting}
-                    isPublishing={isPublishing}
-                    publishResult={publishResult}
+                    albumReview={albumReview}
                     handleFetchLyrics={handleFetchLyrics}
                     handleTranslate={handleTranslate}
                     handleRedownloadRaw={handleRedownloadRaw}
                     handleClearCache={handleClearCache}
-                    exportShareCard={exportShareCard}
-                    handlePublishToSocial={handlePublishToSocial}
                     onBackToAlbum={() => navigate(`/album/${selectedAlbum.id}`)}
                   />
                 </div>
@@ -376,18 +323,6 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
           </div>
         )}
       </main>
-
-      {/* 隱藏的 offscreen ShareCard 用於渲染導出圖片 */}
-      <div className="fixed -left-[9999px] -top-[9999px]">
-         <ShareCard 
-            ref={shareCardRef} 
-            album={selectedAlbum} 
-            track={selectedTrack}
-            artistName={selectedAlbum?.artistName || 'Featured Artist'} 
-            lyrics={lyricsData} 
-            introduction={albumReview?.introduction}
-         />
-      </div>
     </div>
   )
 }

@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle, Link2, Check, ChevronLeft, MoreHorizontal, Trash2, RefreshCw } from 'lucide-react'
+import html2canvas from 'html2canvas'
+import ShareCard from './ShareCard'
 // 安全的輕量 Markdown 轉譯器：抽成純模組（dashboard/src/utils/markdown.js），
 // 由根目錄 tests/markdown-renderer.test.js 做 XSS 防護與格式轉譯的確定性單元測試。
 import { parseMarkdownToHtml } from '../utils/markdown.js'
@@ -55,18 +57,158 @@ const SongPanel = ({
   shouldAnimateLyrics = true,
   isTranslated,
   isTranslating,
-  isExporting,
-  isPublishing,
-  publishResult,
+  albumReview,
   handleFetchLyrics,
   handleTranslate,
   handleRedownloadRaw,
   handleClearCache,
-  exportShareCard,
-  handlePublishToSocial,
   onBackToAlbum // 手機版「返回專輯資訊」的回調
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // 1. 社群分享與發佈之本機狀態 (SOLID: 狀態局部化)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [publishResult, setPublishResult] = useState(null)
+  
+  const shareCardRef = useRef(null)
+  const shareFileRef = useRef(null)
+
+  // 切換歌曲時重設發佈狀態
+  useEffect(() => {
+    setPublishResult(null)
+  }, [selectedTrack])
+
+  // 背景非同步預產生分享圖檔，提升 Web Share API 響應速度
+  const generateShareFile = useCallback(async () => {
+    if (!shareCardRef.current || !selectedAlbum) return
+    try {
+      const canvas = await html2canvas(shareCardRef.current, {
+        scale: 2,
+        backgroundColor: '#121212',
+        useCORS: true
+      })
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      if (!blob) throw new Error('Canvas to Blob conversion failed')
+      const file = new File([blob], `share-${selectedTrack ? selectedTrack.name : selectedAlbum.name}.png`, { type: 'image/png' })
+      shareFileRef.current = file
+    } catch (err) {
+      console.error("Failed to pre-generate share file", err)
+    }
+  }, [selectedAlbum, selectedTrack])
+
+  // 歌詞、樂評就緒時，背景預產生分享卡片
+  useEffect(() => {
+    if (selectedAlbum) {
+      shareFileRef.current = null
+      const timer = setTimeout(() => {
+        generateShareFile()
+      }, 600)
+      return () => clearTimeout(timer)
+    } else {
+      shareFileRef.current = null
+    }
+  }, [selectedAlbum, selectedTrack, lyricsData, albumReview, generateShareFile])
+
+  // 匯出 IG 限動卡邏輯
+  const exportShareCard = async () => {
+    if (!selectedAlbum) return
+    const shareText = `🎵 推薦歌曲！來自 ${selectedAlbum.artistName || '未知藝人'} 的《${selectedTrack ? selectedTrack.name : selectedAlbum.name}》`
+
+    // 自動於背景向 Threads 發送一則發佈通知（此為商業分析追蹤邏輯，維持原樣）
+    setTimeout(() => {
+      fetch('/api/social/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caption: `${shareText}\n\n#MusicRelease #NewMusic`,
+          platforms: ['threads'],
+          imageBase64: null
+        })
+      }).catch(err => {
+        console.error("Auto publish to Threads failed", err)
+      })
+    }, 1000)
+
+    if (shareFileRef.current) {
+      try {
+        if (navigator.canShare && navigator.canShare({ files: [shareFileRef.current] })) {
+          await navigator.share({
+            files: [shareFileRef.current],
+            title: `分享《${selectedAlbum.name}》`,
+            text: shareText
+          })
+          return
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return
+        console.error("Native share failed, falling back to download", err)
+      }
+    }
+
+    setIsExporting(true)
+    try {
+      const canvas = await html2canvas(shareCardRef.current, {
+        scale: 2,
+        backgroundColor: '#121212',
+        useCORS: true
+      })
+      const image = canvas.toDataURL("image/png")
+      const link = document.createElement('a')
+      link.href = image
+      link.download = `share-${selectedAlbum.name || 'card'}.png`
+      link.click()
+    } catch (err) {
+      console.error("Export failed", err)
+      alert("匯出失敗，請稍後再試。")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // 發佈至社群平台之邏輯
+  const handlePublishToSocial = async () => {
+    if (!selectedAlbum || isPublishing) return
+    setIsPublishing(true)
+    setPublishResult(null)
+
+    try {
+      let imageBase64 = null
+      if (shareCardRef.current) {
+        const canvas = await html2canvas(shareCardRef.current, {
+          scale: 2,
+          backgroundColor: '#121212',
+          useCORS: true
+        })
+        imageBase64 = canvas.toDataURL('image/png')
+      }
+
+      const caption = albumReview?.summary
+        || albumReview?.introduction
+        || `🎵 新專輯推薦！來自 ${selectedAlbum.artistName || '未知藝人'} 的《${selectedAlbum.name}》\n\n#MusicRelease #NewMusic`
+
+      const res = await fetch('/api/social/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caption,
+          platforms: ['threads', 'facebook'],
+          imageBase64
+        })
+      })
+
+      const result = await res.json()
+      if (res.ok) {
+        setPublishResult({ success: true, jobId: result.jobId })
+      } else {
+        setPublishResult({ success: false, error: result.error })
+      }
+    } catch (err) {
+      setPublishResult({ success: false, error: err.message })
+    } finally {
+      setIsPublishing(false)
+    }
+  }
 
   // 點選外部區域自動關閉懸浮選單
   useEffect(() => {
@@ -287,6 +429,18 @@ const SongPanel = ({
             返回專輯資訊
           </button>
         )}
+      </div>
+
+      {/* 隱藏的 offscreen ShareCard 用於渲染導出圖片 */}
+      <div className="fixed -left-[9999px] -top-[9999px]">
+         <ShareCard 
+            ref={shareCardRef} 
+            album={selectedAlbum} 
+            track={selectedTrack}
+            artistName={selectedAlbum?.artistName || 'Featured Artist'} 
+            lyrics={lyricsData} 
+            introduction={albumReview?.introduction}
+         />
       </div>
     </div>
   )
