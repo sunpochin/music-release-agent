@@ -1,14 +1,14 @@
 /**
- * 📝 MarkdownLyricsView — 雙語全文模式（靜態/動態雙用）
+ * 📝 MarkdownLyricsView — 雙語全文模式（React 元件化版本）
  * 
- * 負責渲染整篇歌詞，支援純靜態顯示，或帶有時間戳記的動態反白效果。
- * 當含有時間戳記時，會解析 Markdown 內的 [mm:ss.xx] 為徽章，
- * 並在播放進度到達時套用平滑的縮放 (scale) 與模糊 (blur) 效果，
- * 創造類似 Apple Music 的優雅歌詞閱讀體驗。
+ * 負責渲染整篇歌詞，包含 AI 的前言與樂評。
+ * 使用 parseMarkdownToBlocks 解析字串，並共用 <LyricLine> 渲染歌詞，
+ * 徹底解決版面閃動與 XSS 風險，同時擁有 Apple Music 等級的視覺體驗。
  */
-import React, { useRef, useEffect } from 'react'
-import { parseMarkdownToHtml } from '../../utils/markdown.js'
+import React, { useMemo, useRef, useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
+import { parseMarkdownToBlocks } from '../../utils/markdownParser'
+import LyricLine from './LyricLine'
 
 interface MarkdownLyricsViewProps {
   lyricsData: string
@@ -26,123 +26,119 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
   songUri
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
-  const prevActiveMsRef = useRef<number | null>(null)
+  
+  // 1. 解析 Markdown 為 Blocks
+  const blocks = useMemo(() => parseMarkdownToBlocks(lyricsData || ''), [lyricsData])
 
-  // 當歌詞資料改變時，重設上一次播放的 active 時間，以確保換歌時滾動正常
-  useEffect(() => {
-    prevActiveMsRef.current = null
-  }, [lyricsData])
-
-  // 處理時間同步高亮與自動捲動的副作用 (useEffect)
-  useEffect(() => {
-    if (!containerRef.current || playerControls?.position === undefined) return
-
-    // 取得所有的時間徽章
-    const badges = Array.from(containerRef.current.querySelectorAll('.time-badge'))
-    if (badges.length === 0) return
-
-    // 解析出所有的 [timeMs, element] 組合並排序
-    const parsedBadges = badges.map(el => {
-      const ms = parseInt(el.getAttribute('data-time-ms') || '0', 10)
-      return { ms, el: el as HTMLElement }
-    }).sort((a, b) => a.ms - b.ms)
-
-    const position = playerControls.position
-    let activeIdx = -1
-
-    // 尋找最後一個小於等於當前播放進度的時間標籤
-    for (let i = 0; i < parsedBadges.length; i++) {
-      if (parsedBadges[i].ms <= position) {
-        activeIdx = i
-      } else {
-        break
+  // 2. 決定目前啟動的歌詞時間戳記
+  const currentPosition = playerControls?.position ?? 0
+  
+  // 找出最後一個時間戳 <= currentPosition 的歌詞區塊
+  const activeTimeMs = useMemo(() => {
+    if (!currentPosition) return -1
+    let activeMs = -1
+    for (const block of blocks) {
+      if (block.type === 'lyric') {
+        if (block.timeMs <= currentPosition) {
+          activeMs = block.timeMs
+        } else {
+          break
+        }
       }
     }
+    return activeMs
+  }, [blocks, currentPosition])
 
-    const activeBadge = activeIdx !== -1 ? parsedBadges[activeIdx] : null
+  // 3. 自動捲動邏輯
+  const activeLyricRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (activeLyricRef.current) {
+      activeLyricRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [activeTimeMs])
 
-    // 更新所有時間標籤與其對應段落的樣式
-    parsedBadges.forEach((badge) => {
-      const isCurrent = activeBadge && badge.ms === activeBadge.ms
-      const parent = badge.el.closest('p, div') // 尋找該徽章所屬的段落
+  // 處理點擊歌詞跳轉
+  const handleLyricClick = (timeMs: number) => {
+    if (!playerControls) return
+    if (!playerControls.currentTrack && songUri && playerControls.playUri) {
+      playerControls.playUri(songUri, timeMs)
+    } else if (playerControls.seek) {
+      playerControls.seek(timeMs)
+    }
+  }
 
-      if (isCurrent) {
-        // 高亮時間徽章本身
-        badge.el.classList.remove('bg-white/10', 'text-white/50')
-        badge.el.classList.add('bg-spotify-green', 'text-black', 'font-bold')
-
-        // 高亮對應的整行翻譯段落（移除 font-bold 切換以避免版面跳動）
-        if (parent) {
-          parent.classList.remove('text-gray-300', 'opacity-30', 'text-white/40', 'blur-[0.5px]', 'scale-[0.98]', 'origin-left')
-          parent.classList.add('text-white', 'scale-[1.05]', 'transition-all', 'duration-500', 'ease-out', 'origin-left', 'drop-shadow-lg', 'blur-none')
-        }
-      } else {
-        // 還原時間徽章樣式
-        badge.el.classList.remove('bg-spotify-green', 'text-black', 'font-bold')
-        badge.el.classList.add('bg-white/10', 'text-white/50')
-
-        // 暗化非當前播放的段落，使焦點集中在目前歌詞上
-        if (parent) {
-          parent.classList.remove('text-white', 'scale-[1.01]', 'scale-[1.05]', 'drop-shadow-lg', 'blur-none')
-          parent.classList.add('text-white/40', 'blur-[0.5px]', 'scale-[0.98]', 'transition-all', 'duration-500', 'ease-out', 'origin-left')
-        }
+  // 渲染內嵌粗體字 (非歌詞的普通段落用)
+  const renderTextWithBold = (content: string) => {
+    const parts = content.split(/(\*\*.*?\*\*)/g)
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="text-white font-bold">{part.slice(2, -2)}</strong>
       }
+      return part
     })
-
-    // 自動捲動至當前高亮段落的置中位置，且只在歌詞切換時觸發，避免頻繁滾動
-    if (activeBadge) {
-      if (prevActiveMsRef.current !== activeBadge.ms) {
-        prevActiveMsRef.current = activeBadge.ms
-        const parent = activeBadge.el.closest('p, div')
-        if (parent) {
-          parent.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-      }
-    } else {
-      prevActiveMsRef.current = null
-    }
-  }, [playerControls?.position, lyricsData])
-
-  // 處理點擊時間標籤或整行段落事件
-  const handleLyricsClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    
-    // 找出點擊的徽章，或者點擊段落內的徽章
-    let badgeEl: HTMLElement | null = null;
-    if (target.hasAttribute('data-time-ms')) {
-      badgeEl = target;
-    } else {
-      const parent = target.closest('p, div');
-      if (parent) {
-        badgeEl = parent.querySelector('[data-time-ms]');
-      }
-    }
-
-    if (badgeEl && playerControls) {
-      const timeMsStr = badgeEl.getAttribute('data-time-ms');
-      if (timeMsStr) {
-        const timeMs = parseInt(timeMsStr, 10);
-        if (!isNaN(timeMs)) {
-          if (!playerControls.currentTrack && songUri && playerControls.playUri) {
-            // 如果尚未載入歌曲，就發送播放請求並指定時間
-            playerControls.playUri(songUri, timeMs);
-          } else if (playerControls.seek) {
-            // 如果已經載入歌曲，直接 seek
-            playerControls.seek(timeMs);
-          }
-        }
-      }
-    }
-  };
+  }
 
   return (
     <>
       <div 
         ref={containerRef}
-        className={`${shouldAnimateLyrics ? 'ai-stagger' : ''} [&_p]:cursor-pointer [&_p]:hover:bg-white/5 [&_p]:transition-colors [&_p]:rounded-lg [&_p]:p-1 [&_p]:-ml-1`} 
-        dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData || '') }} 
-        onClick={handleLyricsClick}
-      />
+        className={`${shouldAnimateLyrics ? 'ai-stagger' : ''}`}
+      >
+        {blocks.map((block, index) => {
+          if (block.type === 'heading') {
+            if (block.level === 3) {
+              return <h3 key={index} className="text-sm font-bold text-spotify-green mt-8 mb-4 flex items-center gap-1">{block.text}</h3>
+            }
+            return <h2 key={index} className="text-base font-bold text-white mt-6 mb-3">{block.text}</h2>
+          }
+          
+          if (block.type === 'hr') {
+            return <hr key={index} className="border-white/10 my-4" />
+          }
+
+          if (block.type === 'lyric') {
+            const isCurrent = block.timeMs === activeTimeMs
+            const isPast = block.timeMs < activeTimeMs
+            const state = isCurrent ? 'current' : (isPast ? 'past' : 'future')
+            
+            return (
+              <div key={index} ref={isCurrent ? activeLyricRef : null}>
+                <LyricLine
+                  timeMs={block.timeMs}
+                  text={block.text}
+                  translation={block.translation}
+                  state={state}
+                  onClick={handleLyricClick}
+                />
+              </div>
+            )
+          }
+
+          if (block.type === 'paragraph') {
+            // 處理純粗體金句
+            if (block.text.startsWith('**') && block.text.endsWith('**')) {
+              return (
+                <p key={index} className="text-sm italic font-medium text-spotify-green/90 bg-spotify-green/5 border-l-2 border-spotify-green py-2 px-3 my-3 rounded-r-lg">
+                  {block.text.replace(/\*\*/g, '')}
+                </p>
+              )
+            }
+            // 處理清單
+            if (block.text.startsWith('- ')) {
+              return (
+                <div key={index} className="flex items-start gap-2 my-1 text-xs text-gray-300">
+                  <span className="text-spotify-green">•</span>
+                  <span>{renderTextWithBold(block.text.substring(2))}</span>
+                </div>
+              )
+            }
+            
+            return <p key={index} className="text-xs text-gray-300 leading-relaxed my-2">{renderTextWithBold(block.text)}</p>
+          }
+          
+          return null
+        })}
+      </div>
       
       {isTranslating && (
         <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md animate-pulse flex items-center gap-3">
