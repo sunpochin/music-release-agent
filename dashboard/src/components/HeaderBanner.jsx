@@ -21,7 +21,7 @@ const HeaderBanner = ({ selectedAlbum, selectedTrack, onBack, backLabel = '返�
           ← {backLabel}
         </button>
 
-        <div className="z-10 flex items-baseline justify-center lg:justify-start gap-3 flex-wrap w-full mt-2 lg:mt-0">
+        <div className="z-10 flex items-baseline justify-center lg:justify-start gap-3 flex-wrap w-full mt-2 lg:mt-0 lg:justify-center">
           {selectedTrack.url ? (
             <a 
               href={selectedTrack.url} 
@@ -66,13 +66,14 @@ const HeaderBanner = ({ selectedAlbum, selectedTrack, onBack, backLabel = '返�
       
       <img src={selectedAlbum.image} alt="cover" className="w-36 h-36 lg:w-48 lg:h-48 rounded-xl shadow-2xl z-10 border border-white/10 object-cover" />
       <div className="z-10 pb-2 flex flex-col items-center lg:items-start">
-        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
-          <Disc3 size={16} className="text-spotify-green" /> 
+        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest mb-2 flex items-center">
           {selectedAlbum.type === 'album' ? 'Album' : 'Single'}
         </p>
         <h1 className="text-3xl lg:text-5xl font-black mb-2 tracking-tight drop-shadow-md">{selectedAlbum.name}</h1>
-        <p className="text-lg lg:text-xl font-bold text-spotify-green mb-3 lg:mb-4">{selectedAlbum.artistName || '未知藝人'}</p>
-        <p className="text-xs lg:text-sm text-gray-300 font-medium">Released • {selectedAlbum.release_date} • {selectedAlbum.total_tracks}首歌曲</p>
+        <div className="flex flex-row">
+          <div className="text-md lg:text-md font-medium text-spotify-green">{selectedAlbum.artistName || '未知藝人'}</div>
+          <div className="pl-1 text-md lg:text-md text-gray-300 font-medium"> • {selectedAlbum.release_date} • {selectedAlbum.total_tracks}首歌曲</div>
+        </div>
       </div>
     </div>
   )

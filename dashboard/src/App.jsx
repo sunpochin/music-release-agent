@@ -166,18 +166,20 @@ function App() {
         {selectedAlbum ? (
           <>
             {/* Header Banner 頂部專輯資訊橫幅（手機返回鍵：歌曲頁先回專輯頁，再回清單） */}
-            <HeaderBanner
-              selectedAlbum={selectedAlbum}
-              selectedTrack={selectedTrack}
-              backLabel={trackId ? '返回專輯' : '返回列表'}
-              onBack={() => {
-                if (trackId) {
-                  navigate(`/album/${selectedAlbum.id}`)
-                } else {
-                  handleSelectAlbum(null)
-                }
-              }}
-            />
+            <div className="flex justify-center">
+              <HeaderBanner
+                selectedAlbum={selectedAlbum}
+                selectedTrack={selectedTrack}
+                backLabel={trackId ? '返回專輯' : '返回列表'}
+                onBack={() => {
+                  if (trackId) {
+                    navigate(`/album/${selectedAlbum.id}`)
+                  } else {
+                    handleSelectAlbum(null)
+                  }
+                }}
+              />
+            </div>
 
             {/* 主內容：mobile-first 全螢幕專注模式
                 - 專輯頁（未選歌）：AlbumPanel 全版顯示

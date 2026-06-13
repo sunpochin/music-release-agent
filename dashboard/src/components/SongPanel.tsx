@@ -135,35 +135,6 @@ const SongPanel = ({
         />
       </div>
 
-      {/* ── 標題與來源 ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-white/10 pb-6">
-        <div>
-          {selectedTrack ? (
-            <>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-2.5 py-1 rounded-md bg-white/10 text-white/70 text-xs font-bold tracking-widest uppercase">
-                  Track {selectedTrack.track_number}
-                </span>
-                <span className="text-white/40 text-sm font-medium">
-                  {Math.floor(selectedTrack.duration_ms / 60000)}:{String(Math.floor((selectedTrack.duration_ms % 60000) / 1000)).padStart(2, '0')}
-                </span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-white/60 tracking-tight leading-tight">
-                {selectedTrack.name}
-              </h2>
-            </>
-          ) : (
-            <h2 className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-white/60 tracking-tight leading-tight">
-              {selectedAlbum.name}
-            </h2>
-          )}
-        </div>
-        
-        <div className="flex flex-col items-end gap-2">
-          {selectedTrack && <AddToPlaylistButton trackUri={selectedTrack.uri} />}
-        </div>
-      </div>
-
       {/* ── 主內容渲染區域（直接顯示歌詞） ── */}
       <div className="flex-1 flex flex-col min-h-[300px]">
         {rawLoading ? (
@@ -233,13 +204,7 @@ const SongPanel = ({
 
       {/* ── 分隔線：工具區 ── */}
       <div className="border-t border-white/10 pt-5 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
-              當前選中：<span className="text-white font-semibold">{selectedTrack ? selectedTrack.name : selectedAlbum.name}</span>
-            </p>
-          </div>
-        </div>
+
 
         <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <CopyLinkButton />

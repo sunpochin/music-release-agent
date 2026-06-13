@@ -37,29 +37,7 @@ const AlbumPanel = ({
   return (
     <div className={`w-full ${isFull ? 'max-w-2xl mx-auto' : 'lg:w-1/3'} bg-black/20 border border-white/5 rounded-[32px] p-8 backdrop-blur-[60px] shadow-2xl shadow-black/50 flex flex-col justify-between`}>
       <div>
-        <h2 className="text-2xl font-bold flex items-center gap-2 text-white/90 mb-8">
-          <Info size={20} /> 專輯資訊
-        </h2>
-
         <div className="space-y-4 text-sm text-gray-300">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center gap-3 bg-black/20 p-4 rounded-2xl">
-              <Calendar size={18} className="text-spotify-green shrink-0" />
-              <div>
-                <p className="text-xs text-gray-400">發行日期</p>
-                <p className="font-semibold">{selectedAlbum.release_date}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 bg-black/20 p-4 rounded-2xl">
-              <Layers size={18} className="text-spotify-green shrink-0" />
-              <div>
-                <p className="text-xs text-gray-400">曲目總數</p>
-                <p className="font-semibold">{selectedAlbum.total_tracks} 首歌曲</p>
-              </div>
-            </div>
-          </div>
-
           <div className="bg-black/20 p-5 rounded-2xl space-y-2">
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">作品介紹</p>
             <p className="leading-relaxed text-gray-200">
