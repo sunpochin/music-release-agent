@@ -7,7 +7,7 @@ module.exports = {
       // 不要讓 PM2 呼叫 NPM 經理 (npm run dev) 去叫小兵 (server.js)，因為 NPM 經理下班時會忘記叫小兵回家，導致 Port 埠被佔用。
       // 我們讓 PM2 直接管小兵 (server.js)，並用 watch 隨時注意小兵有沒有改寫，自動幫他重新開機！
       name: 'music-release-agent-server',
-      script: 'server.js',
+      script: 'npm', args: 'start',
       watch: ['server.js', 'src'],
       exec_mode: 'fork',
       error_file: 'logs/server-err.log',
@@ -45,7 +45,7 @@ module.exports = {
       // 歌詞翻譯 + Obsidian vault 落盤微服務（選用 companion — 歌詞功能的微服務，獨立 repo，不影響核心功能）
       // 未啟動時核心不受影響：/api/lyrics 回 502、/readyz 標 degraded、前端顯示離線訊息
       name: 'lyrics-vault-service',
-      script: 'server.js',
+      script: 'npm', args: 'start',
       cwd: '../lyrics-vault-service',
       exec_mode: 'fork',
       watch: false,

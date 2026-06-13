@@ -25,7 +25,7 @@ export interface SpotifyPlayerControls {
   position: number   // 毫秒，供 KTV 歌詞同步精準使用
   duration: number   // 毫秒，供進度條使用
   error: PlayerError | null
-  playUri: (spotifyUri: string) => Promise<void>
+  playUri: (spotifyUri: string, positionMs?: number) => Promise<void>
   togglePlay: () => void
   seek: (ms: number) => void
 }
@@ -163,18 +163,39 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
    * 透過 Spotify Web API 控制此設備播放指定 URI
    * SDK 本身不提供 play(uri)，需呼叫 REST API 並指定 device_id
    */
-  const playUri = useCallback(async (spotifyUri: string): Promise<void> => {
+  const playUri = useCallback(async (spotifyUri: string, positionMs?: number): Promise<void> => {
     const token = await fetchToken()
     if (!token || !deviceIdRef.current) return
 
-    await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceIdRef.current}`, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ uris: [spotifyUri] })
-    })
+    const isContext = spotifyUri.startsWith('spotify:album:') || spotifyUri.startsWith('spotify:playlist:') || spotifyUri.startsWith('spotify:artist:')
+    
+    const body: any = {}
+    if (isContext) {
+      body.context_uri = spotifyUri
+    } else {
+      body.uris = [spotifyUri]
+    }
+    
+    if (positionMs !== undefined) {
+      body.position_ms = positionMs
+    }
+
+    try {
+      const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceIdRef.current}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      })
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error('[SpotifyPlayer] playUri failed:', res.status, errText)
+      }
+    } catch (err) {
+      console.error('[SpotifyPlayer] playUri error:', err)
+    }
   }, [fetchToken])
 
   const togglePlay = useCallback((): void => {
