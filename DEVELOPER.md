@@ -147,3 +147,33 @@ Threads 的權限模型在 Meta API 體系中，與 Instagram (IG) 有著極深�
     *   在 `server.js` 尾端設置 `app.get('*')` 路由攔截非 API 的所有前端請求，自動發送 `dashboard/dist/index.html`，以避免使用者重新整理頁面 (F5) 或直接輸入網址列進入 `/album/:albumId` 時造成後端 Express 拋出 404 找不到路由的問題，這充分體現了單頁應用程式 (SPA) 的伺服器配合規範。
 *   **非同步資料載入與 Race Condition 防禦**：
     *   前端載入專輯列表為非同步請求。為防 URL 解析時 `albums` 陣列尚未取回而將匹配判定為無效，增加了 `albums.length > 0` 的守衛閘門 (Guard)，唯有列表確實加載後才與路由參數進行同步。
+
+## ⚛️ React render-before-effect：歌詞切換閃爍根本修法
+
+**症狀**：切換歌曲時，歌詞區出現「舊歌詞 → spinner → 新歌詞」兩次閃爍。
+
+**根本原因**：React 執行順序永遠是 **render → effect**。當 `selectedTrack` state 改變時，React 先用「新 track + 舊 lyricsData」畫一幀，才執行 effect 去清 lyricsData。無論在 effect 多快設 state，都無法攔住第一幀的「舊歌詞閃現」。這是 React 架構本質。
+
+**失敗的直覺解法**（不要再試了）：
+- 在 effect 裡立刻 `setLyricsData('')` → 無效，render 已先畫一幀
+- 把 `setLyricsData('')` 移到 effect 最前面 → 同上，順序無關
+
+**正確修法**：`lyricsForTrackId` + render 階段派生 `isStale`
+
+在 `useTrackAi.js` 加一個 state 追蹤「目前畫面歌詞屬於哪首歌」：
+
+```js
+const [lyricsForTrackId, setLyricsForTrackId] = useState(null)
+
+// API 成功/失敗後才設定
+setLyricsForTrackId(trackIdAtStart)
+
+// render 階段直接算出 stale
+const isStale = selectedTrack != null && lyricsForTrackId !== selectedTrack.id
+const effectiveLoading = rawLoading || isStale
+// return 給外部時：lyricsData: isStale ? '' : lyricsData
+```
+
+**Why it works**：`isStale` 在 render 階段就能算出 true（因為 `selectedTrack` 已是新值，但 `lyricsForTrackId` 還是舊值），第一幀直接顯示 spinner，不需要等 effect。
+
+**通用模式**：任何「切換選取對象時要立刻清空 async 資料」的場景都適用。用 `dataForId` state 追蹤資料歸屬，render 時比對派生 `isStale`，而非靠 effect 清資料。

@@ -11,6 +11,19 @@ import { useEffect, useRef, useState } from 'react'
  *    成果送回來時比對「監視器」(selectedTrackRef) 還是不是同一首，一樣才更新畫面。
  * 2. 換歌先擦黑板：一感應到換歌，立刻把舊歌詞、舊分析擦乾淨，
  *    不讓上一首歌的內容殘留在螢幕上。
+ *
+ * ⚠️ 重要：「歌詞閃兩次」的根本原因與修法
+ * React 執行順序永遠是「render → effect」，不是「effect → render」。
+ * 所以當 selectedTrack 改變時：
+ *   步驟1 (render)：React 先用「新 track + 舊 lyricsData」畫一幀 → 舊歌詞短暫閃現
+ *   步驟2 (effect)：才清掉 lyricsData、設 rawLoading=true → spinner
+ *   步驟3：API 回來 → 新歌詞
+ * 光靠 effect 清 state 永遠無法避免步驟1的閃爍，這是 React 架構本質。
+ *
+ * 修法：用 lyricsForTrackId state 追蹤「目前畫面上的歌詞屬於哪首歌」。
+ * 在 render 階段直接算出 isStale = selectedTrack.id !== lyricsForTrackId。
+ * 只要 isStale，就把 lyricsData 當空字串、rawLoading 當 true，直接顯示 spinner。
+ * 這樣第一幀 render 時就能正確顯示 spinner，不需要等 effect。
  */
 export function useTrackAi(selectedAlbum, selectedTrack) {
   const [lyricsData, setLyricsData] = useState('')
@@ -20,6 +33,12 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   // 歌詞來源（provenance）：lrclib / spotify / llm-recall / none …
   // 攤在 UI 上，讓用戶看得到可信度，而不是只躺在 cache frontmatter
   const [lyricsSource, setLyricsSource] = useState(undefined)
+  // 目前畫面上的歌詞屬於哪首歌的 id
+  // 【小朋友解釋法】：React render 比 effect 先跑，所以光靠 effect 清歌詞還是會
+  // 先渲染一幀「新歌 + 舊歌詞」的組合，造成第一次閃爍。
+  // 我們改用這個 state 在 render 時直接比對：
+  // 只要 lyricsForTrackId !== selectedTrack.id，就當作「正在載入」，直接顯示 spinner。
+  const [lyricsForTrackId, setLyricsForTrackId] = useState(null)
 
   // 隨時追蹤當前選中的單曲，以防異步請求結束時選取已改變
   const selectedTrackRef = useRef(selectedTrack)
@@ -33,7 +52,9 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   // 1. 先把「舊的翻譯狀態」清掉（避免新歌顯示舊歌的「已翻譯」標籤）
   // 2. 延遲 400ms 再開始載入（避免「邊點邊搜尋」時發太多請求）
   // 3. 由 fetchLyricsFor 統一負責清空歌詞、設置 loading 狀態
-  // 這樣就只有一次 UI 閃現（清空 → loading 圈圈 → 新歌詞），不會閃兩次
+  // 「閃兩次」分兩個來源各自處理：
+  //   - 內容殘留（新歌顯示舊歌詞）→ 由下方 isStale 在 render 階段擋掉
+  //   - 進場動畫重播（同份歌詞淡入兩次）→ 由下方 shouldAnimateLyrics「每首只播一次」擋掉
   const autoFetchedRef = useRef(null)
   useEffect(() => {
     // 只清除「翻譯狀態」，不清除歌詞內容（交給 fetchLyricsFor 處理）
@@ -46,14 +67,20 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
       return
     }
 
-    if (autoFetchedRef.current === selectedTrack.id) return
+    if (autoFetchedRef.current === selectedTrack.id) {
+      return
+    }
+
+    setRawLoading(true)
 
     const timer = setTimeout(() => {
       autoFetchedRef.current = selectedTrack.id
       // fetchLyricsFor 會負責設置 rawLoading=true 和清空歌詞
       fetchLyricsFor(selectedTrack, { translate: false })
     }, 400)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAlbum, selectedTrack])
 
@@ -61,7 +88,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   const fetchLyricsFor = async (track, { translate = false, refresh = false } = {}) => {
     if (!selectedAlbum || !track) return
     const trackIdAtStart = track.id
-    
+
     if (translate) {
       setIsTranslating(true)
     } else {
@@ -96,12 +123,14 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
       const result = await res.json()
       if (selectedTrackRef.current?.id === trackIdAtStart) {
         setLyricsData(result?.text || '無法取得歌詞。')
+        setLyricsForTrackId(trackIdAtStart)
         setIsTranslated(Boolean(result?.translated))
         setLyricsSource(result?.source)
       }
     } catch {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
         setLyricsData('載入過程發生錯誤。')
+        setLyricsForTrackId(trackIdAtStart)
       }
     } finally {
       if (selectedTrackRef.current?.id === trackIdAtStart) {
@@ -155,12 +184,47 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     }
   }
 
+  // render 時直接算出「是否正在等待新歌詞」
+  // isStale=true 代表畫面上的歌詞屬於上一首歌，render 階段就擋掉，不等 effect
+  const isStale = selectedTrack != null && lyricsForTrackId !== selectedTrack.id
+  const effectiveLoading = rawLoading || isStale
+
+  // ✨ 進場動畫「只播一次」防閃爍
+  // 【小朋友解釋法】：歌詞逐行淡入的進場動畫（ai-stagger）很漂亮，但有個陷阱——
+  // 只要歌詞那塊 DOM 被 React「重新蓋一次房子」(remount)，CSS 動畫就會從頭再播一次，
+  // 看起來就像「同一份歌詞閃了兩次」。
+  // 什麼時候會偷偷重蓋房子？例如專輯樂評（/api/review 那個慢慢生成的 AI 回應）晚個幾秒
+  // 才送到，觸發整個面板重畫，歌詞那塊就被連帶重蓋 → 動畫重播 → 閃第二次。
+  // 解法：拿一本「點名簿」(animatedTracksRef) 記住哪幾首歌的動畫已經播過了。
+  // 這本簿子放在 App 層的這個 hook 裡，就算下面的歌詞面板被重蓋，簿子也不會被燒掉。
+  // 第一次顯示某首歌的歌詞 → 簿子上沒名字 → 帶動畫；之後任何重蓋 → 簿子上有名字 → 不帶動畫，
+  // 瞬間顯示、絕不重播。換到「真正的新歌」時，新歌不在簿子上，動畫照常播一次。
+  const animatedTracksRef = useRef(new Set())
+  const currentId = selectedTrack?.id
+  const lyricsReady = !effectiveLoading && lyricsForTrackId === currentId && Boolean(lyricsData)
+  const shouldAnimateLyrics = lyricsReady && currentId != null && !animatedTracksRef.current.has(currentId)
+  useEffect(() => {
+    // 歌詞上畫後「等動畫播完」再記進點名簿（不是立刻記）。
+    // 為什麼要等？因為一記進去，shouldAnimateLyrics 立刻變 false，緊接著任何一次
+    // re-render（例如歌詞來源徽章 lyricsSource 更新）就會把 ai-stagger class 從還在
+    // 動畫中的元素上拔掉，連「第一次」的進場動畫都被砍斷。
+    // 等 1.5s（> 動畫總長 0.45s + 最後一行 0.69s 延遲）讓首播完整跑完，
+    // 之後那個罕見的父層 remount（如 /api/review 晚幾秒落地）才會讀到 false → 不重播。
+    if (lyricsReady && currentId != null && !animatedTracksRef.current.has(currentId)) {
+      const timer = setTimeout(() => {
+        animatedTracksRef.current.add(currentId)
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [lyricsReady, currentId])
+
   return {
-    lyricsData,
+    lyricsData: isStale ? '' : lyricsData,
     lyricsSource,
-    rawLoading,
+    rawLoading: effectiveLoading,
     isTranslated,
     isTranslating,
+    shouldAnimateLyrics,
     handleFetchLyrics,
     handleTranslate,
     handleRedownloadRaw,

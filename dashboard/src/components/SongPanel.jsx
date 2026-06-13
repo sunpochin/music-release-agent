@@ -52,6 +52,7 @@ const SongPanel = ({
   lyricsData,
   lyricsSource,
   rawLoading,
+  shouldAnimateLyrics = true,
   isTranslated,
   isTranslating,
   isExporting,
@@ -199,7 +200,8 @@ const SongPanel = ({
             <div className="not-prose mb-3">
               <LyricsSourceBadge source={lyricsSource} />
             </div>
-            <div className="ai-stagger" dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
+            {/* ai-stagger 進場動畫只在首次顯示某首歌歌詞時掛上；之後若父層 remount 則不帶動畫，避免重播閃爍（見 useTrackAi 的 shouldAnimateLyrics） */}
+            <div className={shouldAnimateLyrics ? 'ai-stagger' : ''} dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData) }} />
             {isTranslating && (
               <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md animate-pulse flex items-center gap-3">
                 <Sparkles size={16} className="text-spotify-green animate-spin" />
