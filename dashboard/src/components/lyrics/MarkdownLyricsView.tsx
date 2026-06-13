@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 import { parseMarkdownToHtml } from '../../utils/markdown.js'
 import { Sparkles } from 'lucide-react'
 
@@ -17,6 +17,84 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
   playerControls,
   songUri
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const prevActiveMsRef = useRef<number | null>(null)
+
+  // 當歌詞資料改變時，重設上一次播放的 active 時間，以確保換歌時滾動正常
+  useEffect(() => {
+    prevActiveMsRef.current = null
+  }, [lyricsData])
+
+  // 處理時間同步高亮與自動捲動的副作用 (useEffect)
+  useEffect(() => {
+    if (!containerRef.current || playerControls?.position === undefined) return
+
+    // 取得所有的時間徽章
+    const badges = Array.from(containerRef.current.querySelectorAll('.time-badge'))
+    if (badges.length === 0) return
+
+    // 解析出所有的 [timeMs, element] 組合並排序
+    const parsedBadges = badges.map(el => {
+      const ms = parseInt(el.getAttribute('data-time-ms') || '0', 10)
+      return { ms, el: el as HTMLElement }
+    }).sort((a, b) => a.ms - b.ms)
+
+    const position = playerControls.position
+    let activeIdx = -1
+
+    // 尋找最後一個小於等於當前播放進度的時間標籤
+    for (let i = 0; i < parsedBadges.length; i++) {
+      if (parsedBadges[i].ms <= position) {
+        activeIdx = i
+      } else {
+        break
+      }
+    }
+
+    const activeBadge = activeIdx !== -1 ? parsedBadges[activeIdx] : null
+
+    // 更新所有時間標籤與其對應段落的樣式
+    parsedBadges.forEach((badge) => {
+      const isCurrent = activeBadge && badge.ms === activeBadge.ms
+      const parent = badge.el.closest('p, div') // 尋找該徽章所屬的段落
+
+      if (isCurrent) {
+        // 高亮時間徽章本身
+        badge.el.classList.remove('bg-white/10', 'text-white/50')
+        badge.el.classList.add('bg-spotify-green', 'text-black', 'font-bold')
+
+        // 高亮對應的整行翻譯段落
+        if (parent) {
+          parent.classList.remove('text-gray-300', 'opacity-30')
+          parent.classList.add('text-white', 'font-medium', 'scale-[1.01]', 'transition-all', 'duration-300')
+        }
+      } else {
+        // 還原時間徽章樣式
+        badge.el.classList.remove('bg-spotify-green', 'text-black', 'font-bold')
+        badge.el.classList.add('bg-white/10', 'text-white/50')
+
+        // 暗化非當前播放的段落，使焦點集中在目前歌詞上
+        if (parent) {
+          parent.classList.remove('text-white', 'font-medium', 'scale-[1.01]')
+          parent.classList.add('text-gray-300', 'opacity-30', 'transition-all', 'duration-300')
+        }
+      }
+    })
+
+    // 自動捲動至當前高亮段落的置中位置，且只在歌詞切換時觸發，避免頻繁滾動
+    if (activeBadge) {
+      if (prevActiveMsRef.current !== activeBadge.ms) {
+        prevActiveMsRef.current = activeBadge.ms
+        const parent = activeBadge.el.closest('p, div')
+        if (parent) {
+          parent.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }
+    } else {
+      prevActiveMsRef.current = null
+    }
+  }, [playerControls?.position, lyricsData])
+
   // 處理點擊時間標籤事件
   const handleLyricsClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -34,18 +112,11 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
       }
     }
   };
+
   return (
     <>
-      {/* 
-        給開發者的筆記（為什麼這裡沒有分秒進度？）：
-        
-        小朋友版本的解釋：
-        「KTV 動態」就像是有人拿著碼表，在你唱歌的時候幫你記下每一句話是在第幾分第幾秒唱出來的。
-        「雙語全文 (Markdown 模式)」則是 AI 機器人聽完整首歌後，寫下的一篇優美翻譯文章。
-        AI 機器人只知道整首歌的意思，但它沒有拿碼表幫我們記錄這句話是第幾秒唱的！
-        因為我們沒有 AI 翻譯文章的「碼表時間」，所以沒辦法讓字跟著音樂一起變色前進喔！
-      */}
       <div 
+        ref={containerRef}
         className={shouldAnimateLyrics ? 'ai-stagger' : ''} 
         dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData || '') }} 
         onClick={handleLyricsClick}
