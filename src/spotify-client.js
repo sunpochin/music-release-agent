@@ -195,7 +195,8 @@ function triggerLyricsPreFetch(albumId, tracks, cache) {
     console.log(`[Spotify/Client] 🚀 開始背景預載《${artistName}》專輯 [${albumId}] 的 ${tracks.length} 首歌詞原文...`);
     // 順序觸發；節流與來源禮節由 lyrics-vault-service 負責
     for (const track of tracks) {
-      if (track.name.startsWith('Demo Track')) continue; // 忽略測試/模擬的 Demo 曲目
+      // 忽略測試/模擬的 Demo 曲目與降級的預設 Track 曲目，避免無謂的 API 請求
+      if (track.name.startsWith('Demo Track') || /^Track \d+$/.test(track.name)) continue;
       lyricsClient.fetchLyrics({ artistName, trackName: track.name, translate: false }).catch(() => {});
     }
   }).catch(() => {});
@@ -216,8 +217,29 @@ export async function getSpotifyAlbumTracks(albumId) {
   if (!bypass && cache.album_tracks[albumId] && cacheService.isValid(cache.album_tracks[albumId].timestamp)) {
     console.log(`[Spotify/Client] 💾 從本地快取載入專輯 [${albumId}] 的歌曲清單...`);
     const cachedData = cache.album_tracks[albumId].data;
+    
+    // 檢查快取中是否有舊版的「降級保護」或「Demo Track」字樣，並在運行時進行清洗以保證 UI 質感
+    let needsCacheUpdate = false;
+    const sanitizedData = cachedData.map(track => {
+      if (track.name && (track.name.includes('降級保護') || track.name.startsWith('Demo Track'))) {
+        needsCacheUpdate = true;
+        // 將舊版降級提示字樣清洗為符合唱片工業標準的「Track X」
+        return {
+          ...track,
+          name: `Track ${track.track_number}`
+        };
+      }
+      return track;
+    });
+
+    if (needsCacheUpdate) {
+      cache.album_tracks[albumId].data = sanitizedData;
+      await cacheService.write(cache);
+      console.log(`[Spotify/Client] 🧹 已成功清洗並更新專輯 [${albumId}] 的舊版降級快取曲目。`);
+    }
+
     // 取消背景預載，改為延遲載入 (Lazy Load)
-    return cachedData;
+    return sanitizedData;
   }
 
   try {
@@ -260,7 +282,7 @@ export async function getSpotifyAlbumTracks(albumId) {
     const totalTracksCount = meta?.totalTracks || 1;
     const fallbackTracks = Array.from({ length: totalTracksCount }, (_, i) => ({
       id: `fallback-${albumId}-${i + 1}`,
-      name: `Demo Track ${i + 1} (降級保護)`,
+      name: `Track ${i + 1}`,
       track_number: i + 1,
       duration_ms: 180000,
       uri: `spotify:track:fallback-${albumId}-${i + 1}`,

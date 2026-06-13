@@ -263,7 +263,7 @@ describe('scanRecentNewReleases 基準測試', () => {
       const result = await getSpotifyAlbumTracks('album-unknown');
       expect(result.length).toBe(1);
       expect(result[0].id).toBe('fallback-album-unknown-1');
-      expect(result[0].name).toBe('Demo Track 1 (降級保護)');
+      expect(result[0].name).toBe('Track 1');
     });
   });
 });
