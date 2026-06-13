@@ -113,23 +113,51 @@ const SongPanel = ({
   // 匯出 IG 限動卡邏輯
   const exportShareCard = async () => {
     if (!selectedAlbum) return
-    const shareText = `🎵 推薦歌曲！來自 ${selectedAlbum.artistName || '未知藝人'} 的《${selectedTrack ? selectedTrack.name : selectedAlbum.name}》`
 
-    // 自動於背景向 Threads 發送一則發佈通知（此為商業分析追蹤邏輯，維持原樣）
+    const spotifyLink = selectedTrack?.url || `https://open.spotify.com/album/${selectedAlbum.id}`
+    const shareText = `🎵 ${selectedTrack ? selectedTrack.name : selectedAlbum.name} - ${selectedAlbum.artistName || '未知藝人'}
+${spotifyLink}
+
+${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summary || '')}`
+
+    // --- 完全同步的剪貼簿複製 (繞過 iOS 嚴格的非同步安全限制) ---
+    const textArea = document.createElement("textarea")
+    textArea.value = shareText
+    textArea.style.position = "fixed"
+    textArea.style.left = "-9999px"
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      // 提示使用者已成功複製，可以直接貼到 IG Reels
+      setTimeout(() => alert("✅ 包含 Spotify 歌曲連結與翻譯歌詞的文案已為您複製到剪貼簿！\n\n您可以直接貼上到 Instagram Reels！"), 100);
+    } catch (e) {
+      console.warn("execCommand copy failed", e)
+    }
+    document.body.removeChild(textArea)
+
+    // --- 自動背景發布到 Threads (僅發送單一發行連結以防字數超限) ---
+    // 放入 setTimeout 延遲執行，避免阻礙瀏覽器對 Web Share API (navigator.share) 的點擊觸發判定
     setTimeout(() => {
+      const releaseUrl = selectedTrack
+        ? `https://release.sunpochin.xyz/album/${selectedAlbum.id}/song/${selectedTrack.id}`
+        : `https://release.sunpochin.xyz/album/${selectedAlbum.id}`
+
       fetch('/api/social/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          caption: `${shareText}\n\n#MusicRelease #NewMusic`,
+          caption: releaseUrl,
           platforms: ['threads'],
-          imageBase64: null
+          imageBase64: null // 不包含圖片以節省字數與流量，僅分享純連結
         })
       }).catch(err => {
         console.error("Auto publish to Threads failed", err)
       })
     }, 1000)
 
+    // --- 以下為圖卡匯出邏輯 ---
     if (shareFileRef.current) {
       try {
         if (navigator.canShare && navigator.canShare({ files: [shareFileRef.current] })) {
