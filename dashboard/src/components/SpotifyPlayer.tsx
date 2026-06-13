@@ -33,7 +33,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri }) => {
   }
 
   // 計算進度條百分比（0–100）
-  const progress = duration > 0 ? (position / duration) * 100 : 0
+  const progress = duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0
 
   // 非 Premium 帳號的降級提示
   if (error === 'not_premium') {

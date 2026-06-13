@@ -91,6 +91,10 @@ export async function handleSpotifyCallback(code: string): Promise<SpotifyTokens
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   const redirectUri = process.env.SPOTIFY_REDIRECT_URI;
 
+  if (!clientId || !clientSecret) {
+    throw new Error('Spotify client configuration (SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET) is missing in environment variables.');
+  }
+
   console.log('[Spotify/Auth] 🔑 正在使用 code 交換 Access Token...');
 
   const response = await fetch('https://accounts.spotify.com/api/token', {

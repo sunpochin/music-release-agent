@@ -58,6 +58,8 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
   }, [])
 
   useEffect(() => {
+    let active = true
+
     const initPlayer = async (): Promise<void> => {
       if (!window.Spotify) {
         setError('sdk_not_loaded')
@@ -65,7 +67,7 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
       }
 
       const token = await fetchToken()
-      if (!token) return
+      if (!token || !active) return
 
       const player = new window.Spotify.Player({
         name: PLAYER_NAME,
@@ -73,7 +75,7 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
         // SDK 每次 Token 過期時回調此函式，向後端刷新並回傳
         getOAuthToken: async (cb) => {
           const freshToken = await fetchToken()
-          if (freshToken) cb(freshToken)
+          if (freshToken && active) cb(freshToken)
         }
       })
 
@@ -81,33 +83,35 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
 
       player.addListener('not_ready', ({ device_id }) => {
         console.warn('[SpotifyPlayer] Device offline:', device_id)
-        setIsReady(false)
+        if (active) setIsReady(false)
       })
 
       player.addListener('initialization_error', ({ message }) => {
         console.error('[SpotifyPlayer] Init error:', message)
-        setError(message)
+        if (active) setError(message)
       })
 
       player.addListener('authentication_error', ({ message }) => {
         console.error('[SpotifyPlayer] Auth error:', message)
-        setError('not_authorized')
+        if (active) setError('not_authorized')
       })
 
       player.addListener('account_error', () => {
         // 最常見原因：帳號非 Premium
-        setError('not_premium')
+        if (active) setError('not_premium')
       })
 
       player.addListener('ready', ({ device_id }) => {
         console.log('[SpotifyPlayer] ✅ Ready, device_id:', device_id)
         deviceIdRef.current = device_id
-        setIsReady(true)
-        setError(null)
+        if (active) {
+          setIsReady(true)
+          setError(null)
+        }
       })
 
       player.addListener('player_state_changed', (state: SpotifyPlayerState | null) => {
-        if (!state) return
+        if (!state || !active) return
 
         setIsPlaying(!state.paused)
         setCurrentTrack(state.track_window?.current_track ?? null)
@@ -120,17 +124,19 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
           let pos = state.position
           positionTimerRef.current = setInterval(() => {
             pos += 1000
-            setPosition(pos)
+            if (active) setPosition(pos)
           }, 1000)
         }
       })
 
-      await player.connect()
+      if (active) {
+        await player.connect()
+      }
     }
 
     // SDK 載入完後會呼叫 window.onSpotifyWebPlaybackSDKReady
     // 熱重載時 SDK 可能已存在，直接初始化
-    if (window.Spotify) {
+    if (window.Spotify) { 
       initPlayer()
     } else {
       window.onSpotifyWebPlaybackSDKReady = initPlayer
@@ -145,6 +151,7 @@ export function useSpotifyPlayer(): SpotifyPlayerControls {
     }
 
     return () => {
+      active = false
       if (positionTimerRef.current) clearInterval(positionTimerRef.current)
       playerRef.current?.disconnect()
       playerRef.current = null

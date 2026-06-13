@@ -86,7 +86,7 @@ export function createApp() {
   app.use(coreRoutes());
   app.use(lyricsRoutes());
   app.use(socialRoutes());
-  app.use('/api/health', healthRoutes);
+  app.use(healthRoutes());
   app.use('/api/review', aiRoutes);
   app.use(authRoutes());
 

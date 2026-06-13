@@ -17,8 +17,8 @@ export function authRoutes() {
 
   router.get('/api/auth/callback/spotify', async (req, res) => {
     const code = req.query.code;
-    if (!code) {
-      return res.status(400).send('Missing authorization code');
+    if (!code || typeof code !== 'string') {
+      return res.status(400).send('Missing or invalid authorization code');
     }
 
     try {

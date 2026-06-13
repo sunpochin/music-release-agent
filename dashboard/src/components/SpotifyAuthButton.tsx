@@ -12,47 +12,55 @@ export default function SpotifyAuthButton() {
   const [loading, setLoading] = useState<boolean>(true);
   const [user, setUser] = useState<SpotifyUser | null>(null);
 
-  // 檢查後端憑證狀態並撈取使用者資訊
-  const checkAuth = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/auth/token');
-      if (res.ok) {
-        const data = await res.json();
-        setToken(data.access_token);
-        await fetchSpotifyUserProfile(data.access_token);
-      } else {
-        setToken(null);
-        setUser(null);
-      }
-    } catch (err) {
-      console.error('檢查授權狀態時發生錯誤:', err);
-      setToken(null);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 呼叫 Spotify API 撈取個人資訊
-  const fetchSpotifyUserProfile = async (accessToken: string) => {
-    try {
-      const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-      }
-    } catch (err) {
-      console.error('撈取 Spotify 個人檔案失敗:', err);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchSpotifyUserProfile = async (accessToken: string) => {
+      try {
+        const res = await fetch('https://api.spotify.com/v1/me', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setUser(data);
+        }
+      } catch (err) {
+        console.error('撈取 Spotify 個人檔案失敗:', err);
+      }
+    };
+
+    const checkAuth = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/auth/token');
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setToken(data.access_token);
+          await fetchSpotifyUserProfile(data.access_token);
+        } else if (isMounted) {
+          setToken(null);
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('檢查授權狀態時發生錯誤:', err);
+        if (isMounted) {
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     checkAuth();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // 跳轉至後端 Spotify 授權登入 URL

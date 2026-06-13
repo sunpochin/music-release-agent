@@ -19,9 +19,12 @@ aiRoutes.post('/top-tracks-review', async (req, res) => {
       return res.status(400).json({ error: 'Missing or invalid tracks array' });
     }
 
-    const tracksText = tracks.map((t: any, i: number) => 
-      `${i + 1}. ${t.name} by ${t.artists.map((a: any) => a.name).join(', ')} (Album: ${t.album.name})`
-    ).join('\n');
+    const tracksText = tracks.map((t: any, i: number) => {
+      const trackName = t?.name || 'Unknown Track';
+      const artistsName = t?.artists?.map((a: any) => a?.name || 'Unknown Artist').join(', ') || 'Unknown Artist';
+      const albumName = t?.album?.name || 'Unknown Album';
+      return `${i + 1}. ${trackName} by ${artistsName} (Album: ${albumName})`;
+    }).join('\n');
 
     const prompt = `
 作為一位深具洞察力且文筆優美、充滿情感溫度的音樂雜誌專欄作家（風格類似 Pitchfork 但更溫暖），
