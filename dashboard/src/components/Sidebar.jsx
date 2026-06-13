@@ -4,7 +4,7 @@ import { Music } from 'lucide-react'
 // 側邊欄元件：展示關注藝人的最新專輯列表
 const Sidebar = ({ albums, selectedAlbum, handleSelectAlbum }) => {
   return (
-    <aside className={`w-full lg:w-80 bg-black flex flex-col border-r border-white/5 z-10 ${selectedAlbum ? 'hidden lg:flex' : 'flex'}`}>
+    <aside className={`w-full lg:w-80 bg-black/40 backdrop-blur-[40px] flex flex-col border-r border-white/5 z-10 ${selectedAlbum ? 'hidden lg:flex' : 'flex'}`}>
       <div className="p-6 flex items-center gap-3 border-b border-white/5">
         <div className="w-10 h-10 bg-spotify-green rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(29,185,84,0.4)]">
           <Music className="text-black" size={24} />

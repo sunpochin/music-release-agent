@@ -5,7 +5,7 @@ import ShareCard from './ShareCard'
 // 安全的輕量 Markdown 轉譯器：抽成純模組（dashboard/src/utils/markdown.js），
 // 由根目錄 tests/markdown-renderer.test.js 做 XSS 防護與格式轉譯的確定性單元測試。
 import { parseMarkdownToHtml } from '../utils/markdown.js'
-import WaveformVisualizer from './WaveformVisualizer'
+
 import LyricsSourceBadge from './LyricsSourceBadge'
 
 // 複製目前頁面連結的小按鈕（桌面端分享體驗；行動端已有原生分享）
@@ -262,16 +262,16 @@ const SongPanel = ({
     return (
       <button
         onClick={handleTranslate}
-        className="bg-gradient-to-r from-spotify-green/10 to-spotify-green/20 hover:from-spotify-green/20 hover:to-spotify-green/30 border border-spotify-green/30 hover:border-spotify-green/50 text-spotify-green hover:scale-105 active:scale-95 transition-all px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 shadow-lg shadow-spotify-green/5"
+        className="bg-white/10 backdrop-blur-2xl border border-white/10 hover:border-white/30 hover:bg-white/20 text-white hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 px-6 py-3 rounded-full font-medium text-sm flex items-center gap-3 shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_60px_rgba(255,255,255,0.2)]"
       >
-        <Sparkles size={12} className="animate-pulse" />
-        🎵 AI 雙語對照翻譯
+        <Sparkles size={14} className="animate-pulse text-white/80" />
+        <span className="tracking-widest">產生 AI 雙語翻譯</span>
       </button>
     )
   }
 
   return (
-    <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col gap-6">
+    <div className="flex-1 bg-black/20 backdrop-blur-[60px] border border-white/5 rounded-[32px] p-8 shadow-2xl shadow-black/50 flex flex-col gap-6">
 
       {/* ── 隨選翻譯按鈕 ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
@@ -322,22 +322,18 @@ const SongPanel = ({
           )}
         </div>
 
-        {selectedTrack && (
-          <div className="hidden" title={`${selectedTrack.name} 的專屬音波`}>
-            <WaveformVisualizer seed={selectedTrack.id} />
-          </div>
-        )}
+
       </div>
 
       {/* ── 主內容渲染區域（直接顯示歌詞） ── */}
       <div className="flex-1 flex flex-col min-h-[300px]">
         {rawLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
-            <div className="w-10 h-10 border-4 border-spotify-green border-t-transparent rounded-full animate-spin"></div>
-            <p className="animate-pulse font-medium text-center text-xs">正在從網路資料庫尋獲並載入原文歌詞...</p>
+          <div className="py-24 flex flex-col items-center justify-center text-white/50 space-y-6">
+            <div className="w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
+            <p className="animate-pulse font-light tracking-widest text-center text-sm">聆聽中...</p>
           </div>
         ) : lyricsData ? (
-          <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-h3:text-spotify-green prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-2">
+          <div className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20">
             {/* 歌詞來源徽章：誠實標示可信度（真實來源 / 實驗性 / AI 記憶模式可能不準確） */}
             <div className="not-prose mb-3">
               <LyricsSourceBadge source={lyricsSource} />
