@@ -27,6 +27,18 @@
 - [Hero Image Spec](./docs/hero_image_spec.md)
 - [Readiness And Observability Guide](./docs/readiness_and_observability.md)
 
+### 🤖 AI 工具協作規則（鐵律）
+
+本專案使用「**小朋友解說法**」作為所有代碼修改的標準。這意味著：
+- 所有複雜邏輯都必須用 7-10 歲小朋友能聽懂的方式解釋
+- 適用於：Claude、GitHub Copilot、Google Gemini、OpenAI GPT、VS Code、Antigravity IDE
+
+👉 **新手必讀：** [CLAUDE_CONVENTIONS.md](./CLAUDE_CONVENTIONS.md)  
+👉 **所有 AI 工具指南：** [.github/ai-tools-instructions.md](./.github/ai-tools-instructions.md)  
+👉 **Copilot 專用：** [.github/copilot-instructions.md](./.github/copilot-instructions.md)
+
+**為什麼？** 因為好的代碼不只給電腦看，也給人類看。6 個月後的你會感謝現在的你。
+
 ---
 
 ## Evaluator Quickstart
