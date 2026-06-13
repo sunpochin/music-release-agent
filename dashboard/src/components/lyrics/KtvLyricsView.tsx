@@ -1,3 +1,10 @@
+/**
+ * 🎤 KtvLyricsView — KTV 動態同步模式
+ * 
+ * 專門處理帶有精準時間戳記的動態歌詞 (LRC)。
+ * 會將正在播放的那一句歌詞放大並置中顯示，同時透過 `translationMatcher`
+ * 自動尋找並顯示對應的中文翻譯。點擊任意一句歌詞，可使播放器直接跳轉至該時間點。
+ */
 import React, { useEffect } from 'react'
 import { createTranslationMap, getTranslation } from '../../utils/translationMatcher'
 

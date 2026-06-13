@@ -1,3 +1,11 @@
+/**
+ * 📝 MarkdownLyricsView — 雙語全文模式（靜態/動態雙用）
+ * 
+ * 負責渲染整篇歌詞，支援純靜態顯示，或帶有時間戳記的動態反白效果。
+ * 當含有時間戳記時，會解析 Markdown 內的 [mm:ss.xx] 為徽章，
+ * 並在播放進度到達時套用平滑的縮放 (scale) 與模糊 (blur) 效果，
+ * 創造類似 Apple Music 的優雅歌詞閱讀體驗。
+ */
 import React, { useRef, useEffect } from 'react'
 import { parseMarkdownToHtml } from '../../utils/markdown.js'
 import { Sparkles } from 'lucide-react'
@@ -63,10 +71,10 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
         badge.el.classList.remove('bg-white/10', 'text-white/50')
         badge.el.classList.add('bg-spotify-green', 'text-black', 'font-bold')
 
-        // 高亮對應的整行翻譯段落
+        // 高亮對應的整行翻譯段落（移除 font-bold 切換以避免版面跳動）
         if (parent) {
           parent.classList.remove('text-gray-300', 'opacity-30', 'text-white/40', 'blur-[0.5px]', 'scale-[0.98]', 'origin-left')
-          parent.classList.add('text-white', 'font-bold', 'scale-[1.05]', 'transition-all', 'duration-500', 'ease-out', 'origin-left', 'drop-shadow-lg', 'blur-none')
+          parent.classList.add('text-white', 'scale-[1.05]', 'transition-all', 'duration-500', 'ease-out', 'origin-left', 'drop-shadow-lg', 'blur-none')
         }
       } else {
         // 還原時間徽章樣式
@@ -75,7 +83,7 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
 
         // 暗化非當前播放的段落，使焦點集中在目前歌詞上
         if (parent) {
-          parent.classList.remove('text-white', 'font-medium', 'font-bold', 'scale-[1.01]', 'scale-[1.05]', 'drop-shadow-lg', 'blur-none')
+          parent.classList.remove('text-white', 'scale-[1.01]', 'scale-[1.05]', 'drop-shadow-lg', 'blur-none')
           parent.classList.add('text-white/40', 'blur-[0.5px]', 'scale-[0.98]', 'transition-all', 'duration-500', 'ease-out', 'origin-left')
         }
       }
