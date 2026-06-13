@@ -20,8 +20,8 @@ function App() {
   const [albums, setAlbums] = useState([])
   const [selectedAlbum, setSelectedAlbum] = useState(null)
   const [isExporting, setIsExporting] = useState(false)
-  // 儲存預先產生的圖卡檔案，以利 iOS Safari 進行同步分享
-  const [shareFile, setShareFile] = useState(null)
+  // 儲存預先產生的圖卡檔案，以利 iOS Safari 進行同步分享 (使用 useRef 避免背景生成時觸發不必要的整頁重畫)
+  const shareFileRef = useRef(null)
   // 儲存本地 AI 樂評之介紹與總結
   const [albumReview, setAlbumReview] = useState({ introduction: '', summary: '' })
 
@@ -39,6 +39,7 @@ function App() {
     rawLoading,
     isTranslated,
     isTranslating,
+    shouldAnimateLyrics,
     handleFetchLyrics,
     handleTranslate,
     handleRedownloadRaw,
@@ -127,7 +128,7 @@ function App() {
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
       if (!blob) throw new Error('Canvas to Blob conversion failed')
       const file = new File([blob], `share-${selectedTrack ? selectedTrack.name : selectedAlbum.name}.png`, { type: 'image/png' })
-      setShareFile(file)
+      shareFileRef.current = file
     } catch (err) {
       console.error("Failed to pre-generate share file", err)
     }
@@ -136,13 +137,13 @@ function App() {
   // 當選取專輯、歌曲、歌詞、歌曲分析或頁籤更新時，在背景非同步預先產生圖卡檔案
   useEffect(() => {
     if (selectedAlbum) {
-      setShareFile(null) // 先清空舊檔案
+      shareFileRef.current = null // 先清空舊檔案
       const timer = setTimeout(() => {
         generateShareFile()
       }, 600) // 延遲 600ms 確保 ShareCard DOM 已渲染完畢
       return () => clearTimeout(timer)
     } else {
-      setShareFile(null)
+      shareFileRef.current = null
     }
   }, [selectedAlbum, selectedTrack, lyricsData, albumReview, generateShareFile])
 
@@ -205,11 +206,11 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
 
     // --- 以下為圖卡匯出邏輯 ---
     // 如果預先產生的檔案已經在背景準備妥當，則「完全同步」呼叫 Web Share API
-    if (shareFile) {
+    if (shareFileRef.current) {
       try {
-        if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+        if (navigator.canShare && navigator.canShare({ files: [shareFileRef.current] })) {
           await navigator.share({
-            files: [shareFile],
+            files: [shareFileRef.current],
             title: `分享《${selectedAlbum.name}》`,
             text: shareText
           })
@@ -338,6 +339,7 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
                     lyricsData={lyricsData}
                     lyricsSource={lyricsSource}
                     rawLoading={rawLoading}
+                    shouldAnimateLyrics={shouldAnimateLyrics}
                     isTranslated={isTranslated}
                     isTranslating={isTranslating}
                     isExporting={isExporting}

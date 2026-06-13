@@ -1,0 +1,28 @@
+{
+  "style": "xiaopengyyou_jieshi",
+  "description": "小朋友解說法 - 用簡單日常語言解釋複雜技術",
+  "enabled": true,
+  "applies_to": [
+    "comments",
+    "commit_messages",
+    "code_review",
+    "documentation"
+  ],
+  "rules": {
+    "complex_logic": "必須有『小朋友解說法』註解",
+    "hooks": "React Hooks 的邏輯必須解釋『為什麼』",
+    "async_code": "非同步流程需要說明錯誤處理策略",
+    "commit_format": "所有 commit 需包含【小朋友解釋法】段落"
+  },
+  "prohibited_terms": [
+    "防答非所問",
+    "遞迴",
+    "競態條件",
+    "狀態管理",
+    "副作用",
+    "高階組件",
+    "序列化",
+    "反序列化"
+  ],
+  "reference_file": "CLAUDE_CONVENTIONS.md"
+}
