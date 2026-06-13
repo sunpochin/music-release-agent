@@ -8,6 +8,7 @@ import SongPage from './components/SongPage'
 import { useAlbumTracks } from './hooks/useAlbumTracks'
 import { useTrackAi } from './hooks/useTrackAi'
 import { useTrackKeyboardNav } from './hooks/useTrackKeyboardNav'
+import SpotifyPlayer from './components/SpotifyPlayer'
 
 // 【小朋友解釋法】：
 // App.jsx 以前是「什麼家具都堆在裡面的大客廳」。
@@ -210,6 +211,14 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Floating Spotify Player (Renders if an album or track is selected) */}
+      {(selectedTrack || selectedAlbum) && (
+        <SpotifyPlayer 
+          id={selectedTrack ? selectedTrack.id : selectedAlbum.id} 
+          type={selectedTrack ? 'track' : 'album'} 
+        />
+      )}
     </div>
   )
 }
