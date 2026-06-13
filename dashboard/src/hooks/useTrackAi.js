@@ -27,26 +27,24 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     selectedTrackRef.current = selectedTrack
   }, [selectedTrack])
 
-  // 換歌先擦黑板
+  // 🪄 選歌即自動載入歌詞（產品決策）：
+  // 合併「擦黑板」與「自動載入」邏輯到同一個 useEffect，消除中間的閃現
+  const autoFetchedRef = useRef(null)
   useEffect(() => {
+    // 擦黑板：清空舊數據（防止兩個 useEffect 導致的閃兩次）
     setLyricsData('')
     setIsTranslated(false)
     setIsTranslating(false)
     setLyricsSource(undefined)
-    if (selectedTrack) {
-      setRawLoading(true)
-    } else {
-      setRawLoading(false)
-    }
-  }, [selectedTrack])
 
-  // 🪄 選歌即自動載入歌詞（產品決策）：
-  // 歌曲頁的「主菜」就是歌詞 — 客人選中即上菜，載入原始歌詞。
-  const autoFetchedRef = useRef(null)
-  useEffect(() => {
-    if (!selectedAlbum || !selectedTrack) return
+    if (!selectedAlbum || !selectedTrack) {
+      setRawLoading(false)
+      return
+    }
+
     if (autoFetchedRef.current === selectedTrack.id) return
 
+    setRawLoading(true)
     const timer = setTimeout(() => {
       autoFetchedRef.current = selectedTrack.id
       fetchLyricsFor(selectedTrack, { translate: false })
