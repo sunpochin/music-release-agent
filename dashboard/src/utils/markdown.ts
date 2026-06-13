@@ -15,13 +15,13 @@
  */
 
 /** 將 HTML 特殊字元轉義，杜絕 XSS */
-export const escapeHtml = (text) => text
+export const escapeHtml = (text: string) => text
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;');
 
 /** 將 Markdown 語法安全且語意化地轉譯為具有 Tailwind 樣式的 HTML */
-export function parseMarkdownToHtml(markdown) {
+export function parseMarkdownToHtml(markdown: string) {
   if (!markdown) return '';
 
   const lines = markdown.split('\n');
@@ -56,9 +56,16 @@ export function parseMarkdownToHtml(markdown) {
       return `<p class="text-sm italic font-medium text-spotify-green/90 bg-spotify-green/5 border-l-2 border-spotify-green py-2 px-3 my-3 rounded-r-lg">${escapedLine.replace(/\*\*/g, '')}</p>`;
     }
 
-    // 處理一般段落，支援內建粗體
+    // 處理一般段落，支援內建粗體與 LRC 時間碼
     if (escapedLine) {
-      const formatted = escapedLine.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+      let formatted = escapedLine.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+      
+      // 處理 LRC 時間碼 [mm:ss.xx]
+      formatted = formatted.replace(/\[(\d{2}):(\d{2}(?:\.\d{2,3})?)\]/g, (match, m, s) => {
+        const timeMs = Math.floor((parseInt(m, 10) * 60 + parseFloat(s)) * 1000);
+        return `<span class="time-badge cursor-pointer inline-flex items-center justify-center px-1.5 py-0.5 mx-1 rounded-md bg-white/10 text-white/50 text-[10px] font-mono hover:bg-spotify-green hover:text-black transition-colors" data-time-ms="${timeMs}">${match}</span>`;
+      });
+      
       return `<p class="text-xs text-gray-300 leading-relaxed my-2">${formatted}</p>`;
     }
     return '<br/>';
