@@ -178,7 +178,7 @@ const SongPanel = ({
           >
             {/* Header: Badge & View Toggle */}
             <div className="not-prose mb-3 sticky top-0 bg-black/20 backdrop-blur-md z-10 p-2 rounded-lg flex items-center justify-between">
-              <LyricsSourceBadge source={lrcData ? 'LRCLIB (動態同步)' : lyricsSource} />
+              <LyricsSourceBadge source={lyricsSource} isSynced={!!lrcData} />
               
               {/* Toggle switch visible if we have lrcData (even before translation) */}
               {lrcData && (

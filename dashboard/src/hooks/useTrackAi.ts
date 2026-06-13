@@ -95,19 +95,6 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     }
 
     try {
-      // 非同步抓取 LRCLIB，不阻擋 API 請求，以便快速解除 loading 狀態
-      if (!translate) {
-        fetch(`https://lrclib.net/api/search?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(selectedAlbum.artistName || '')}`)
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data && data.length > 0 && data[0].syncedLyrics) {
-              if (selectedTrackRef.current?.id === trackIdAtStart) {
-                setLrcData(parseLrc(data[0].syncedLyrics));
-              }
-            }
-          }).catch(() => null);
-      }
-
       const apiPromise = fetch('/api/lyrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
