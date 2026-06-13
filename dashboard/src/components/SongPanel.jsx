@@ -7,6 +7,7 @@ import ShareCard from './ShareCard'
 import { parseMarkdownToHtml } from '../utils/markdown.js'
 
 import LyricsSourceBadge from './LyricsSourceBadge'
+import AddToPlaylistButton from './AddToPlaylistButton'
 
 // 複製目前頁面連結的小按鈕（桌面端分享體驗；行動端已有原生分享）
 const CopyLinkButton = () => {

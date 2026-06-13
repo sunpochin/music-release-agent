@@ -28,7 +28,7 @@ export default defineConfig({
         'src/album-reviewer.js',
         'src/gitbook-publisher.js',
         'src/spotify-client.js',
-        'src/spotify-auth.js',
+        'src/spotify-auth.ts',
         'src/musicbrainz-client.js'
       ],
       // 設定覆蓋率門檻（可選，用於確保程式碼品質）

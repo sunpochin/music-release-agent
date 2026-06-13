@@ -9,7 +9,7 @@
  */
 import { CacheService } from './services/cache-service.js';
 import { SystemStateService } from './services/system-state-service.js';
-import { SpotifyApiClient } from './services/spotify-api-client.js';
+import { SpotifyApiClient } from './services/spotify-api-client.ts';
 import { PlaybackService } from './services/playback-service.js';
 import { SpotifyDiscoveryStrategy } from './strategies/spotify-strategy.js';
 import { MusicBrainzDiscoveryStrategy } from './strategies/musicbrainz-strategy.js';

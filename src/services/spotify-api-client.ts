@@ -1,5 +1,5 @@
 import { fetch } from 'undici';
-import { getSpotifyAccessToken } from '../spotify-auth.js';
+import { getSpotifyAccessToken } from '../spotify-auth.ts';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -7,6 +7,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * 職責單一的 Spotify API 通訊客戶端 (SpotifyApiClient)
  */
 export class SpotifyApiClient {
+  stateService: any;
+  tokenProvider: any;
+  minIntervalMs: number;
+  sleep: (ms: number) => Promise<void>;
+  lastSpotifyRequestTime: number;
+  spotifyLock: Promise<void>;
+
   /**
    * @param {SystemStateService} stateService - 系統狀態服務
    * @param {object} options - 其他設定
@@ -16,7 +23,7 @@ export class SpotifyApiClient {
    *        即可把「等了多久」變成「有沒有呼叫、參數是多少」的確定性斷言，
    *        測試不再消耗真實時鐘（429 重試與限速測試從秒級降到毫秒級）
    */
-  constructor(stateService, options = {}) {
+  constructor(stateService: any, options: any = {}) {
     this.stateService = stateService;
     this.tokenProvider = options.tokenProvider || getSpotifyAccessToken;
     this.minIntervalMs = options.minIntervalMs !== undefined ? options.minIntervalMs : 1000;
@@ -81,13 +88,13 @@ export class SpotifyApiClient {
       const urlParams = new URLSearchParams();
       Object.entries(params).forEach(([key, val]) => {
         if (val !== null && val !== undefined) {
-          urlParams.append(key, val);
+          urlParams.append(key, val as string);
         }
       });
       url += `?${urlParams.toString()}`;
     }
 
-    const options = {
+    const options: any = {
       method: method,
       headers: {
         'Authorization': `Bearer ${token}`,

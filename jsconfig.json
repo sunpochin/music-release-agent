@@ -8,10 +8,12 @@
     "checkJs": false,
     "skipLibCheck": true,
     "noEmit": true,
-    "strict": false
+    "strict": false,
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src/**/*.js",
+    "src/**/*.ts",
     "server.js",
     "tests/**/*.js"
   ],

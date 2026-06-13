@@ -23,7 +23,7 @@ import { coreRoutes } from './routes/core.js';
 import { lyricsRoutes } from './routes/lyrics.js';
 import { socialRoutes } from './routes/social.js';
 import { shareRoutes } from './routes/share.js';
-import { authRoutes } from './routes/auth.js';
+import { authRoutes } from './routes/auth.ts';
 import { healthRoutes } from './routes/health.js';
 
 export function createApp() {

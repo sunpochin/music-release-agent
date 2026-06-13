@@ -2,7 +2,7 @@
  * Auth 路由 — Spotify OAuth 登入與 callback。
  */
 import { Router } from 'express';
-import { getSpotifyAuthUrl, handleSpotifyCallback, getSpotifyAccessToken, clearSpotifyTokens } from '../spotify-auth.js';
+import { getSpotifyAuthUrl, handleSpotifyCallback, getSpotifyAccessToken, clearSpotifyTokens } from '../spotify-auth.ts';
 
 export function authRoutes() {
   const router = Router();
