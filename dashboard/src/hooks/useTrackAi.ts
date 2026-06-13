@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { parseLrc } from '../utils/lrcParser'
 
 /**
  * 🤖 useTrackAi — 單曲 AI 歌詞翻譯與賞析的載入 hook
@@ -96,14 +97,14 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     try {
       // 並行抓取 LRCLIB 與自家的 API
       const lrclibPromise = !translate ? fetch(`https://lrclib.net/api/search?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(selectedAlbum.artistName || '')}`)
-        .then(res => res.json())
+        // 確保 API 狀態碼是 OK 才解析 JSON，否則回傳 null 避免壞檔
+        .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && data.length > 0 && data[0].syncedLyrics) {
-            import('../utils/lrcParser').then(({ parseLrc }) => {
-              if (selectedTrackRef.current?.id === trackIdAtStart) {
-                setLrcData(parseLrc(data[0].syncedLyrics));
-              }
-            });
+            // 直接使用靜態 import 的 parseLrc (效能更好且不會產生非同步競態)
+            if (selectedTrackRef.current?.id === trackIdAtStart) {
+              setLrcData(parseLrc(data[0].syncedLyrics));
+            }
           }
         }).catch(() => null) : Promise.resolve();
 

@@ -19,19 +19,26 @@ const KtvLyricsView: React.FC<KtvLyricsViewProps> = ({
   // Memoize translation map to avoid recreating it on every render
   const translationMap = React.useMemo(() => createTranslationMap(lyricsData || ''), [lyricsData]);
 
+  // 預先計算當前正在播放的那一句歌詞索引，避免在 map 迴圈內重複計算
+  const currentLineIdx = lrcData ? lrcData.findIndex((line: any, idx: number) => {
+    return playerControls?.position >= line.timeMs && 
+      (idx === lrcData.length - 1 || playerControls?.position < lrcData[idx + 1].timeMs);
+  }) : -1;
+
+  // 使用 useEffect 處理自動滾動的副作用 (Side Effect)，避免在 Render 階段直接操作 DOM 導致效能問題
+  useEffect(() => {
+    if (currentLineIdx !== -1 && lyricsContainerRef.current) {
+      const el = document.getElementById(`lrc-line-${currentLineIdx}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [currentLineIdx, lyricsContainerRef]);
+
   return (
     <div className="flex flex-col gap-6 py-32 transition-all duration-500">
       {lrcData.map((line: any, idx: number) => {
-        const isCurrent = playerControls?.position >= line.timeMs && 
-          (idx === lrcData.length - 1 || playerControls?.position < lrcData[idx + 1].timeMs);
-        
-        // 自動置中滾動
-        if (isCurrent && lyricsContainerRef.current) {
-          const el = document.getElementById(`lrc-line-${idx}`);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }
+        const isCurrent = idx === currentLineIdx;
         
         // 嘗試在 lyricsData 翻譯結果中尋找對應的翻譯
         const translatedText = getTranslation(line.timeMs, translationMap);

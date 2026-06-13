@@ -22,7 +22,8 @@ export function parseLrc(lrcString: string): LrcLine[] {
     if (match) {
       const minutes = parseInt(match[1], 10);
       const seconds = parseFloat(match[2]);
-      const text = line.replace(timeRegex, '').trim();
+      // 使用全域正則表達式清除可能存在的多個時間標籤 (例如 [01:20.00][02:30.00] lyrics)
+      const text = line.replace(/\[\d{2}:\d{2}(?:\.\d{2,3})?\]/g, '').trim();
       
       const timeMs = Math.floor((minutes * 60 + seconds) * 1000);
       
