@@ -82,5 +82,17 @@ export function useSpotifyApi() {
     if (!res.ok) throw new Error('Failed to add track to playlist');
   }, [fetchToken]);
 
-  return { fetchPlaylists, createPlaylist, addTrackToPlaylist };
+  const fetchTopTracks = useCallback(async (): Promise<any[]> => {
+    const token = await fetchToken();
+    if (!token) throw new Error('Not authenticated');
+
+    const res = await fetch('https://api.spotify.com/v1/me/top/tracks?limit=5&time_range=short_term', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to fetch top tracks');
+    const data = await res.json();
+    return data.items;
+  }, [fetchToken]);
+
+  return { fetchPlaylists, createPlaylist, addTrackToPlaylist, fetchTopTracks };
 }

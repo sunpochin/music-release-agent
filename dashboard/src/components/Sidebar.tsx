@@ -1,9 +1,10 @@
 import React from 'react'
 import { Music } from 'lucide-react'
 import SpotifyAuthButton from './SpotifyAuthButton'
+import TopTracksReview from './TopTracksReview'
 
 // 側邊欄元件：展示關注藝人的最新專輯列表，以及 Spotify 帳號登入/登出狀態
-const Sidebar = ({ albums, selectedAlbum, handleSelectAlbum }) => {
+const Sidebar = ({ albums, selectedAlbum, handleSelectAlbum }: any) => {
   return (
     <aside className={`w-full lg:w-80 bg-black/40 backdrop-blur-[40px] flex flex-col border-r border-white/5 z-10 ${selectedAlbum ? 'hidden lg:flex' : 'flex'}`}>
       <div className="p-6 flex flex-col gap-4 border-b border-white/5">
@@ -14,6 +15,7 @@ const Sidebar = ({ albums, selectedAlbum, handleSelectAlbum }) => {
           <h1 className="text-xl font-bold tracking-tight">Music Release</h1>
         </div>
         <SpotifyAuthButton />
+        <TopTracksReview />
       </div>
 
       
