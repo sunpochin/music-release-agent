@@ -234,9 +234,6 @@ const SongPanel = ({
       <div className="border-t border-white/10 pt-5 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles size={12} className="text-spotify-green" /> AI 歌曲智囊助手
-            </p>
             <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
               當前選中：<span className="text-white font-semibold">{selectedTrack ? selectedTrack.name : selectedAlbum.name}</span>
             </p>

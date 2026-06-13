@@ -95,18 +95,18 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     }
 
     try {
-      // 並行抓取 LRCLIB 與自家的 API
-      const lrclibPromise = !translate ? fetch(`https://lrclib.net/api/search?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(selectedAlbum.artistName || '')}`)
-        // 確保 API 狀態碼是 OK 才解析 JSON，否則回傳 null 避免壞檔
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data && data.length > 0 && data[0].syncedLyrics) {
-            // 直接使用靜態 import 的 parseLrc (效能更好且不會產生非同步競態)
-            if (selectedTrackRef.current?.id === trackIdAtStart) {
-              setLrcData(parseLrc(data[0].syncedLyrics));
+      // 非同步抓取 LRCLIB，不阻擋 API 請求，以便快速解除 loading 狀態
+      if (!translate) {
+        fetch(`https://lrclib.net/api/search?track_name=${encodeURIComponent(track.name)}&artist_name=${encodeURIComponent(selectedAlbum.artistName || '')}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data && data.length > 0 && data[0].syncedLyrics) {
+              if (selectedTrackRef.current?.id === trackIdAtStart) {
+                setLrcData(parseLrc(data[0].syncedLyrics));
+              }
             }
-          }
-        }).catch(() => null) : Promise.resolve();
+          }).catch(() => null);
+      }
 
       const apiPromise = fetch('/api/lyrics', {
         method: 'POST',
@@ -120,7 +120,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
         })
       });
 
-      const [res] = await Promise.all([apiPromise, lrclibPromise]);
+      const res = await apiPromise;
       
       // 502 = 歌詞翻譯 companion 不可達（核心服務的明確降級回應）
       // 顯示可行動的訊息而非通用錯誤 — 音樂庫等核心功能不受影響
@@ -139,6 +139,9 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
         setLyricsForTrackId(trackIdAtStart)
         setIsTranslated(Boolean(result?.translated))
         setLyricsSource(result?.source)
+        if (result?.lrc) {
+          setLrcData(parseLrc(result.lrc))
+        }
       }
     } catch {
       if (selectedTrackRef.current?.id === trackIdAtStart) {

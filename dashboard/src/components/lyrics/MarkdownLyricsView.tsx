@@ -65,8 +65,8 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
 
         // 高亮對應的整行翻譯段落
         if (parent) {
-          parent.classList.remove('text-gray-300', 'opacity-30')
-          parent.classList.add('text-white', 'font-medium', 'scale-[1.01]', 'transition-all', 'duration-300')
+          parent.classList.remove('text-gray-300', 'opacity-30', 'text-white/40', 'blur-[0.5px]', 'scale-[0.98]', 'origin-left')
+          parent.classList.add('text-white', 'font-bold', 'scale-[1.05]', 'transition-all', 'duration-500', 'ease-out', 'origin-left', 'drop-shadow-lg', 'blur-none')
         }
       } else {
         // 還原時間徽章樣式
@@ -75,8 +75,8 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
 
         // 暗化非當前播放的段落，使焦點集中在目前歌詞上
         if (parent) {
-          parent.classList.remove('text-white', 'font-medium', 'scale-[1.01]')
-          parent.classList.add('text-gray-300', 'opacity-30', 'transition-all', 'duration-300')
+          parent.classList.remove('text-white', 'font-medium', 'font-bold', 'scale-[1.01]', 'scale-[1.05]', 'drop-shadow-lg', 'blur-none')
+          parent.classList.add('text-white/40', 'blur-[0.5px]', 'scale-[0.98]', 'transition-all', 'duration-500', 'ease-out', 'origin-left')
         }
       }
     })
@@ -95,19 +95,33 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
     }
   }, [playerControls?.position, lyricsData])
 
-  // 處理點擊時間標籤事件
+  // 處理點擊時間標籤或整行段落事件
   const handleLyricsClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    const timeMsStr = target.getAttribute('data-time-ms');
-    if (timeMsStr && playerControls) {
-      const timeMs = parseInt(timeMsStr, 10);
-      if (!isNaN(timeMs)) {
-        if (!playerControls.currentTrack && songUri && playerControls.playUri) {
-          // 如果尚未載入歌曲，就發送播放請求並指定時間
-          playerControls.playUri(songUri, timeMs);
-        } else if (playerControls.seek) {
-          // 如果已經載入歌曲，直接 seek
-          playerControls.seek(timeMs);
+    
+    // 找出點擊的徽章，或者點擊段落內的徽章
+    let badgeEl: HTMLElement | null = null;
+    if (target.hasAttribute('data-time-ms')) {
+      badgeEl = target;
+    } else {
+      const parent = target.closest('p, div');
+      if (parent) {
+        badgeEl = parent.querySelector('[data-time-ms]');
+      }
+    }
+
+    if (badgeEl && playerControls) {
+      const timeMsStr = badgeEl.getAttribute('data-time-ms');
+      if (timeMsStr) {
+        const timeMs = parseInt(timeMsStr, 10);
+        if (!isNaN(timeMs)) {
+          if (!playerControls.currentTrack && songUri && playerControls.playUri) {
+            // 如果尚未載入歌曲，就發送播放請求並指定時間
+            playerControls.playUri(songUri, timeMs);
+          } else if (playerControls.seek) {
+            // 如果已經載入歌曲，直接 seek
+            playerControls.seek(timeMs);
+          }
         }
       }
     }
@@ -117,7 +131,7 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
     <>
       <div 
         ref={containerRef}
-        className={shouldAnimateLyrics ? 'ai-stagger' : ''} 
+        className={`${shouldAnimateLyrics ? 'ai-stagger' : ''} [&_p]:cursor-pointer [&_p]:hover:bg-white/5 [&_p]:transition-colors [&_p]:rounded-lg [&_p]:p-1 [&_p]:-ml-1`} 
         dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData || '') }} 
         onClick={handleLyricsClick}
       />
