@@ -177,3 +177,19 @@ const effectiveLoading = rawLoading || isStale
 **Why it works**：`isStale` 在 render 階段就能算出 true（因為 `selectedTrack` 已是新值，但 `lyricsForTrackId` 還是舊值），第一幀直接顯示 spinner，不需要等 effect。
 
 **通用模式**：任何「切換選取對象時要立刻清空 async 資料」的場景都適用。用 `dataForId` state 追蹤資料歸屬，render 時比對派生 `isStale`，而非靠 effect 清資料。
+
+## ⚠️ React State 反模式：非渲染狀態引發的二次動畫重播（經典 Bug）
+
+**症狀**：點擊無歌詞歌曲（如 Apocalipsis）載入完成後，歌詞區域的淡入動畫（`ai-stagger`）會在載入完幾百毫秒後又重新播一次，看起來像「重畫了兩次」。
+
+**根本原因**：
+1. 前端包含一個背景非同步工作（在 `App.jsx` 中的 `generateShareFile`），它會在歌詞載入後 600ms 自動在背景用 canvas 產生分享卡片圖檔。
+2. 舊架構將這個產生的圖片物件儲存在 state `const [shareFile, setShareFile] = useState(null)` 中。但這個 `shareFile` 在 JSX 畫面中根本沒有被渲染，它只在點擊分享按鈕時被讀取。
+3. 每當背景圖片生成完畢並呼叫 `setShareFile(file)` 時，就會引發全域元件的 Re-render。這場重畫發生在動畫鎖定時間（1.5 秒）結束之前，導致淡入動畫（`ai-stagger`）被意外重新觸發播放。
+
+**最佳實踐修正**：
+* 將無涉渲染的背景狀態移出 `useState`，改以 `useRef` 持久化儲存：
+  ```js
+  const shareFileRef = useRef(null)
+  ```
+* 由於 `useRef` 的變更不會觸發元件重新渲染，因此在背景圖片生成完畢後，UI 依然保持極致的靜態與流暢，徹底解決了動畫二次播放的視覺問題。
