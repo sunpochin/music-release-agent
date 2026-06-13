@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { useSpotifyApi } from '../hooks/useSpotifyApi';
-import { parseMarkdownToHtml } from '../utils/markdown.js';
+import { parseMarkdownToHtml } from '../utils/markdown';
 
 export default function TopTracksReview() {
   const [loading, setLoading] = useState(false);
