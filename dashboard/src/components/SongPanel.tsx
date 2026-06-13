@@ -111,6 +111,7 @@ const SongPanel = ({
   // 自動降級邏輯：如果要求翻譯，卻沒抓出任何雙語對照，則自動強制切換為 Markdown 模式
   // 使用 autoFallbackRef 確保每首歌只會自動降級一次，允許使用者事後手動切換回 KTV 模式（即便沒翻譯）
   useEffect(() => {
+    // 只有在「已經經過翻譯」且「沒有抓出任何雙語對照」時，才自動降級為 Markdown 模式
     if (isTranslated && lrcData && !hasTranslationsInMap && viewMode === 'ktv' && !autoFallbackRef.current) {
       setViewMode('markdown')
       autoFallbackRef.current = true
@@ -179,8 +180,8 @@ const SongPanel = ({
             <div className="not-prose mb-3 sticky top-0 bg-black/20 backdrop-blur-md z-10 p-2 rounded-lg flex items-center justify-between">
               <LyricsSourceBadge source={lrcData ? 'LRCLIB (動態同步)' : lyricsSource} />
               
-              {/* Toggle switch only visible if we have BOTH lrcData and it has been translated */}
-              {lrcData && isTranslated && (
+              {/* Toggle switch visible if we have lrcData (even before translation) */}
+              {lrcData && (
                 <div className="flex bg-white/5 border border-white/10 rounded-xl p-1">
                   <button 
                     onClick={() => setViewMode('ktv')}
