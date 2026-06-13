@@ -239,6 +239,21 @@ const SongPanel = ({
         </div>
 
 
+        {/* 發文結果通知 */}
+        {publishResult && (
+          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium ${
+            publishResult.success
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+          }`}>
+            {publishResult.success ? (
+              <><CheckCircle size={14} /> 發文已排程成功！JobId: {publishResult.jobId}</>
+            ) : (
+              <><XCircle size={14} /> 發文失敗: {publishResult.error}</>
+            )}
+          </div>
+        )}
+
         {/* 操作按鈕群組（垂直堆疊讓手機也寬敞） */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <CopyLinkButton />
@@ -252,6 +267,14 @@ const SongPanel = ({
             匯出 IG 限動卡
           </button>
 
+          <button
+            onClick={handlePublishToSocial}
+            disabled={isPublishing || rawLoading}
+            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-400 hover:to-purple-500 hover:scale-105 transition-all px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg w-full sm:w-auto"
+          >
+            {isPublishing ? <AlertCircle size={16} className="animate-spin" /> : <Send size={16} />}
+            {isPublishing ? '發文中...' : '發佈到社群'}
+          </button>
         </div>
 
         {/* 「返回專輯資訊」按鈕（手機桌機皆顯示，讓使用者從歌曲頁回到 AlbumPanel） */}

@@ -19,17 +19,15 @@ module.exports = {
     {
       // 前端 Vite Dashboard 介面
       name: 'music-release-agent-dashboard',
-      script: '/Users/pac/.nvm/versions/node/v22.18.0/bin/npm',
+      script: 'npm',
       args: 'run dev',
       cwd: './dashboard',
-      interpreter: 'none',
       exec_mode: 'fork',
       watch: false,
       error_file: '../logs/dashboard-err.log',
       out_file: '../logs/dashboard-out.log',
       env: {
-        NODE_ENV: 'development',
-        PATH: '/Users/pac/.nvm/versions/node/v22.18.0/bin:' + process.env.PATH
+        NODE_ENV: 'development'
       }
     },
     {
