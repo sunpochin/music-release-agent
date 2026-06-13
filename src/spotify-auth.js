@@ -28,7 +28,10 @@ const SPOTIFY_SCOPES = [
   'user-modify-playback-state',
   'user-read-playback-state',
   'user-read-currently-playing',
-  'user-follow-read'
+  'user-follow-read',
+  'streaming',           // Web Playback SDK 串流播放必須
+  'user-read-email',     // SDK 初始化時需要讀取用戶基本資訊
+  'user-read-private'    // SDK 需確認用戶是否為 Premium 帳號
 ].join(' ');
 
 /**

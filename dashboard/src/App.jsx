@@ -212,11 +212,10 @@ function App() {
         )}
       </main>
 
-      {/* Floating Spotify Player (Renders if an album or track is selected) */}
+      {/* 懸浮式 Spotify Web Playback SDK 播放器：自動跟隨選取的歌曲或專輯切換 */}
       {(selectedTrack || selectedAlbum) && (
         <SpotifyPlayer 
-          id={selectedTrack ? selectedTrack.id : selectedAlbum.id} 
-          type={selectedTrack ? 'track' : 'album'} 
+          uri={selectedTrack ? `spotify:track:${selectedTrack.id}` : `spotify:album:${selectedAlbum?.id}`}
         />
       )}
     </div>
