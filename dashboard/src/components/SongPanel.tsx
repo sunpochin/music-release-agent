@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Sparkles, Download, AlertCircle, Send, CheckCircle, XCircle, Link2, Check, ChevronLeft, MoreHorizontal, Trash2, RefreshCw, Upload } from 'lucide-react'
+import { Sparkles, Download, AlertCircle, Link2, Check, ChevronLeft, MoreHorizontal, Trash2, RefreshCw, Upload } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import ShareCard from './ShareCard'
 // 安全的輕量 Markdown 轉譯器：抽成純模組（dashboard/src/utils/markdown.js），
 // 由根目錄 tests/markdown-renderer.test.js 做 XSS 防護與格式轉譯的確定性單元測試。
 import { parseMarkdownToHtml } from '../utils/markdown.js'
+import { createTranslationMap, getTranslation } from '../utils/translationMatcher'
 
 import LyricsSourceBadge from './LyricsSourceBadge'
 import AddToPlaylistButton from './AddToPlaylistButton'
@@ -72,15 +73,12 @@ const SongPanel = ({
 
   // 1. 社群分享與發佈之本機狀態 (SOLID: 狀態局部化)
   const [isExporting, setIsExporting] = useState(false)
-  const [isPublishing, setIsPublishing] = useState(false)
-  const [publishResult, setPublishResult] = useState(null)
   
   const shareCardRef = useRef(null)
   const shareFileRef = useRef(null)
 
-  // 切換歌曲時重設發佈狀態
+  // 切換歌曲時重設狀態（原本發佈狀態也在此重設）
   useEffect(() => {
-    setPublishResult(null)
   }, [selectedTrack])
 
   // 背景非同步預產生分享圖檔，提升 Web Share API 響應速度
@@ -198,49 +196,6 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
     }
   }
 
-  // 發佈至社群平台之邏輯
-  const handlePublishToSocial = async () => {
-    if (!selectedAlbum || isPublishing) return
-    setIsPublishing(true)
-    setPublishResult(null)
-
-    try {
-      let imageBase64 = null
-      if (shareCardRef.current) {
-        const canvas = await html2canvas(shareCardRef.current, {
-          scale: 2,
-          backgroundColor: '#121212',
-          useCORS: true
-        })
-        imageBase64 = canvas.toDataURL('image/png')
-      }
-
-      const caption = albumReview?.summary
-        || albumReview?.introduction
-        || `🎵 新專輯推薦！來自 ${selectedAlbum.artistName || '未知藝人'} 的《${selectedAlbum.name}》\n\n#MusicRelease #NewMusic`
-
-      const res = await fetch('/api/social/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          caption,
-          platforms: ['threads', 'facebook'],
-          imageBase64
-        })
-      })
-
-      const result = await res.json()
-      if (res.ok) {
-        setPublishResult({ success: true, jobId: result.jobId })
-      } else {
-        setPublishResult({ success: false, error: result.error })
-      }
-    } catch (err) {
-      setPublishResult({ success: false, error: err.message })
-    } finally {
-      setIsPublishing(false)
-    }
-  }
 
   // 點選外部區域自動關閉懸浮選單
   useEffect(() => {
@@ -377,31 +332,44 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
             {/* 動態 KTV 歌詞模式 */}
             {lrcData ? (
               <div className="flex flex-col gap-6 py-32 transition-all duration-500">
-                {lrcData.map((line: any, idx: number) => {
-                  const isCurrent = playerControls?.position >= line.timeMs && 
-                    (idx === lrcData.length - 1 || playerControls?.position < lrcData[idx + 1].timeMs);
-                  
-                  // 自動置中滾動
-                  if (isCurrent && lyricsContainerRef.current) {
-                    const el = document.getElementById(`lrc-line-${idx}`);
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                {(() => {
+                  const translationMap = createTranslationMap(lyricsData);
+                  return lrcData.map((line: any, idx: number) => {
+                    const isCurrent = playerControls?.position >= line.timeMs && 
+                      (idx === lrcData.length - 1 || playerControls?.position < lrcData[idx + 1].timeMs);
+                    
+                    // 自動置中滾動
+                    if (isCurrent && lyricsContainerRef.current) {
+                      const el = document.getElementById(`lrc-line-${idx}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
                     }
-                  }
+                    
+                    // 嘗試在 lyricsData 翻譯結果中尋找對應的翻譯
+                    const translatedText = getTranslation(line.text, translationMap);
 
                   return (
-                    <p 
+                    <div 
                       key={idx} 
                       id={`lrc-line-${idx}`}
                       onClick={() => {
                         if (playerControls?.seek) playerControls.seek(line.timeMs);
                       }}
-                      className={`m-0 cursor-pointer transition-all duration-500 ${isCurrent ? 'text-white text-2xl font-bold shadow-white drop-shadow-lg scale-105' : 'text-white/30 blur-[0.5px] hover:text-white/60 hover:blur-none'}`}
+                      className={`cursor-pointer transition-all duration-500 flex flex-col items-center justify-center text-center ${isCurrent ? 'scale-105' : 'blur-[0.5px] hover:blur-none'}`}
                     >
-                      {line.text || '...'}
-                    </p>
+                      <p className={`m-0 ${isCurrent ? 'text-white text-2xl font-bold shadow-white drop-shadow-lg' : 'text-white/30 hover:text-white/60'}`}>
+                        {line.text || '...'}
+                      </p>
+                      {translatedText && (
+                        <p className={`m-0 mt-1 ${isCurrent ? 'text-spotify-green text-lg font-medium' : 'text-spotify-green/30 hover:text-spotify-green/60'}`}>
+                          {translatedText}
+                        </p>
+                      )}
+                    </div>
                   );
-                })}
+                  });
+                })()}
               </div>
             ) : (
               /* 純文字/Markdown 降級模式 */
@@ -445,20 +413,7 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
         </div>
 
 
-        {/* 發文結果通知 */}
-        {publishResult && (
-          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium ${
-            publishResult.success
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}>
-            {publishResult.success ? (
-              <><CheckCircle size={14} /> 發文已排程成功！JobId: {publishResult.jobId}</>
-            ) : (
-              <><XCircle size={14} /> 發文失敗: {publishResult.error}</>
-            )}
-          </div>
-        )}
+
 
         {/* 操作按鈕群組（垂直堆疊讓手機也寬敞） */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-2">
@@ -473,14 +428,7 @@ ${lyricsData ? lyricsData.replace(/[#*_\-`]/g, '').trim() : (albumReview?.summar
             匯出 IG 限動卡
           </button>
 
-          {/* <button
-            onClick={handlePublishToSocial}
-            disabled={isPublishing || rawLoading}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-400 hover:to-purple-500 hover:scale-105 transition-all px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg w-full sm:w-auto"
-          >
-            {isPublishing ? <AlertCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            {isPublishing ? '發文中...' : '發佈到社群'}
-          </button> */}
+
         </div>
 
         {/* 「返回專輯資訊」按鈕（手機桌機皆顯示，讓使用者從歌曲頁回到 AlbumPanel） */}

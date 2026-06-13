@@ -1,21 +1,21 @@
 import React, { useEffect } from 'react'
 import { Play, Pause, AlertCircle, Music } from 'lucide-react'
-import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer'
 
 interface SpotifyPlayerProps {
   /** 要播放的 Spotify URI (e.g. 'spotify:track:xxx' 或 'spotify:album:xxx') */
   uri?: string
+  playerControls: any
 }
 
 /**
  * SpotifyPlayer — 懸浮式 Spotify Web Playback SDK 播放器元件
  *
- * 使用 useSpotifyPlayer hook 管理 SDK 生命週期，
+ * 接受 playerControls 作為 prop，不自己呼叫 hook，避免多重初始化。
  * 當 uri prop 改變時自動切換播放目標。
  * 降級處理：非 Premium 帳號顯示引導訊息而非崩潰。
  */
-const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri }) => {
-  const { isReady, isPlaying, currentTrack, position, duration, error, playUri, togglePlay } = useSpotifyPlayer()
+const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri, playerControls }) => {
+  const { isReady, isPlaying, currentTrack, position, duration, error, playUri, togglePlay } = playerControls
 
   // 當 uri 或播放器就緒狀態改變時，自動播放新的曲目
   useEffect(() => {
