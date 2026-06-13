@@ -28,11 +28,15 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
   }, [selectedTrack])
 
   // 🪄 選歌即自動載入歌詞（產品決策）：
-  // 合併「擦黑板」與「自動載入」邏輯到同一個 useEffect，消除中間的閃現
+  // 【小朋友解釋法】：
+  // 當使用者點進一首新歌時，我們：
+  // 1. 先把「舊的翻譯狀態」清掉（避免新歌顯示舊歌的「已翻譯」標籤）
+  // 2. 延遲 400ms 再開始載入（避免「邊點邊搜尋」時發太多請求）
+  // 3. 由 fetchLyricsFor 統一負責清空歌詞、設置 loading 狀態
+  // 這樣就只有一次 UI 閃現（清空 → loading 圈圈 → 新歌詞），不會閃兩次
   const autoFetchedRef = useRef(null)
   useEffect(() => {
-    // 擦黑板：清空舊數據（防止兩個 useEffect 導致的閃兩次）
-    setLyricsData('')
+    // 只清除「翻譯狀態」，不清除歌詞內容（交給 fetchLyricsFor 處理）
     setIsTranslated(false)
     setIsTranslating(false)
     setLyricsSource(undefined)
@@ -44,9 +48,9 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
 
     if (autoFetchedRef.current === selectedTrack.id) return
 
-    setRawLoading(true)
     const timer = setTimeout(() => {
       autoFetchedRef.current = selectedTrack.id
+      // fetchLyricsFor 會負責設置 rawLoading=true 和清空歌詞
       fetchLyricsFor(selectedTrack, { translate: false })
     }, 400)
     return () => clearTimeout(timer)
