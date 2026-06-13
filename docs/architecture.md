@@ -1,200 +1,132 @@
-# 系統架構（Architecture）
+# 系統架構（System Architecture & Port Mapping）
 
-本文件說明 `music-release-agent` 的資料流、服務邊界、跨服務交接格式（handoff format）與失敗模式。目標讀者是想在 15 分鐘內理解「資料怎麼流、邊界在哪、壞掉時會發生什麼事」的評估者。
+本文件說明 `music-release-agent` 的系統架構、服務邊界、開發環境雙埠（5173/3011）反向代理機制與 HMR 運作原理。
 
 ---
 
-## 1. 系統總覽
+## 1. 系統總覽與模組劃分
 
-本專案由一個核心服務、兩個 companion services 與一個前端組成：
+本專案由一個前端、一個後端核心服務與兩個 Companion 服務組成，架構圖如下：
 
 ```mermaid
-graph LR
-    Dashboard[React Dashboard :5173] -->|REST| Core[music-release-agent :3011]
-    Core -->|代理轉發 POST /api/posts| Social[social-post-service :3012]
-    Core -->|代理轉發 POST /api/lyrics| Lyrics[lyrics-vault-service :3013]
+graph TD
+    %% 定義風格
+    classDef client fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef cf fill:#2f74ff,stroke:#111,stroke-width:1px,color:#fff;
+    classDef backend fill:#1db954,stroke:#111,stroke-width:2px,color:#fff;
+    classDef companion fill:#3ca0f0,stroke:#111,stroke-width:1.5px,color:#fff;
+    classDef frontend fill:#ff9f43,stroke:#111,stroke-width:1px,color:#fff;
+
+    User([瀏覽器/爬蟲]) -->|1. 請求網頁或 API| CF[Cloudflare Tunnel / 本地入口 Port 3011]
+    CF --> Server[music-release-agent 核心服務 :3011]
+
+    subgraph PM2 守護與開發進程
+        Server
+        Vite[Vite 開發伺服器 :5173]
+    end
+
+    Server -->|2. 代理轉發 /api/posts| Social[social-post-service :3012]
+    Server -->|3. 代理轉發 /api/lyrics| Lyrics[lyrics-vault-service :3013]
     Lyrics -->|落盤 Markdown| Vault[(Obsidian vault)]
-    Core -->|讀寫| Data[(data/ 快取與狀態檔)]
+
+    Server -->|讀寫| Data[(data/ 快取與狀態檔)]
     Scanner[掃描管線 scan-releases.js] -->|外部 API| Spotify[Spotify API]
     Scanner -->|降級| MB[MusicBrainz API]
     Scanner -->|AI 生成| Gemini[Gemini API]
     Scanner -->|Git push| GitBook[GitBook repo]
+
+    %% 判斷路由與環境
+    Server -->|開發環境非 API 靜態資源| Proxy[http-proxy-middleware]
+    Proxy -->|反向代理| Vite
+    Vite -.->|WebSocket HMR| User
+
+    %% 套用風格
+    class User client;
+    class CF cf;
+    class Server backend;
+    class Social,Lyrics companion;
+    class Vite,Proxy frontend;
 ```
 
-職責劃分遵循單一職責原則：
+各模組的職責劃分遵循單一職責原則（Single Responsibility Principle）：
 
 | 元件 | 職責 | 不負責 |
 |---|---|---|
-| `music-release-agent`（核心服務） | 音樂庫 API、掃描管線、AI 樂評、GitBook 輸出、companion「代理」 | 實際對社群平台發文、歌詞翻譯與落盤 |
-| `social-post-service`（companion） | 接收發文任務、入隊、依策略（Mock / Ayrshare）非同步發佈 | 音樂資料與內容生成 |
-| `lyrics-vault-service`（companion） | 歌詞取得（LRCLIB）、LLM 翻譯（Gemini/Ollama）、Obsidian 相容 Markdown 落盤 | 音樂庫與發佈流程 |
-| `dashboard`（React + Vite） | 瀏覽、歌詞翻譯展示、觸發發佈 | 任何商業邏輯與狀態持久化 |
-
-兩個 companion 走同一套模式：核心只持有 thin client（`src/services/social-client.js`、`src/services/lyrics-client.js`）+ handoff contract（`contracts/*.schema.json`）+ 降級行為；companion 不可達時對應 API 回 502、`/readyz` 標 degraded、核心不崩。
+| `music-release-agent`（核心服務） | 專輯元資料處理、掃描管線控制、AI 樂評、GitBook 輸出、對 Companion 服務的反向代理 | 實際對社群平台發佈貼文、歌詞翻譯與落盤 |
+| `social-post-service`（Companion） | 接收社群發文任務、入隊、依策略（Mock / Ayrshare）非同步發佈至 Threads/X | 音樂庫資料處理、內容生成 |
+| `lyrics-vault-service`（Companion） | 抓取 LRC 動態歌詞（LRCLIB）、呼叫 LLM 翻譯（Gemini/Ollama）、Obsidian 相容 Markdown 落盤 | 音樂發佈流程與元資料快取 |
+| `dashboard`（React + Vite） | 專輯/單曲瀏覽介面、動態/全文歌詞播放同步、發文動作觸發 | 核心業務邏輯與狀態持久化 |
 
 ---
 
-## 2. 資料流（Data Flow）
+## 2. 開發環境與雙埠機制（為什麼分成 3011 與 5173 ？）
 
-### 2.1 掃描 → 樂評 → 發佈管線
+在本地開發此專案時，會同時運行前端（Vite, Port 5173）與後端（Express, Port 3011）兩個伺服器。以下為前後端分離下的技術原理解析：
 
-真實模式（`npm run scan`）與離線模式（`npm run scan:dry`）走同一條邏輯管線，差別只在資料來源與副作用：
+### 2.1 統一入口點（Single Point of Entry）與反向代理
+在生產環境中，我們只需要將域名直接對準後端 **Port 3011**，這是因為 Express 會直接透過靜態資源目錄分發經過 `vite build` 壓縮的前端檔案。
+但在本地開發環境 (`NODE_ENV=development`)，我們需要快速的熱更新 (HMR)，所以：
+1. Express 核心服務會啟用 `http-proxy-middleware`，將所有非 API 與非爬蟲的靜態檔案與熱更新請求反向代理至 **Port 5173 (Vite Dev Server)**。
+2. 此時 Vite 的 WebSocket (`ws: true`) 會穿透後端代理直接與瀏覽器相連，達成代碼即時修改、即時更新。
+3. 這樣既解決了瀏覽器**同源政策 (Same-Origin Policy)** 導致的 CORS 跨域阻擋問題，也保留了靈活的開發體驗。
 
-```
-[資料來源] → [掃描] → [樂評生成] → [寫入 GitBook 結構] → [SUMMARY.md 更新] → [Git push]
-
-真實模式:  Spotify API     Gemini API      GITBOOK_PATH          真實 commit/push
-離線模式:  mock-releases.json  確定性模板    data/mock-gitbook/    模擬輸出（log only）
-```
-
-離線模式的關鍵檔案：
-
-- 輸入 fixture：`data/mock-releases.json`（schema 見下節）
-- 共用核心：`src/dry-run/pipeline-core.js` — slug 規則、樂評模板、schema 驗證的單一事實來源，被 `scan-releases-dry.js`、`scripts/demo-verify.js` 與 golden tests 三方共用，避免規則漂移
-- 產物：`data/mock-gitbook/new-releases/<slug>.md` + `SUMMARY.md`
-
-### 2.2 release 資料格式（管線輸入 schema）
-
-`data/mock-releases.json` 中每筆 release 必須通過 `validateReleases()`：
-
-```json
-{
-  "id": "Spotify ID（非空字串，slug 退化時的檔名後備）",
-  "name": "發行名稱（非空字串）",
-  "primary_artist": "主要藝人（非空字串）",
-  "type": "album 或 single",
-  "total_tracks": "正整數",
-  "release_date": "YYYY-MM-DD",
-  "url": "http(s) 連結",
-  "image": "封面圖 URL",
-  "artist_genres": "字串陣列（可為空，空時樂評使用後備流派文字）"
-}
-```
-
-違反 schema 的資料會讓管線以非零 exit code 失敗，錯誤訊息包含「第幾筆、哪個欄位、規則是什麼」。
-
-### 2.3 檔名 slug 規則
-
-`releaseSlug(release)` = `generateSlug("{artist}-{name}")`，規則：轉小寫、空白轉連字號、移除非 `\w`/連字號/中日韓字元、合併連續連字號。邊界情況：名稱全為符號時 slug 會退化（如 `"!!!-???"` → `"-"`），此時退回使用 `release.id`，避免產生 `-.md` 這類無效檔名。此行為由 golden tests 鎖定。
+### 2.2 👶 小朋友解說法：餐廳與廚房的故事
+> 想像一下，你開了一間**超酷的音樂餐廳**：
+>
+> 1. **服務生與精美菜單 (Port 5173 - React 前端)**
+>    * **它是誰**：在餐廳門口迎賓、拿著漂亮菜單、親切為顧客服務的**服務生**。
+>    * **工作內容**：負責把專輯封面排得很漂亮、做出亮麗的按鈕，當你點擊按鈕時，服務生會在本子上紀錄「客人想要匯出圖卡」。
+>    * **為什麼是 5173**：這是服務生站的**迎賓櫃檯位置**。如果大家都擠在廚房點餐，餐廳就亂套了！
+>
+> 2. **躲在後面的大廚與食材庫 (Port 3011 - Express 後端)**
+>    * **它是誰**：躲在餐廳後方，負責拿食材、生火、用魔法烤箱 (Gemini AI) 煮出美味料理的**主廚**。
+>    * **工作內容**：客人點了「歌詞翻譯」時，主廚立刻去冰箱拿出 Spotify 資料，再用 Gemini 魔法烤箱把雙語翻譯煮出來交給服務生。
+>    * **為什麼是 3011**：這是廚房的**烹飪工作台位置**。主廚需要安靜且安全的空間來放金鑰 (GEMINI_API_KEY)，不能隨便讓客人跑進來看。
+>
+> 3. **他們怎麼合作？**
+>    當你在菜單 (5173) 上點了「尋找歌詞」時，服務生會立刻小跑步到廚房工作台 (3011) 說：「主廚！請幫我煮一份 Maroon 5 的歌詞翻譯！」主廚煮好後交給服務生，服務生再端到桌上呈現在你面前。
 
 ---
 
-## 3. 服務邊界與交接格式（Handoff Format）
+## 3. 服務邊界與交接格式（Handoff Contract）
 
-### 3.1 核心服務 → 發文服務
+核心服務 `music-release-agent` 不直接持有社群發佈和歌詞翻譯的實作邏輯，而是分別向兩個 Companion 服務發送代理請求，此通訊嚴格遵循交接合約 (Handoff Schema)。
 
-Dashboard 不直接呼叫 `social-post-service`；一律經由核心服務代理。這讓前端只需要一個 origin，也讓核心服務統一處理逾時、錯誤轉譯與 request id 傳遞（`x-request-id` correlation header）。
+### 3.1 核心服務 ➔ 社群發文服務
+*   **路由節點**：Dashboard ➔ `POST /api/social/publish` (核心) ➔ `POST /api/posts` (Companion, Port 3012)
+*   **交接 JSON 格式**：
+    ```json
+    {
+      "image": "<Base64 或 null>",
+      "caption": "貼文內容文案（必填）",
+      "platforms": ["threads"]
+    }
+    ```
+*   **處理結果**：交接成功返回 HTTP `202 Accepted`，並附帶 `id` 以便非同步狀態輪詢。
 
-**發文請求**（Dashboard → 核心 `POST /api/social/publish` → companion `POST /api/posts`）：
-
-```json
-{
-  "image": "<base64 或 null>",
-  "caption": "發文文案（必填，缺少時核心服務直接回 400，不轉發）",
-  "platforms": ["threads"]
-}
-```
-
-**接受回應**（companion → 核心 → Dashboard，HTTP 202）：
-
-```json
-{ "jobId": "<uuid>", "status": "queued" }
-```
-
-**狀態輪詢**（`GET /api/social/status/:jobId` → companion `GET /api/posts/:jobId`）：
-
-```json
-{
-  "jobId": "<uuid>",
-  "status": "queued | completed | failed",
-  "results": [
-    { "platform": "threads", "success": true, "postedAt": "<ISO 8601>" }
-  ]
-}
-```
-
-**契約的單一事實來源是 [`contracts/social-handoff.schema.json`](../contracts/social-handoff.schema.json)**（JSON Schema draft-07），由四方共同消費：
-
-1. 核心服務 proxy（`server.js`）— 轉發前以 `publishRequest` definition 驗證請求體，違約直接 400 不轉發
-2. 內建 mock（`tests/fixtures/mock-social-service.js`）— 以同一 schema 驗證請求，並對自己的每個回應做契約自我檢查（違約回 500，fail-loud）
-3. `scripts/demo-verify-social-handoff.js` — 對「真實或 mock」companion 的活回應做 schema 驗證 — 這就是「mock 與真實服務悄悄漂移」的偵測點
-4. 契約測試（`tests/contract/social-handoff.test.js`）— schema 對合法/非法樣本的判定，加上把 mock 真的跑起來驗證活回應全部符合契約
-
-驗證器是零依賴的 JSON Schema 子集實作（`src/services/contract-validator.js`），姊妹 repo 可改用 ajv 消費同一份 schema 檔。
-
-可執行證明：
-
-1. `npm run demo:verify:social` — 若姊妹 repo `../social-post-service` 存在則用真實服務；不存在時自動退回內建 mock，所以本 repo 單獨 clone 也能驗證 handoff；兩種模式的回應都過同一份 schema
-2. `npm run demo:verify:social:down` — 驗證 companion 不可達時的降級行為
-3. `npx vitest run tests/contract` — 契約 schema 與 mock 實作的離線確定性驗證
-
-### 3.2 核心服務 → 歌詞服務
-
-歌詞翻譯與 Obsidian vault 落盤由 `lyrics-vault-service` 負責；核心同樣只做代理（`POST/DELETE /api/lyrics` → companion 同路徑）。
-
-**歌詞請求**（Dashboard → 核心 `POST /api/lyrics` → companion）：
-
-```json
-{ "artistName": "string", "trackName": "string", "trackId": "string|null", "translate": true, "refresh": false }
-```
-
-**回應**：
-
-```json
-{ "text": "string", "cached": false, "provider": "gemini|ollama|raw", "source": "lrclib|spotify|llm-recall|...", "translated": true }
-```
-
-契約單一事實來源在 `lyrics-vault-service/contracts/lyrics-handoff.schema.json`；本 repo 持有副本供內建 mock（`tests/fixtures/mock-lyrics-service.js`）與 `demo:verify:lyrics` 離線使用，`tests/contract/lyrics-handoff-drift.test.js` 比對兩檔內容一致。`source` 欄位是誠實標示機制：`lrclib` 為可驗證真實歌詞、`llm-recall` 為模型記憶（幻覺風險）、`*-untranslated` 為翻譯降級。
-
-### 3.3 掃描器 → 外部資料源（策略邊界）
-
-`src/strategies/` 實作 discovery strategy 介面，掃描器只依賴抽象：
-
-- `spotify-strategy.js` — 主要渠道
-- `musicbrainz-strategy.js` — 降級渠道，輸出動態轉換為 Spotify 相容 schema
-
-### 3.4 後端 → 前端（內容信任邊界）
-
-AI 生成的歌詞與分析以 Markdown 字串交付前端。前端視其為**不可信輸入**：`dashboard/src/utils/markdown.js` 先對整行做 HTML 轉義，再做格式解析，輸出僅含白名單標籤（h2/h3/hr/div/span/p/strong/br）。此邊界有兩層證明：單元層（`tests/markdown-renderer.test.js`，轉譯器輸出字串性質）與瀏覽器層（`tests/e2e/dashboard.spec.js` 的 XSS 測試 — 把含 `<script>`、`onerror`、`onload` 注入的 payload 餵進歌詞 API，驗證注入旗標未執行、內容以純文字呈現、DOM 無危險元素、無 dialog）。
+### 3.2 核心服務 ➔ 歌詞與 Obsidian 快取服務
+*   **路由節點**：Dashboard ➔ `POST /api/lyrics` (核心) ➔ `POST /api/translate` (Companion, Port 3013)
+*   **交接 JSON 格式**：
+    ```json
+    {
+      "artistName": "主要藝人名稱",
+      "trackName": "歌曲名稱",
+      "albumName": "專輯名稱（可選）",
+      "forceRefresh": false
+    }
+    ```
+*   **處理結果**：返回 HTTP `200 OK`，並輸出包含時間碼 `[mm:ss.xx]` 的中英對照 Markdown 格式，以及 Obsidian 落盤路徑。
 
 ---
 
-## 4. 失敗模式（Failure Modes）
+## 4. 降級與防禦性錯誤處理 (Graceful Degradation)
 
-| 失敗情境 | 系統行為 | 可執行證明 |
-|---|---|---|
-| Spotify 回 429 限流 | 解析 `Retry-After` 智慧休眠；24 小時內達 2 次 → 熔斷禁用 Spotify 24 小時 | `tests/circuit-breaker.test.js`、`tests/baseline.test.js` |
-| Spotify 被熔斷或連線失敗 | 自動降級 MusicBrainz（搜 MBID → 抓專輯 → 轉換 schema） | `tests/baseline.test.js`、`tests/strategies.test.js` |
-| MusicBrainz 也失敗 | 回傳 mock 預設曲目（最後防線），不讓管線崩潰 | `tests/baseline.test.js` |
-| `social-post-service` 不可達 | `/api/social/health` 回 `reachable: false`；`/api/social/publish` 回穩定 502（不 hang、不 crash）；`/readyz` 回 `degraded` | `npm run demo:verify:social:down` |
-| `lyrics-vault-service` 不可達 | `/api/lyrics/health` 回 `reachable: false`；`/api/lyrics` 回穩定 502；`/readyz` 回 `degraded` 並標明 `lyricsVaultService: unreachable`；歌詞預載靜默跳過 | `npm run demo:verify:lyrics:down` |
-| mock fixture 資料壞掉 | 管線非零 exit code + 列出每個壞欄位；`demo:verify` 在執行管線「之前」就擋下 | `tests/golden/dry-run-golden.test.js`（失敗情境） |
-| 生成的樂評內容不完整 | `demo:verify` 檢查封面圖、標題、評分、聆聽連結四個必要標記，缺一即 fail | `npm run demo:verify` |
-| SUMMARY.md 重複連結（冪等性破壞） | `demo:verify` 偵測同一連結出現超過一次即 fail | golden tests 冪等性案例 + `demo:verify` |
-| AI 回傳的歌詞/分析含惡意 HTML | 前端 Markdown 轉譯器先轉義再解析，輸出僅含白名單標籤，注入內容以純文字呈現 | `tests/markdown-renderer.test.js` |
+在 Companion 服務或第三方 API 不可用時，系統具備以下健壯的降級防衛措施，確保核心服務與測試不崩潰：
 
-### Readiness 語意
-
-`/readyz` 刻意不把「依賴掛了」壓縮成二元 up/down：
-
-- `ok` — 核心 ready 且 companion 可達
-- `degraded` — 核心 ready，companion 不可達（核心讀取功能照常服務）
-- `not_ready` — 核心靜態資產或必要 mock data 不完整（回 503）
-
----
-
-## 5. 驗證層次（Proof Ladder）
-
-由淺入深，每一層都是一個命令：
-
-| 層次 | 命令 | 需要網路/憑證 | 驗證什麼 |
-|---|---|---|---|
-| 1 | `npm test` | 否 | 全部單元 + golden + 前端安全測試（含正常/模糊/失敗情境） |
-| 2 | `npm run demo:verify` | 否 | 離線管線端到端 + 產物 schema 與內容完整性 |
-| 3 | `npm run demo:verify:social` / `demo:verify:lyrics` | 否（自動退回內建 mock） | 跨服務 handoff 契約 |
-| 4 | `npm run demo:verify:social:down` / `demo:verify:lyrics:down` | 否 | 依賴失敗時的降級行為 |
-| 5 | `npm run scan` | 是（Spotify + Gemini 憑證） | 真實管線 |
-
-測試提示：golden e2e 測試透過 `DRY_RUN_FAST=1`、`DRY_RUN_DATA_PATH`、`DRY_RUN_OUTPUT_DIR` 環境變數把管線導向暫存目錄執行，輸出內容與正式 dry-run 完全相同，只是跳過模擬延遲。
-
-CI（`.github/workflows/ci.yml`）在每次 push 時執行第 1–4 層：單元測試、`demo:verify`、`demo:verify:social`（內建 mock）、`demo:verify:social:down`，再加上 dashboard build、Playwright e2e 與兩個 Docker image build。第 5 層需要真實憑證，刻意不放入 CI。
+1. **健康與就緒探針 (Liveness & Readiness Probes)**：
+   * `/healthz`：一律回傳 200 OK，代表服務本身還活著。
+   * `/readyz`：動態檢查依賴服務狀態。當 `social-post-service` 或 `lyrics-vault-service` 斷線或未啟動時，`/readyz` 會回傳 HTTP 200 OK 但回應中會將狀態標記為 `"status": "degraded"`，而非引發 Promise 崩潰的 500 錯誤。
+2. **Spotify API 呼叫降級**：
+   * 當 Spotify API 觸發冷卻上限時，系統會自動降級改為呼叫 **MusicBrainz API** 獲取曲目列表，若兩者都失效，則會啟用 **Fallback 機制** 輸出 Mock 的預設曲目，保證前端功能永遠處於可用狀態。
+3. **MIME 資源錯誤防範**：
+   * 萬用路由 `app.get('*')` 會排除任何包含副檔名（除了 `.html`）的檔案請求（回傳 404），避免瀏覽器將 HTML 當作 JS/CSS 載入時觸發致命的 MIME 混淆報錯。

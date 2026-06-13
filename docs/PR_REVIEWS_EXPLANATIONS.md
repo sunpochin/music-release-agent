@@ -264,6 +264,66 @@
 ### 🛠️ 修正實作
 請參閱 [dashboard.spec.js](file:///Users/pac/codes/interview/music-release-agent/tests/e2e/dashboard.spec.js)。
 
+---
+
+## 12. 播放器多重初始化防護（SpotifyPlayer.tsx）
+
+### 🚨 PR 審查回饋
+`SpotifyPlayer` 元件不應該在內部直接呼叫 `useSpotifyPlayer()` 進行連線初始化，這樣會導致傳入的 `playerControls` 無法被正確使用，且會重複載入 Spotify SDK，引發連線衝突。
+
+### 👶 小朋友解釋法
+> 想像 `SpotifyPlayer` 是一台「電視機元件」，而 `useSpotifyPlayer` 是「拉第四台的線」。
+> 原本的寫法是在客廳 (`App.jsx`) 拉了一條線，又在電視機裡面 (`SpotifyPlayer.tsx`) 自己拉了一條線！兩條線搶訊號，就會導致畫面跟聲音不同步，或是根本無法播放（因為連線衝突了）。
+> 我們現在把電視機裡面的線拔掉，規定電視機必須接客廳拉過來的線 (`playerControls`)，這樣全家就只會有一個 Spotify 連線，再也不會打架了！
+
+### 🛠️ 修正實作
+請參閱 [SpotifyPlayer.tsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/components/SpotifyPlayer.tsx) 與 [App.jsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/App.jsx)。
+
+---
+
+## 13. 自動捲動歌詞的副作用（KtvLyricsView.tsx）
+
+### 🚨 PR 審查回饋
+不應該在畫面的「繪製階段 (Render phase)」去執行捲動頁面 (Scroll) 的動作，應該要預先計算目前正在播放的歌詞索引，並將自動捲動的副作用邏輯放到 `useEffect` 裡面，以防 layout 抖動與重複渲染。
+
+### 👶 小朋友解釋法
+> React 畫畫面就像是畫家在「打草稿」。在打草稿的時候，畫家應該專心決定「每一句歌詞要畫在哪裡、誰要發光」。
+> 如果我們在打草稿的同時，又命令畫布「自動往下捲動」，畫家就會手忙腳亂（這叫做 Side Effect 副作用），嚴重的話會導致畫面卡頓或是無限重畫。
+> 我們現在改成：畫家專心打草稿（標記出目前唱到哪一句），等整張圖畫完掛到牆上後，才由負責掛圖的人 (`useEffect`) 輕輕把畫面捲到正中間！
+
+### 🛠️ 修正實作
+請參閱 [KtvLyricsView.tsx](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/components/lyrics/KtvLyricsView.tsx)。
+
+---
+
+## 14. 字典載入效能優化與錯誤防護（useTrackAi.ts）
+
+### 🚨 PR 審查回饋
+使用 `import()` 動態載入 `lrcParser` 會增加非同步請求的複雜性與額外開銷。此外，在解析 JSON 之前，我們應先檢查 `res.ok` 確認 API 正常運作，否則若回傳失敗會導致崩潰。
+
+### 👶 小朋友解釋法
+> 想像 `lrcParser` 是一本「翻譯字典」。
+> 原本的寫法是：等收到外國信件後，才「打電話叫快遞送一本字典過來」(`import(...)`)，然後才開始翻譯。但這本字典明明很薄！這樣做會浪費很多等待的時間。
+> 我們直接把字典放在辦公桌上（在檔案最上面用 `import { parseLrc }` 靜態載入），信一來就可以立刻翻譯，速度飛快！同時我們也加了一道檢查：如果信件根本寄丟了 (`res.ok` 是 false)，我們就不會傻傻打開一封空信件然後當機。
+
+### 🛠️ 修正實作
+請參閱 [useTrackAi.ts](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/hooks/useTrackAi.ts)。
+
+---
+
+## 15. 多個時間標籤全域清除防護（lrcParser.ts）
+
+### 🚨 PR 審查回饋
+有些 LRC 檔案中，一行歌詞可能包含多個時間標籤 (例如 `[01:20.00][02:30.00] lyrics`)。原本的 `line.replace(timeRegex, '')` 只能替換掉第一個標籤，應使用全域正則表達式 `/\[\d{2}:\d{2}(?:\.\d{2,3})?\]/g` 來徹底清除。
+
+### 👶 小朋友解釋法
+> 副歌的歌詞因為重複唱，有時候會在同一行貼上兩個「時間貼紙」。
+> 原本我們的打掃機器人很懶惰，看到一行字，撕掉「第一張」貼紙後就覺得工作做完了，結果畫面上就會跑出類似 `[02:30.00] 寶貝對不起` 這種帶有亂碼的歌詞。
+> 我們在機器人的指令後面加了一個 `/g` (Global，代表全部都要)，現在機器人會死盯著那行字，把「所有」的時間貼紙通通撕乾淨，只留下純淨的歌詞！
+
+### 🛠️ 修正實作
+請參閱 [lrcParser.ts](file:///Users/pac/codes/interview/music-release-agent/dashboard/src/utils/lrcParser.ts)。
+
 
 
 

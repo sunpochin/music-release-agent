@@ -1,6 +1,14 @@
-import React from 'react'
-import { parseMarkdownToHtml } from '../../utils/markdown.js'
+/**
+ * 📝 MarkdownLyricsView — 雙語全文模式（React 元件化版本）
+ * 
+ * 負責渲染整篇歌詞，包含 AI 的前言與樂評。
+ * 使用 parseMarkdownToBlocks 解析字串，並共用 <LyricLine> 渲染歌詞，
+ * 徹底解決版面閃動與 XSS 風險，同時擁有 Apple Music 等級的視覺體驗。
+ */
+import React, { useMemo, useRef, useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
+import { parseMarkdownToBlocks } from '../../utils/markdownParser'
+import LyricLine from './LyricLine'
 
 interface MarkdownLyricsViewProps {
   lyricsData: string
@@ -17,39 +25,120 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
   playerControls,
   songUri
 }) => {
-  // 處理點擊時間標籤事件
-  const handleLyricsClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    const timeMsStr = target.getAttribute('data-time-ms');
-    if (timeMsStr && playerControls) {
-      const timeMs = parseInt(timeMsStr, 10);
-      if (!isNaN(timeMs)) {
-        if (!playerControls.currentTrack && songUri && playerControls.playUri) {
-          // 如果尚未載入歌曲，就發送播放請求並指定時間
-          playerControls.playUri(songUri, timeMs);
-        } else if (playerControls.seek) {
-          // 如果已經載入歌曲，直接 seek
-          playerControls.seek(timeMs);
+  const containerRef = useRef<HTMLDivElement>(null)
+  
+  // 1. 解析 Markdown 為 Blocks
+  const blocks = useMemo(() => parseMarkdownToBlocks(lyricsData || ''), [lyricsData])
+
+  // 2. 決定目前啟動的歌詞時間戳記
+  const currentPosition = playerControls?.position ?? 0
+  
+  // 找出最後一個時間戳 <= currentPosition 的歌詞區塊
+  const activeTimeMs = useMemo(() => {
+    if (!currentPosition) return -1
+    let activeMs = -1
+    for (const block of blocks) {
+      if (block.type === 'lyric') {
+        if (block.timeMs <= currentPosition) {
+          activeMs = block.timeMs
+        } else {
+          break
         }
       }
     }
-  };
+    return activeMs
+  }, [blocks, currentPosition])
+
+  // 3. 自動捲動邏輯
+  const activeLyricRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (activeLyricRef.current) {
+      activeLyricRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [activeTimeMs])
+
+  // 處理點擊歌詞跳轉
+  const handleLyricClick = (timeMs: number) => {
+    if (!playerControls) return
+    if (!playerControls.currentTrack && songUri && playerControls.playUri) {
+      playerControls.playUri(songUri, timeMs)
+    } else if (playerControls.seek) {
+      playerControls.seek(timeMs)
+    }
+  }
+
+  // 渲染內嵌粗體字 (非歌詞的普通段落用)
+  const renderTextWithBold = (content: string) => {
+    const parts = content.split(/(\*\*.*?\*\*)/g)
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="text-white font-bold">{part.slice(2, -2)}</strong>
+      }
+      return part
+    })
+  }
+
   return (
     <>
-      {/* 
-        給開發者的筆記（為什麼這裡沒有分秒進度？）：
-        
-        小朋友版本的解釋：
-        「KTV 動態」就像是有人拿著碼表，在你唱歌的時候幫你記下每一句話是在第幾分第幾秒唱出來的。
-        「雙語全文 (Markdown 模式)」則是 AI 機器人聽完整首歌後，寫下的一篇優美翻譯文章。
-        AI 機器人只知道整首歌的意思，但它沒有拿碼表幫我們記錄這句話是第幾秒唱的！
-        因為我們沒有 AI 翻譯文章的「碼表時間」，所以沒辦法讓字跟著音樂一起變色前進喔！
-      */}
       <div 
-        className={shouldAnimateLyrics ? 'ai-stagger' : ''} 
-        dangerouslySetInnerHTML={{ __html: parseMarkdownToHtml(lyricsData || '') }} 
-        onClick={handleLyricsClick}
-      />
+        ref={containerRef}
+        className={`${shouldAnimateLyrics ? 'ai-stagger' : ''}`}
+      >
+        {blocks.map((block, index) => {
+          if (block.type === 'heading') {
+            if (block.level === 3) {
+              return <h3 key={index} className="text-sm font-bold text-spotify-green mt-8 mb-4 flex items-center gap-1">{block.text}</h3>
+            }
+            return <h2 key={index} className="text-base font-bold text-white mt-6 mb-3">{block.text}</h2>
+          }
+          
+          if (block.type === 'hr') {
+            return <hr key={index} className="border-white/10 my-4" />
+          }
+
+          if (block.type === 'lyric') {
+            const isCurrent = block.timeMs === activeTimeMs
+            const isPast = block.timeMs < activeTimeMs
+            const state = isCurrent ? 'current' : (isPast ? 'past' : 'future')
+            
+            return (
+              <div key={index} ref={isCurrent ? activeLyricRef : null}>
+                <LyricLine
+                  timeMs={block.timeMs}
+                  text={block.text}
+                  translation={block.translation}
+                  state={state}
+                  onClick={handleLyricClick}
+                />
+              </div>
+            )
+          }
+
+          if (block.type === 'paragraph') {
+            // 處理純粗體金句
+            if (block.text.startsWith('**') && block.text.endsWith('**')) {
+              return (
+                <p key={index} className="text-sm italic font-medium text-spotify-green/90 bg-spotify-green/5 border-l-2 border-spotify-green py-2 px-3 my-3 rounded-r-lg">
+                  {block.text.replace(/\*\*/g, '')}
+                </p>
+              )
+            }
+            // 處理清單
+            if (block.text.startsWith('- ')) {
+              return (
+                <div key={index} className="flex items-start gap-2 my-1 text-xs text-gray-300">
+                  <span className="text-spotify-green">•</span>
+                  <span>{renderTextWithBold(block.text.substring(2))}</span>
+                </div>
+              )
+            }
+            
+            return <p key={index} className="text-xs text-gray-300 leading-relaxed my-2">{renderTextWithBold(block.text)}</p>
+          }
+          
+          return null
+        })}
+      </div>
       
       {isTranslating && (
         <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md animate-pulse flex items-center gap-3">

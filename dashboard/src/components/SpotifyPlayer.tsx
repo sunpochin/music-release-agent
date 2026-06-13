@@ -39,6 +39,16 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri, playerControls, fall
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  // 處理進度條點擊跳轉 (Seek)
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!playerControls.seek || duration === 0) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const percent = clickX / rect.width
+    const newPosition = Math.floor(percent * duration)
+    playerControls.seek(newPosition)
+  }
+
   // 計算進度條百分比（0–100）
   const progress = duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0
 
@@ -121,9 +131,12 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ uri, playerControls, fall
 
       {/* 進度條 */}
       <div className="mt-3">
-        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+        <div 
+          className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden cursor-pointer hover:h-2 transition-all"
+          onClick={handleProgressClick}
+        >
           <div
-            className="h-full bg-spotify-green rounded-full transition-all duration-1000 ease-linear"
+            className="h-full bg-spotify-green rounded-full transition-all duration-1000 ease-linear pointer-events-none"
             style={{ width: `${progress}%` }}
           />
         </div>
