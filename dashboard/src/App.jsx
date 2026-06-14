@@ -166,26 +166,27 @@ function App() {
         {selectedAlbum ? (
           <>
             {/* Header Banner 頂部專輯資訊橫幅（手機返回鍵：歌曲頁先回專輯頁，再回清單） */}
-            <HeaderBanner
-              selectedAlbum={selectedAlbum}
-              selectedTrack={selectedTrack}
-              backLabel={trackId ? '返回專輯' : '返回列表'}
-              onBack={() => {
-                if (trackId) {
-                  navigate(`/album/${selectedAlbum.id}`)
-                } else {
-                  handleSelectAlbum(null)
-                }
-              }}
-            />
+            <div className="flex justify-center">
+              <HeaderBanner
+                selectedAlbum={selectedAlbum}
+                selectedTrack={selectedTrack}
+                backLabel={trackId ? '返回專輯' : '返回列表'}
+                onBack={() => {
+                  if (trackId) {
+                    navigate(`/album/${selectedAlbum.id}`)
+                  } else {
+                    handleSelectAlbum(null)
+                  }
+                }}
+              />
+            </div>
 
             {/* 主內容：mobile-first 全螢幕專注模式
                 - 專輯頁（未選歌）：AlbumPanel 全版顯示
                 - 歌曲頁（已選歌）：SongPanel 獨佔全幅，底部「返回專輯資訊」可導回 */}
-            <div className="flex-1 overflow-y-auto p-4 lg:p-8 lg:pt-4">
-              {(trackId || selectedTrack) ? (
-                <div className="max-w-3xl mx-auto">
-                  {/* 歌曲頁：SongPanel 單欄全幅，不再與 AlbumPanel 並排 */}
+            <div className="flex-1 overflow-hidden p-4 lg:p-8 lg:pt-4 flex flex-col items-center">
+              <div className="w-full max-w-3xl flex-1 flex flex-col min-h-0 pb-2">
+                {(trackId || selectedTrack) ? (
                   <SongPage
                     trackId={trackId}
                     tracks={tracks}
@@ -209,19 +210,32 @@ function App() {
                     handleClearCache={handleClearCache}
                     onBackToAlbum={() => navigate(`/album/${selectedAlbum.id}`)}
                   />
-                </div>
-              ) : (
-                <AlbumPanel
-                  variant="full"
-                  selectedAlbum={selectedAlbum}
-                  albumReview={albumReview}
-                  tracks={tracks}
-                  selectedTrack={selectedTrack}
-                  tracksLoading={tracksLoading}
-                  tracksError={tracksError}
-                  retryTracks={retryTracks}
-                />
-              )}
+                ) : (
+                  <AlbumPanel
+                    variant="full"
+                    selectedAlbum={selectedAlbum}
+                    albumReview={albumReview}
+                    tracks={tracks}
+                    selectedTrack={selectedTrack}
+                    tracksLoading={tracksLoading}
+                    tracksError={tracksError}
+                    retryTracks={retryTracks}
+                    onPlayTrack={playerControls.playUri}
+                  />
+                )}
+                
+                {/* 乖乖排在 flex 下面：手動播放控制，顯示備用元資料 */}
+                {(selectedTrack || selectedAlbum) && (
+                  <div className="mt-6 w-full shrink-0">
+                    <SpotifyPlayer
+                      uri={selectedTrack ? `spotify:track:${selectedTrack.id}` : `spotify:album:${selectedAlbum.id}`}
+                      fallbackTrackName={selectedTrack?.name}
+                      fallbackArtistName={selectedTrack?.artists?.map(a => a.name).join(', ') ?? selectedAlbum?.artistName}
+                      playerControls={playerControls}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </>
         ) : (
@@ -232,16 +246,6 @@ function App() {
           </div>
         )}
       </main>
-
-      {/* 懸浮式 Spotify Web Playback SDK 播放器：手動播放控制，顯示備用元資料 */}
-      {(selectedTrack || selectedAlbum) && (
-        <SpotifyPlayer
-          uri={selectedTrack ? `spotify:track:${selectedTrack.id}` : `spotify:album:${selectedAlbum.id}`}
-          fallbackTrackName={selectedTrack?.name}
-          fallbackArtistName={selectedTrack?.artists?.map(a => a.name).join(', ') ?? selectedAlbum?.artistName}
-          playerControls={playerControls}
-        />
-      )}
     </div>
   )
 }

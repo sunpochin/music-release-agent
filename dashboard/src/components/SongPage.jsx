@@ -19,7 +19,7 @@ import SongPanel from './SongPanel'
 const SongPageSkeleton = () => (
   <div
     data-testid="song-page-skeleton"
-    className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl min-h-[400px] animate-pulse"
+    className="flex-1 min-h-0 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl animate-pulse"
     aria-busy="true"
     aria-label="歌曲內容載入中"
   >
@@ -36,7 +36,7 @@ const SongPageSkeleton = () => (
 
 /** 載入失敗：給出原因與重試按鈕，而不是默默顯示「無曲目資料」 */
 const TracksError = ({ error, onRetry }) => (
-  <div className="flex-1 bg-white/5 border border-red-400/20 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px]">
+  <div className="flex-1 min-h-0 bg-white/5 border border-red-400/20 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center">
     <div className="w-16 h-16 rounded-full bg-red-400/10 flex items-center justify-center mb-4 text-red-400">
       <AlertCircle size={32} />
     </div>
@@ -51,13 +51,12 @@ const TracksError = ({ error, onRetry }) => (
   </div>
 )
 
-/** 友善 404：trackId 不在這張專輯 → 推薦同專輯其他曲目，舊分享連結不會死 */
-const TrackNotFound = ({ albumId, tracks }) => {
+const TrackNotFound = ({ albumId, tracks, playerControls }) => {
   const navigate = useNavigate()
   return (
     <div
       data-testid="track-not-found"
-      className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px]"
+      className="flex-1 min-h-0 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center"
     >
       <div className="w-16 h-16 rounded-full bg-yellow-400/10 flex items-center justify-center mb-4 text-yellow-400">
         <Music4 size={32} />
@@ -71,7 +70,10 @@ const TrackNotFound = ({ albumId, tracks }) => {
         {tracks.slice(0, 5).map((track) => (
           <button
             key={track.id}
-            onClick={() => navigate(`/album/${albumId}/song/${track.id}`)}
+            onClick={() => {
+              navigate(`/album/${albumId}/song/${track.id}`);
+              playerControls?.playUri?.(`spotify:track:${track.id}`);
+            }}
             className="w-full text-left px-4 py-2.5 rounded-xl bg-white/5 hover:bg-spotify-green/20 transition-all text-xs text-gray-300 hover:text-white flex items-center gap-2"
           >
             <span className="text-spotify-green font-mono w-4 text-center">{track.track_number}</span>
@@ -103,7 +105,7 @@ const SongPage = ({
 
   // 3. 門票過期：URL 有 trackId、歌單已載入、但找不到對應的歌 → 友善 404
   if (trackId && !panelProps.selectedTrack && tracks.length > 0) {
-    return <TrackNotFound albumId={panelProps.selectedAlbum?.id} tracks={tracks} />
+    return <TrackNotFound albumId={panelProps.selectedAlbum?.id} tracks={tracks} playerControls={panelProps.playerControls} />
   }
 
   // 4. 有選中的歌 → 歌詞面板

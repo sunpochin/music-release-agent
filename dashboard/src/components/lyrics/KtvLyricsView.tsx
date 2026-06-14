@@ -12,6 +12,7 @@ import LyricLine from './LyricLine'
 interface KtvLyricsViewProps {
   lrcData: any[]
   lyricsData: string
+  isTranslating?: boolean
   playerControls: any
   lyricsContainerRef: any
   songUri?: string
@@ -20,6 +21,7 @@ interface KtvLyricsViewProps {
 const KtvLyricsView: React.FC<KtvLyricsViewProps> = ({
   lrcData,
   lyricsData,
+  isTranslating = false,
   playerControls,
   lyricsContainerRef,
   songUri
@@ -70,12 +72,11 @@ const KtvLyricsView: React.FC<KtvLyricsViewProps> = ({
   }
 
   return (
-    <div className="py-20 flex flex-col items-center justify-center text-center space-y-4">
+    <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 relative">
       {lrcData.map((line, index) => {
         const translation = getTranslation(line.timeMs, translationsMap) || undefined
         const isCurrent = index === activeIdx
-        const isPast = index < activeIdx
-        const state = isCurrent ? 'current' : (isPast ? 'past' : 'future')
+        const distance = activeIdx === -1 ? index : index - activeIdx
 
         return (
           <div key={index} data-active={isCurrent}>
@@ -83,12 +84,22 @@ const KtvLyricsView: React.FC<KtvLyricsViewProps> = ({
               timeMs={line.timeMs}
               text={line.text}
               translation={translation}
-              state={state}
+              distance={distance}
               onClick={handleLyricClick}
             />
           </div>
         )
       })}
+      
+      {isTranslating && (
+        <div className="mt-8 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md animate-pulse flex items-center gap-3">
+          <svg className="w-4 h-4 text-spotify-green animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span className="text-xs text-spotify-green font-bold">AI 正在翻譯中，請稍候...</span>
+        </div>
+      )}
     </div>
   )
 }

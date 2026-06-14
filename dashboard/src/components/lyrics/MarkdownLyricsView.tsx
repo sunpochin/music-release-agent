@@ -34,20 +34,26 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
   const currentPosition = playerControls?.position ?? 0
   
   // 找出最後一個時間戳 <= currentPosition 的歌詞區塊
-  const activeTimeMs = useMemo(() => {
-    if (!currentPosition) return -1
+  const activeLyricInfo = useMemo(() => {
+    if (!currentPosition) return { activeMs: -1, activeIdx: -1 }
     let activeMs = -1
+    let activeIdx = -1
+    let lyricIdx = 0
     for (const block of blocks) {
       if (block.type === 'lyric') {
         if (block.timeMs <= currentPosition) {
           activeMs = block.timeMs
+          activeIdx = lyricIdx
         } else {
           break
         }
+        lyricIdx++
       }
     }
-    return activeMs
+    return { activeMs, activeIdx }
   }, [blocks, currentPosition])
+
+  const { activeMs: activeTimeMs, activeIdx: activeLyricIdx } = activeLyricInfo
 
   // 3. 自動捲動邏輯
   const activeLyricRef = useRef<HTMLDivElement>(null)
@@ -84,35 +90,37 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
         ref={containerRef}
         className={`${shouldAnimateLyrics ? 'ai-stagger' : ''}`}
       >
-        {blocks.map((block, index) => {
-          if (block.type === 'heading') {
-            if (block.level === 3) {
-              return <h3 key={index} className="text-sm font-bold text-spotify-green mt-8 mb-4 flex items-center gap-1">{block.text}</h3>
+        {(() => {
+          let lyricIdxCounter = 0;
+          return blocks.map((block, index) => {
+            if (block.type === 'heading') {
+              if (block.level === 3) {
+                return <h3 key={index} className="text-sm font-bold text-spotify-green mt-8 mb-4 flex items-center gap-1">{block.text}</h3>
+              }
+              return <h2 key={index} className="text-base font-bold text-white mt-6 mb-3">{block.text}</h2>
             }
-            return <h2 key={index} className="text-base font-bold text-white mt-6 mb-3">{block.text}</h2>
-          }
-          
-          if (block.type === 'hr') {
-            return <hr key={index} className="border-white/10 my-4" />
-          }
-
-          if (block.type === 'lyric') {
-            const isCurrent = block.timeMs === activeTimeMs
-            const isPast = block.timeMs < activeTimeMs
-            const state = isCurrent ? 'current' : (isPast ? 'past' : 'future')
             
-            return (
-              <div key={index} ref={isCurrent ? activeLyricRef : null}>
-                <LyricLine
-                  timeMs={block.timeMs}
-                  text={block.text}
-                  translation={block.translation}
-                  state={state}
-                  onClick={handleLyricClick}
-                />
-              </div>
-            )
-          }
+            if (block.type === 'hr') {
+              return <hr key={index} className="border-white/10 my-4" />
+            }
+
+            if (block.type === 'lyric') {
+              const currentLyricIdx = lyricIdxCounter++;
+              const isCurrent = block.timeMs === activeTimeMs
+              const distance = activeLyricIdx === -1 ? currentLyricIdx : currentLyricIdx - activeLyricIdx
+              
+              return (
+                <div key={index} ref={isCurrent ? activeLyricRef : null}>
+                  <LyricLine
+                    timeMs={block.timeMs}
+                    text={block.text}
+                    translation={block.translation}
+                    distance={distance}
+                    onClick={handleLyricClick}
+                  />
+                </div>
+              )
+            }
 
           if (block.type === 'paragraph') {
             // 處理純粗體金句
@@ -137,7 +145,8 @@ const MarkdownLyricsView: React.FC<MarkdownLyricsViewProps> = ({
           }
           
           return null
-        })}
+          })
+        })()}
       </div>
       
       {isTranslating && (
