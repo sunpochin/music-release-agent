@@ -127,10 +127,10 @@ const SongPanel = ({
             <p className="animate-pulse font-light tracking-widest text-center text-sm">讀取中...</p>
           </div>
         ) : lyricsData || lrcData ? (
-          <div 
-            ref={lyricsContainerRef}
-            className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto flex-1 min-h-0 pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 relative"
-          >
+            <div 
+              ref={lyricsContainerRef}
+              className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto overflow-x-hidden break-words flex-1 min-h-0 pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 relative"
+            >
             {/* Header: Badge */}
             <div className="not-prose mb-3 sticky top-0 bg-black/20 backdrop-blur-md z-10 p-2 rounded-lg flex items-center justify-between">
               <LyricsSourceBadge source={lyricsSource} isSynced={!!lrcData} />
