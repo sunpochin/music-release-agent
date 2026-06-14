@@ -1,7 +1,9 @@
 /* global window, document */
 import { test, expect } from '@playwright/test';
 
-test.describe('Music Release Dashboard E2E Tests', () => {
+test.describe('Music Release Dashboard E2E Tests (Mocked for CI)', () => {
+  // 這些是使用 Mock 的測試，專門給 CI 跑的，本地可以跳過（本地跑 Live）
+  test.skip(!process.env.CI, 'Skip mock tests in local environment');
   test('should load albums, fetch lyrics, and publish to social', async ({ page }) => {
     // 攔截獲取所有專輯的 API 請求，避免依賴本地 spotify-cache.json 導致 CI 環境失敗
     // 【小朋友解釋法】：
