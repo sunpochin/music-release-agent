@@ -2,15 +2,13 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Sparkles, AlertCircle, ChevronLeft, Upload } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import ShareCard from './ShareCard'
-import { createTranslationMap } from '../utils/translationMatcher'
 
 import LyricsSourceBadge from './LyricsSourceBadge'
 import AddToPlaylistButton from './AddToPlaylistButton'
 
 // Extracted Sub-Components
 import CopyLinkButton from './lyrics/CopyLinkButton'
-import KtvLyricsView from './lyrics/KtvLyricsView'
-import MarkdownLyricsView from './lyrics/MarkdownLyricsView'
+import UnifiedLyricsView from './lyrics/UnifiedLyricsView'
 import LyricsToolbar from './lyrics/LyricsToolbar'
 
 const SongPanel = ({
@@ -37,16 +35,6 @@ const SongPanel = ({
   const [isExporting, setIsExporting] = useState(false)
   const shareCardRef = useRef(null)
   const shareFileRef = useRef(null)
-
-  // 視圖切換狀態：'ktv' 或 'markdown'
-  const [viewMode, setViewMode] = useState<'ktv' | 'markdown'>('ktv')
-  const autoFallbackRef = useRef(false)
-
-  // 當切換歌曲時重置視圖為 KTV 模式
-  useEffect(() => {
-    setViewMode('ktv')
-    autoFallbackRef.current = false
-  }, [selectedTrack])
 
   // 背景非同步預產生分享圖檔
   const generateShareFile = useCallback(async () => {
@@ -104,22 +92,6 @@ const SongPanel = ({
 
   if (!selectedAlbum) return null
 
-  // Check translation mapping viability
-  const translationMap = useMemo(() => createTranslationMap(lyricsData || ''), [lyricsData]);
-  const hasTranslationsInMap = Object.keys(translationMap).length > 0;
-  
-  // 自動降級邏輯：如果要求翻譯，卻沒抓出任何雙語對照，則自動強制切換為 Markdown 模式
-  // 使用 autoFallbackRef 確保每首歌只會自動降級一次，允許使用者事後手動切換回 KTV 模式（即便沒翻譯）
-  useEffect(() => {
-    // 只有在「已經經過翻譯」且「沒有抓出任何雙語對照」時，才自動降級為 Markdown 模式
-    if (isTranslated && lrcData && !hasTranslationsInMap && viewMode === 'ktv' && !autoFallbackRef.current) {
-      setViewMode('markdown')
-      autoFallbackRef.current = true
-    }
-  }, [isTranslated, lrcData, hasTranslationsInMap, viewMode])
-
-  const effectiveViewMode = lrcData ? viewMode : 'markdown';
-
   return (
     <div className="flex-1 min-h-0 bg-black/20 backdrop-blur-[60px] border border-white/5 rounded-[32px] p-4 lg:p-6 shadow-2xl shadow-black/50 flex flex-col gap-3">
 
@@ -155,51 +127,24 @@ const SongPanel = ({
             <p className="animate-pulse font-light tracking-widest text-center text-sm">讀取中...</p>
           </div>
         ) : lyricsData || lrcData ? (
-          <div 
-            ref={lyricsContainerRef}
-            className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto flex-1 min-h-0 pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 relative"
-          >
-            {/* Header: Badge & View Toggle */}
+            <div 
+              ref={lyricsContainerRef}
+              className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto overflow-x-hidden break-words flex-1 min-h-0 pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 relative"
+            >
+            {/* Header: Badge */}
             <div className="not-prose mb-3 sticky top-0 bg-black/20 backdrop-blur-md z-10 p-2 rounded-lg flex items-center justify-between">
               <LyricsSourceBadge source={lyricsSource} isSynced={!!lrcData} />
-              
-              {/* Toggle switch visible if we have lrcData (even before translation) */}
-              {lrcData && (
-                <div className="flex bg-white/5 border border-white/10 rounded-xl p-1">
-                  <button 
-                    onClick={() => setViewMode('ktv')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${viewMode === 'ktv' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/70'}`}
-                  >
-                    KTV 動態
-                  </button>
-                  <button 
-                    onClick={() => setViewMode('markdown')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${viewMode === 'markdown' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/70'}`}
-                  >
-                    雙語全文
-                  </button>
-                </div>
-              )}
             </div>
             
-            {effectiveViewMode === 'ktv' && lrcData ? (
-              <KtvLyricsView 
-                lrcData={lrcData} 
-                lyricsData={lyricsData} 
-                isTranslating={isTranslating}
-                playerControls={playerControls} 
-                lyricsContainerRef={lyricsContainerRef} 
-                songUri={selectedTrack ? `spotify:track:${selectedTrack.id}` : undefined}
-              />
-            ) : (
-              <MarkdownLyricsView 
-                lyricsData={lyricsData} 
-                shouldAnimateLyrics={shouldAnimateLyrics} 
-                isTranslating={isTranslating} 
-                playerControls={playerControls}
-                songUri={selectedTrack ? `spotify:track:${selectedTrack.id}` : undefined}
-              />
-            )}
+            <UnifiedLyricsView
+              lrcData={lrcData}
+              lyricsData={lyricsData}
+              shouldAnimateLyrics={shouldAnimateLyrics}
+              isTranslating={isTranslating}
+              playerControls={playerControls}
+              songUri={selectedTrack ? `spotify:track:${selectedTrack.id}` : undefined}
+              lyricsContainerRef={lyricsContainerRef}
+            />
           </div>
         ) : (
           <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
