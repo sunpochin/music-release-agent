@@ -87,6 +87,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
 
     if (translate) {
       setIsTranslating(true)
+      // 不要在這裡清空 lyricsData，保留原本的歌詞讓使用者在等 TTFT 時有東西看
     } else {
       setRawLoading(true)
       setLyricsData('')
@@ -95,7 +96,8 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
     }
 
     try {
-      const apiPromise = fetch('/api/lyrics', {
+      const endpoint = translate ? '/api/lyrics/stream' : '/api/lyrics'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -107,10 +109,7 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
         })
       });
 
-      const res = await apiPromise;
-      
-      // 502 = 歌詞翻譯 companion 不可達（核心服務的明確降級回應）
-      // 顯示可行動的訊息而非通用錯誤 — 音樂庫等核心功能不受影響
+      // 502 = 歌詞翻譯 companion 不可達
       if (res.status === 502) {
         if (selectedTrackRef.current?.id === trackIdAtStart) {
           setLyricsData('### 歌詞服務暫時離線\n\n歌詞翻譯服務目前暫時離線。\n\n音樂庫瀏覽與其他功能不受影響；服務恢復後點擊「重新載入歌詞」即可。')
@@ -120,14 +119,59 @@ export function useTrackAi(selectedAlbum, selectedTrack) {
         return
       }
 
-      const result = await res.json()
-      if (selectedTrackRef.current?.id === trackIdAtStart) {
-        setLyricsData(result?.text || '無法取得歌詞。')
-        setLyricsForTrackId(trackIdAtStart)
-        setIsTranslated(Boolean(result?.translated))
-        setLyricsSource(result?.source)
-        if (result?.lrc) {
-          setLrcData(parseLrc(result.lrc))
+      if (translate) {
+        // 處理 SSE 串流
+        const reader = res.body?.getReader()
+        if (!reader) return
+        const decoder = new TextDecoder('utf-8')
+        let done = false
+        let currentLyrics = ''
+
+        while (!done) {
+          const { value, done: doneReading } = await reader.read()
+          done = doneReading
+          if (value) {
+            const chunkValue = decoder.decode(value, { stream: true })
+            const lines = chunkValue.split('\n')
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const dataStr = line.slice(6).trim()
+                if (!dataStr || dataStr === '{}') continue
+                try {
+                  const data = JSON.parse(dataStr)
+                  if (selectedTrackRef.current?.id !== trackIdAtStart) return // 若已換歌則提早結束
+
+                  if (data.type === 'meta') {
+                    setLyricsSource(data.source)
+                    setIsTranslated(true)
+                    setLyricsForTrackId(trackIdAtStart)
+                    if (data.lrc) {
+                      setLrcData(parseLrc(data.lrc))
+                    }
+                  } else if (data.type === 'chunk') {
+                    currentLyrics += data.text
+                    setLyricsData(currentLyrics)
+                  } else if (data.type === 'error') {
+                    setLyricsData(`載入過程發生錯誤: ${data.error}`)
+                  }
+                } catch (e) {
+                  // skip parse errors from incomplete chunks
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // 一般的 JSON 回應 (translate=false)
+        const result = await res.json()
+        if (selectedTrackRef.current?.id === trackIdAtStart) {
+          setLyricsData(result?.text || '無法取得歌詞。')
+          setLyricsForTrackId(trackIdAtStart)
+          setIsTranslated(Boolean(result?.translated))
+          setLyricsSource(result?.source)
+          if (result?.lrc) {
+            setLrcData(parseLrc(result.lrc))
+          }
         }
       }
     } catch {

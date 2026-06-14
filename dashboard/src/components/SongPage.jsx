@@ -19,7 +19,7 @@ import SongPanel from './SongPanel'
 const SongPageSkeleton = () => (
   <div
     data-testid="song-page-skeleton"
-    className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl min-h-[400px] animate-pulse"
+    className="flex-1 min-h-0 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl animate-pulse"
     aria-busy="true"
     aria-label="歌曲內容載入中"
   >
@@ -36,7 +36,7 @@ const SongPageSkeleton = () => (
 
 /** 載入失敗：給出原因與重試按鈕，而不是默默顯示「無曲目資料」 */
 const TracksError = ({ error, onRetry }) => (
-  <div className="flex-1 bg-white/5 border border-red-400/20 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px]">
+  <div className="flex-1 min-h-0 bg-white/5 border border-red-400/20 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center">
     <div className="w-16 h-16 rounded-full bg-red-400/10 flex items-center justify-center mb-4 text-red-400">
       <AlertCircle size={32} />
     </div>
@@ -56,7 +56,7 @@ const TrackNotFound = ({ albumId, tracks, playerControls }) => {
   return (
     <div
       data-testid="track-not-found"
-      className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center min-h-[400px]"
+      className="flex-1 min-h-0 bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-xl flex flex-col items-center justify-center text-center"
     >
       <div className="w-16 h-16 rounded-full bg-yellow-400/10 flex items-center justify-center mb-4 text-yellow-400">
         <Music4 size={32} />

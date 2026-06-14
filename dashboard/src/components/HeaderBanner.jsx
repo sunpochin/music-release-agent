@@ -16,9 +16,9 @@ const HeaderBanner = ({ selectedAlbum, selectedTrack, onBack, backLabel = '返�
         <button
           onClick={onBack}
           aria-label={backLabel}
-          className="absolute top-4 left-4 z-20 lg:hidden bg-black/60 hover:bg-black/80 hover:scale-105 active:scale-95 transition-all px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1 border border-white/10 shadow-lg"
+          className="absolute top-4 left-4 z-20 lg:hidden bg-black/60 hover:bg-black/80 hover:scale-105 active:scale-95 transition-all w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border border-white/10 shadow-lg"
         >
-          ← {backLabel}
+          ←
         </button>
 
         <div className="z-10 flex items-baseline justify-center lg:justify-start gap-3 flex-wrap w-full mt-2 lg:mt-0 lg:justify-center">
@@ -48,15 +48,20 @@ const HeaderBanner = ({ selectedAlbum, selectedTrack, onBack, backLabel = '返�
 
   // 專輯全尺寸標題列 (Album Mode)
   return (
-    <div className="min-h-[256px] lg:h-64 p-6 lg:p-8 flex flex-col lg:flex-row items-center lg:items-end gap-6 relative overflow-hidden text-center lg:text-left pt-20 lg:pt-8">
-      {/* 手機版返回按鈕（兩層導航：歌曲 → 專輯 → 清單） */}
-      <button
-        onClick={onBack}
-        aria-label={backLabel}
-        className="absolute top-6 left-6 z-20 lg:hidden bg-black/60 hover:bg-black/80 hover:scale-105 active:scale-95 transition-all px-4 py-2 rounded-full font-bold text-xs flex items-center gap-1 border border-white/10 shadow-lg animate-fade-in"
-      >
-        ← {backLabel}
-      </button>
+    <div className="min-h-[160px] lg:min-h-[256px] lg:h-64 p-4 lg:p-8 flex flex-col lg:flex-row items-center lg:items-end gap-3 lg:gap-6 relative overflow-hidden text-center lg:text-left pt-14 lg:pt-8">
+      {/* 行動端頂部控制列：包含返回與 Album 字樣 */}
+      <div className="absolute top-6 left-6 right-6 z-20 lg:hidden flex items-center gap-3">
+        <button
+          onClick={onBack}
+          aria-label={backLabel}
+          className="bg-black/60 hover:bg-black/80 hover:scale-105 active:scale-95 transition-all w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border border-white/10 shadow-lg animate-fade-in"
+        >
+          ←
+        </button>
+        <span className="text-xs font-bold uppercase tracking-widest opacity-80">
+          {selectedAlbum.type === 'album' ? 'Album' : 'Single'}
+        </span>
+      </div>
 
       {/* 背景高斯模糊效果 */}
       <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -64,15 +69,15 @@ const HeaderBanner = ({ selectedAlbum, selectedTrack, onBack, backLabel = '返�
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-spotify-dark via-spotify-dark/60 to-transparent"></div>
       
-      <img src={selectedAlbum.image} alt="cover" className="w-36 h-36 lg:w-48 lg:h-48 rounded-xl shadow-2xl z-10 border border-white/10 object-cover" />
-      <div className="z-10 pb-2 flex flex-col items-center lg:items-start">
-        <p className="text-xs lg:text-sm font-bold uppercase tracking-widest mb-2 flex items-center">
+      <img src={selectedAlbum.image} alt="cover" className="w-24 h-24 lg:w-48 lg:h-48 rounded-xl shadow-2xl z-10 border border-white/10 object-cover mt-2 lg:mt-0" />
+      <div className="z-10 flex flex-col items-center lg:items-start mt-1 lg:mt-0">
+        <p className="hidden lg:flex text-sm font-bold uppercase tracking-widest mb-2 items-center">
           {selectedAlbum.type === 'album' ? 'Album' : 'Single'}
         </p>
-        <h1 className="text-3xl lg:text-5xl font-black mb-2 tracking-tight drop-shadow-md">{selectedAlbum.name}</h1>
-        <div className="flex flex-row">
-          <div className="text-md lg:text-md font-medium text-spotify-green">{selectedAlbum.artistName || '未知藝人'}</div>
-          <div className="pl-1 text-md lg:text-md text-gray-300 font-medium"> • {selectedAlbum.release_date} • {selectedAlbum.total_tracks}首歌曲</div>
+        <h1 className="text-xl lg:text-5xl font-black mb-1 lg:mb-2 tracking-tight drop-shadow-md px-4 lg:px-0">{selectedAlbum.name}</h1>
+        <div className="flex flex-row flex-wrap justify-center lg:justify-start gap-1">
+          <div className="text-xs lg:text-md font-medium text-spotify-green">{selectedAlbum.artistName || '未知藝人'}</div>
+          <div className="text-xs lg:text-md text-gray-300 font-medium"> • {selectedAlbum.release_date} • {selectedAlbum.total_tracks}首歌曲</div>
         </div>
       </div>
     </div>

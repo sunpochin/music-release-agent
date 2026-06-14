@@ -37,10 +37,10 @@ const LyricsToolbar: React.FC<LyricsToolbarProps> = ({
       return (
         <button
           disabled
-          className="bg-white/5 border border-white/10 text-gray-400 px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 cursor-not-allowed opacity-60"
+          className="bg-white/5 border border-white/10 text-gray-400 px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 cursor-not-allowed opacity-60"
         >
           <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
-          ⏳ 讀取原文中...
+          讀取原文中...
         </button>
       )
     }
@@ -49,10 +49,10 @@ const LyricsToolbar: React.FC<LyricsToolbarProps> = ({
       return (
         <button
           disabled
-          className="bg-white/5 border border-white/10 text-spotify-green px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 cursor-not-allowed animate-pulse"
+          className="bg-white/5 border border-white/10 text-spotify-green px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 cursor-not-allowed animate-pulse"
         >
           <Sparkles size={12} className="animate-spin text-spotify-green" />
-          🧠 AI 正在對照翻譯...
+          對照翻譯中...
         </button>
       )
     }
@@ -61,10 +61,10 @@ const LyricsToolbar: React.FC<LyricsToolbarProps> = ({
       return (
         <button
           onClick={() => handleTranslate(true)}
-          className="bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white hover:scale-105 active:scale-95 transition-all px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 shadow-lg"
+          className="bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white hover:scale-105 active:scale-95 transition-all px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 shadow-lg"
         >
           <Sparkles size={12} className="text-spotify-green" />
-          🔄 重新翻譯
+          重新翻譯
         </button>
       )
     }
@@ -73,10 +73,10 @@ const LyricsToolbar: React.FC<LyricsToolbarProps> = ({
     return (
       <button
         onClick={() => handleTranslate()}
-        className="bg-white/10 backdrop-blur-2xl border border-white/10 hover:border-white/30 hover:bg-white/20 text-white hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 px-6 py-3 rounded-full font-medium text-sm flex items-center gap-3 shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_60px_rgba(255,255,255,0.2)]"
+        className="bg-white/10 backdrop-blur-2xl border border-white/10 hover:border-white/30 hover:bg-white/20 text-white hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 px-4 py-2 rounded-full font-medium text-xs flex items-center gap-1.5 shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_60px_rgba(255,255,255,0.2)]"
       >
-        <Sparkles size={14} className="animate-pulse text-white/80" />
-        <span className="tracking-widest">產生 AI 雙語翻譯</span>
+        <Sparkles size={12} className="animate-pulse text-white/80" />
+        <span className="tracking-widest">產生雙語翻譯</span>
       </button>
     )
   }

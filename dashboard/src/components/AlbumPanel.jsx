@@ -35,12 +35,12 @@ const AlbumPanel = ({
   const isFull = variant === 'full'
 
   return (
-    <div className={`w-full ${isFull ? 'max-w-2xl mx-auto' : 'lg:w-1/3'} bg-black/20 border border-white/5 rounded-[32px] p-8 backdrop-blur-[60px] shadow-2xl shadow-black/50 flex flex-col justify-between`}>
-      <div>
-        <div className="space-y-4 text-sm text-gray-300">
-          <div className="bg-black/20 p-5 rounded-2xl space-y-2">
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">作品介紹</p>
-            <p className="leading-relaxed text-gray-200">
+    <div className={`w-full ${isFull ? 'max-w-2xl mx-auto flex-1 min-h-0' : 'lg:w-1/3'} bg-black/20 border border-white/5 rounded-[32px] p-4 lg:p-8 backdrop-blur-[60px] shadow-2xl shadow-black/50 flex flex-col justify-between`}>
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="space-y-3 lg:space-y-4 text-sm text-gray-300 flex-1 flex flex-col min-h-0">
+          <div className="bg-black/20 p-3 lg:p-5 rounded-2xl space-y-1 lg:space-y-2 shrink-0 max-h-[80px] lg:max-h-[120px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+            <p className="text-[10px] lg:text-xs text-gray-400 font-bold uppercase tracking-wider">作品介紹</p>
+            <p className="leading-relaxed text-gray-200 text-xs lg:text-sm">
               {/* 若有從本地 AI 樂評載入介紹，則優先顯示，否則回退至預設元數據描述 */}
               {albumReview?.introduction ? (
                 albumReview.introduction
@@ -53,8 +53,8 @@ const AlbumPanel = ({
           </div>
 
           {/* 專輯曲目清單 */}
-          <div className={`bg-black/20 p-5 rounded-2xl space-y-3 flex flex-col ${isFull ? '' : 'max-h-[300px]'}`}>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
+          <div className={`bg-black/20 p-3 lg:p-5 rounded-2xl flex flex-col gap-2 ${isFull ? 'flex-1 min-h-0' : 'flex-1 min-h-[150px]'}`}>
+            <p className="text-[10px] lg:text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
                <Music4 size={14} className="text-spotify-green" /> 專輯曲目清單
             </p>
 
@@ -74,9 +74,9 @@ const AlbumPanel = ({
                 </button>
               </div>
             ) : (!Array.isArray(tracks) || tracks.length === 0) ? (
-              <p className="text-xs text-gray-500 py-2">無曲目資料</p>
+              <p className="text-xs text-gray-500 py-2 shrink-0">無曲目資料</p>
             ) : (
-              <div className={`overflow-y-auto space-y-1 pr-1 ${isFull ? '' : 'max-h-[220px]'}`} role="list" aria-label="專輯曲目清單（可用 j/k 或上下鍵切換）">
+              <div className={`overflow-y-auto space-y-1 pr-1 ${isFull ? 'flex-1 min-h-0' : 'flex-1 min-h-0'}`} role="list" aria-label="專輯曲目清單（可用 j/k 或上下鍵切換）">
                 {tracks.map((track) => (
                   <button
                     key={track.id}
@@ -111,18 +111,6 @@ const AlbumPanel = ({
             )}
           </div>
         </div>
-      </div>
-
-      <div className="mt-8">
-        <a
-          href={selectedAlbum.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-all duration-300 text-white px-4 py-4 rounded-2xl font-medium text-sm flex items-center justify-center gap-2 shadow-lg"
-        >
-          <ExternalLink size={16} />
-          在 Spotify 上聆聽
-        </a>
       </div>
     </div>
   )

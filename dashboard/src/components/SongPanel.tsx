@@ -121,10 +121,22 @@ const SongPanel = ({
   const effectiveViewMode = lrcData ? viewMode : 'markdown';
 
   return (
-    <div className="flex-1 bg-black/20 backdrop-blur-[60px] border border-white/5 rounded-[32px] p-8 shadow-2xl shadow-black/50 flex flex-col gap-6">
+    <div className="flex-1 min-h-0 bg-black/20 backdrop-blur-[60px] border border-white/5 rounded-[32px] p-4 lg:p-6 shadow-2xl shadow-black/50 flex flex-col gap-3">
 
-      {/* ── 隨選翻譯按鈕 ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
+      {/* ── 隨選翻譯按鈕與 IG 限動卡 ── */}
+      <div className="flex flex-row items-center justify-end gap-2 shrink-0">
+        {lyricsData && (
+          <button
+            onClick={exportShareCard}
+            disabled={isExporting || rawLoading}
+            className="bg-white text-black hover:bg-spotify-green hover:scale-105 transition-all px-3 py-1.5 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            title="匯出 IG 限動卡"
+          >
+            {isExporting ? <AlertCircle size={14} className="animate-spin" /> : <Upload size={14} />}
+            <span className="hidden sm:inline">IG 限動卡</span>
+            <span className="sm:hidden">IG</span>
+          </button>
+        )}
         <LyricsToolbar 
           rawLoading={rawLoading}
           isTranslating={isTranslating}
@@ -136,16 +148,16 @@ const SongPanel = ({
       </div>
 
       {/* ── 主內容渲染區域（直接顯示歌詞） ── */}
-      <div className="flex-1 flex flex-col min-h-[300px]">
+      <div className="flex-1 flex flex-col min-h-0">
         {rawLoading ? (
           <div className="py-24 flex flex-col items-center justify-center text-white/50 space-y-6">
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
-            <p className="animate-pulse font-light tracking-widest text-center text-sm">聆聽中...</p>
+            <p className="animate-pulse font-light tracking-widest text-center text-sm">讀取中...</p>
           </div>
         ) : lyricsData || lrcData ? (
           <div 
             ref={lyricsContainerRef}
-            className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto max-h-[500px] pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 relative"
+            className="prose prose-invert max-w-none prose-lg prose-p:leading-loose tracking-wide prose-h3:text-white/80 prose-h3:mt-8 prose-h3:mb-4 overflow-y-auto flex-1 min-h-0 pr-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 relative"
           >
             {/* Header: Badge & View Toggle */}
             <div className="not-prose mb-3 sticky top-0 bg-black/20 backdrop-blur-md z-10 p-2 rounded-lg flex items-center justify-between">
@@ -174,6 +186,7 @@ const SongPanel = ({
               <KtvLyricsView 
                 lrcData={lrcData} 
                 lyricsData={lyricsData} 
+                isTranslating={isTranslating}
                 playerControls={playerControls} 
                 lyricsContainerRef={lyricsContainerRef} 
                 songUri={selectedTrack ? `spotify:track:${selectedTrack.id}` : undefined}
@@ -199,33 +212,6 @@ const SongPanel = ({
               沒有自動載入？點此重新載入
             </button>
           </div>
-        )}
-      </div>
-
-      {/* ── 分隔線：工具區 ── */}
-      <div className="border-t border-white/10 pt-5 flex flex-col gap-4">
-
-
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-          <CopyLinkButton />
-          <button
-            onClick={exportShareCard}
-            disabled={isExporting || rawLoading}
-            className="bg-white text-black hover:bg-spotify-green hover:scale-105 transition-all px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg w-full sm:w-auto"
-          >
-            {isExporting ? <AlertCircle size={16} className="animate-spin" /> : <Upload size={16} />}
-            匯出 IG 限動卡
-          </button>
-        </div>
-
-        {onBackToAlbum && (
-          <button
-            onClick={onBackToAlbum}
-            className="flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors text-sm font-medium py-2 rounded-xl hover:bg-white/5 mt-1"
-          >
-            <ChevronLeft size={16} />
-            返回專輯資訊
-          </button>
         )}
       </div>
 
