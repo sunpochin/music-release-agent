@@ -114,9 +114,30 @@ export async function gitPushChanges(commitMessage) {
   try {
     // [技術] 使用 execFile 代替 exec 以安全傳遞參數，防範惡意 commitMessage 命令注入漏洞
     // [童趣] 戴上魔法防護手套：用 execFile 像捏橡皮泥一樣抓緊程式參數，不讓怪人利用古怪符號把木馬偷偷塞進去！
-    const { stdout: branchStdout } = await execFilePromise('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: GITBOOK_DIR });
-    const currentBranch = branchStdout.trim();
-    console.log(`[GitBook/GitOps] 📍 當前分支為: ${currentBranch}`);
+    // 優先使用 git branch --show-current 偵測分支，此命令在空倉庫 (0 commits) 與一般情況下皆能安全運作且不拋出 128 異常
+    let rawBranch = '';
+    let isDetached = false;
+    try {
+      const { stdout: currentOut } = await execFilePromise('git', ['branch', '--show-current'], { cwd: GITBOOK_DIR });
+      rawBranch = currentOut.trim();
+    } catch {
+      // 舊版 git 降級使用 rev-parse
+      try {
+        const { stdout: revOut } = await execFilePromise('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: GITBOOK_DIR });
+        rawBranch = revOut.trim();
+      } catch {
+        rawBranch = 'main';
+      }
+    }
+
+    if (!rawBranch || rawBranch === 'HEAD') {
+      isDetached = true;
+      rawBranch = 'HEAD';
+    }
+
+    // 雲端無頭環境 (GitHub Actions actions/checkout) 可能處於 detached HEAD 狀態，預設將推送目標定為 main
+    const targetBranch = isDetached ? 'main' : rawBranch;
+    console.log(`[GitBook/GitOps] 📍 當前分支為: ${rawBranch} (推送目標: ${targetBranch})`);
 
     console.log(`[GitBook/GitOps] ➕ 正在將 GitBook 目錄加入暫存區...`);
     await execFilePromise('git', ['add', '.'], { cwd: GITBOOK_DIR });
@@ -126,9 +147,9 @@ export async function gitPushChanges(commitMessage) {
     try {
       await execFilePromise('git', ['commit', '-m', commitMessage], { cwd: GITBOOK_DIR });
     } catch (e) {
-      const errMessage = e.message || '';
-      // 僅在確定是「無變動」的情況下才安全跳過，其餘錯誤應主動拋出以利除錯
-      if (errMessage.includes('nothing to commit') || errMessage.includes('working tree clean')) {
+      // execFile 報錯時，git 的提示可能落在 stdout 或 stderr 中，需全量檢查
+      const combinedOutput = `${e.message || ''} ${e.stdout || ''} ${e.stderr || ''}`;
+      if (combinedOutput.includes('nothing to commit') || combinedOutput.includes('working tree clean')) {
         console.log(`[GitBook/GitOps] ⚠️ 沒有檢測到新的變更，跳過 Commit。`);
         return;
       }
@@ -137,8 +158,10 @@ export async function gitPushChanges(commitMessage) {
     }
 
     try {
-      console.log(`[GitBook/GitOps] 🚀 正在推送至 GitHub 遠端倉庫 [origin/${currentBranch}]...`);
-      await execFilePromise('git', ['push', 'origin', currentBranch], { cwd: GITBOOK_DIR });
+      console.log(`[GitBook/GitOps] 🚀 正在推送至 GitHub 遠端倉庫 [origin/${targetBranch}]...`);
+      // 若原始為 detached HEAD，需明確推送當前 HEAD 至遠端目標分支 (HEAD:main)，否則 git push origin HEAD 會報無上游分支錯誤
+      const pushRef = isDetached ? `HEAD:${targetBranch}` : targetBranch;
+      await execFilePromise('git', ['push', 'origin', pushRef], { cwd: GITBOOK_DIR });
       console.log(`[GitBook/GitOps] 🎉 GitOps 自動推送完成！GitBook 將在數秒內自動同步並上線新頁面。`);
     } catch (pushErr) {
       const pushErrMsg = pushErr.message || '';

@@ -1,11 +1,12 @@
 # =====================================================================
-# 🚀 每日 Spotify 新發行自動掃描與 GitBook 同步工作流 (Daily Scan Workflow)
+# 🚀 每日 Spotify 新發行自動掃描與筆記庫 (Obsidian Vault) 同步工作流
 # =====================================================================
 # [設計決策] 透過 GitHub Actions Cron 排程擺脫本機 Mac 運行依賴，以無頭 (Headless) 模式
-#            定時執行 scan-releases.js，並在掃描完成後自動將狀態碼與快取資料提交回倉庫。
+#            定時執行 scan-releases.js，並在掃描完成後自動將產出的樂評 Markdown 推送至
+#            social-dancing-notes 筆記庫倉庫，並持久化游標狀態回存主倉庫。
 # =====================================================================
 
-name: Daily Release Scan & GitBook Sync
+name: Daily Release Scan & Obsidian Vault Sync
 
 on:
   schedule:
@@ -14,13 +15,17 @@ on:
   # 支援手動觸發 (workflow_dispatch)，方便工程師隨時於 GitHub 介面進行測試驗證與臨時補掃
   workflow_dispatch:
 
-# 授權 GITHUB_TOKEN 具備寫入權限，以便於執行完畢後自動 commit 並 push 掃描進度至 repo
+# 授權 GITHUB_TOKEN 具備主倉庫寫入權限，以便於執行完畢後自動 commit 並 push 掃描進度至 repo
 permissions:
   contents: write
 
 jobs:
   scan-and-sync:
     runs-on: ubuntu-latest
+    env:
+      # [安全架構決策] 跨倉庫 PAT 憑證支援 VAULT_PAT 或相容舊版 GITBOOK_PAT。
+      # 在 job 層級注入環境變數，確保 step 條件式 (if: ${{ env.VAULT_PAT != '' }}) 能在步驟啟動前被正確評估
+      VAULT_PAT: ${{ secrets.VAULT_PAT || secrets.GITBOOK_PAT }}
 
     steps:
       # 1. 檢出 music-release-agent 專案主倉庫
@@ -29,30 +34,41 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2. 檢出 GitBook 文件倉庫 (可選；若有設定 GITBOOK_PAT 則直接對接真實 GitBook 筆記庫)
-      - name: Checkout GitBook Documentation Repository (Optional)
-        if: ${{ env.GITBOOK_PAT != '' }}
+      # 設定全域 Git 簽名身分，確保主倉庫與筆記庫 (Obsidian Vault) 執行 commit 均具備合法認證身分
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # 2. 檢出 Obsidian 筆記庫 (social-dancing-notes) 倉庫 (若有配置 VAULT_PAT/GITBOOK_PAT)
+      - name: Checkout Obsidian Vault Repository (Optional)
+        if: ${{ env.VAULT_PAT != '' }}
         uses: actions/checkout@v4
         with:
           repository: 'sunpochin/social-dancing-notes'
-          token: ${{ secrets.GITBOOK_PAT }}
+          token: ${{ env.VAULT_PAT }}
           path: 'social-dancing-notes'
-        env:
-          GITBOOK_PAT: ${{ secrets.GITBOOK_PAT }}
+          ref: 'main'
+          fetch-depth: 0
 
-      # 3. 準備 GitBook 執行環境：若未配置外部 GitBook 倉庫，自動初始化本地 mock 倉庫避免 git rev-parse 失敗
-      - name: Prepare GitBook Workspace Fallback
+      # 確保 social-dancing-notes 處於具名分支 main 而非 detached HEAD，以利後續 git push
+      - name: Setup Obsidian Vault Branch
+        if: ${{ env.VAULT_PAT != '' }}
+        run: |
+          cd social-dancing-notes
+          git checkout main 2>/dev/null || git checkout -b main
+
+      # 3. 準備筆記庫執行環境降級機制：若未配置外部筆記庫倉庫，自動初始化本地 mock 倉庫避免管線中斷
+      - name: Prepare Vault Workspace Fallback
         run: |
           if [ ! -d "social-dancing-notes/.git" ]; then
-            echo "未檢測到外部 GitBook 倉庫，啟用本地 data/mock-gitbook 降級工作區..."
+            echo "未檢測到外部筆記庫倉庫，啟用本地 data/mock-gitbook 降級工作區..."
             mkdir -p data/mock-gitbook/new-releases
             cd data/mock-gitbook
             if [ ! -d ".git" ]; then
               git init -b main
-              git config user.name "github-actions[bot]"
-              git config user.email "github-actions[bot]@users.noreply.github.com"
               git add .
-              git commit -m "chore: initialize local fallback gitbook workspace" || true
+              git commit -m "chore: initialize local fallback vault workspace" || true
             fi
             cd ../..
           fi
@@ -89,7 +105,7 @@ jobs:
             }
           '
 
-      # 7. 執行核心掃描管線 (調度 Spotify/MusicBrainz -> Gemini AI 樂評 -> GitBook 發布)
+      # 7. 執行核心掃描管線 (調度 Spotify/MusicBrainz -> Gemini AI 樂評 -> 筆記庫發布)
       - name: Execute Daily Scan & AI Review Pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -105,11 +121,31 @@ jobs:
           fi
           node scan-releases.js
 
-      # 8. 持久化掃描狀態：將本次掃描後的游標進度與快取回存 Git 倉庫，避免跨日重掃
+      # 8. 同步並推送樂評 Markdown 至 Obsidian 筆記庫 (social-dancing-notes)
+      # [雙重保險防禦] 即使應用層已呼叫 gitPushChanges，此步驟仍會掃描是否有未提交或超前之 Commits，確保樂評 100% 同步
+      - name: Push Reviews to Obsidian Vault
+        if: ${{ env.VAULT_PAT != '' }}
+        run: |
+          cd social-dancing-notes
+          # 檢查是否有新產生的 Markdown 樂評或目錄變更
+          git add new-releases/ SUMMARY.md README.md
+          if ! git diff --staged --quiet; then
+            echo "📝 偵測到尚未提交之樂評檔案，執行 Commit..."
+            git commit -m "docs(music): auto sync new album reviews from music-release-agent [skip ci]"
+          fi
+          # 檢查本地是否超前遠端 (防止應用程式層推送失敗時遺漏變更)
+          LOCAL_REV=$(git rev-parse HEAD)
+          REMOTE_REV=$(git rev-parse origin/main 2>/dev/null || echo "")
+          if [ "$LOCAL_REV" != "$REMOTE_REV" ]; then
+            echo "🚀 正在將新樂評 Markdown 推送至 social-dancing-notes (origin/main)..."
+            git push origin main
+          else
+            echo "✅ Obsidian Vault 倉庫已是最新狀態，無需重複推送。"
+          fi
+
+      # 9. 持久化掃描狀態：將本次掃描後的游標進度與快取回存主倉庫，避免跨日重掃
       - name: Commit and Push Scanner State
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/scanner-state.json data/spotify-cache.json data/system-state.json
           if git diff --staged --quiet; then
             echo "掃描狀態無變更，跳過 Commit。"
