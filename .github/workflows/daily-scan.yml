@@ -1,0 +1,119 @@
+# =====================================================================
+# 🚀 每日 Spotify 新發行自動掃描與 GitBook 同步工作流 (Daily Scan Workflow)
+# =====================================================================
+# [設計決策] 透過 GitHub Actions Cron 排程擺脫本機 Mac 運行依賴，以無頭 (Headless) 模式
+#            定時執行 scan-releases.js，並在掃描完成後自動將狀態碼與快取資料提交回倉庫。
+# =====================================================================
+
+name: Daily Release Scan & GitBook Sync
+
+on:
+  schedule:
+    # 每日 UTC 00:00 (台北時間 08:00) 定時觸發一次全自動掃描
+    - cron: '0 0 * * *'
+  # 支援手動觸發 (workflow_dispatch)，方便工程師隨時於 GitHub 介面進行測試驗證與臨時補掃
+  workflow_dispatch:
+
+# 授權 GITHUB_TOKEN 具備寫入權限，以便於執行完畢後自動 commit 並 push 掃描進度至 repo
+permissions:
+  contents: write
+
+jobs:
+  scan-and-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 檢出 music-release-agent 專案主倉庫
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 檢出 GitBook 文件倉庫 (可選；若有設定 GITBOOK_PAT 則直接對接真實 GitBook 筆記庫)
+      - name: Checkout GitBook Documentation Repository (Optional)
+        if: ${{ env.GITBOOK_PAT != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: 'sunpochin/social-dancing-notes'
+          token: ${{ secrets.GITBOOK_PAT }}
+          path: 'social-dancing-notes'
+        env:
+          GITBOOK_PAT: ${{ secrets.GITBOOK_PAT }}
+
+      # 3. 準備 GitBook 執行環境：若未配置外部 GitBook 倉庫，自動初始化本地 mock 倉庫避免 git rev-parse 失敗
+      - name: Prepare GitBook Workspace Fallback
+        run: |
+          if [ ! -d "social-dancing-notes/.git" ]; then
+            echo "未檢測到外部 GitBook 倉庫，啟用本地 data/mock-gitbook 降級工作區..."
+            mkdir -p data/mock-gitbook/new-releases
+            cd data/mock-gitbook
+            if [ ! -d ".git" ]; then
+              git init -b main
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add .
+              git commit -m "chore: initialize local fallback gitbook workspace" || true
+            fi
+            cd ../..
+          fi
+
+      # 4. 配置 Node.js 執行環境 (採用專案相容之 Node 22)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      # 5. 安裝專案依賴套件
+      - name: Install Dependencies
+        run: npm ci
+
+      # 6. 注入 Spotify 授權憑證：無頭環境無瀏覽器可供互動授權，依賴 Secret 注入的 Refresh Token 生成初始憑證
+      - name: Hydrate Spotify Credentials
+        env:
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
+            if (refreshToken) {
+              const payload = {
+                access_token: "init_pending_refresh",
+                refresh_token: refreshToken,
+                expires_at: 0
+              };
+              fs.writeFileSync("spotify_tokens.json", JSON.stringify(payload, null, 2));
+              console.log("✅ 成功由 Secrets 注入初始 Spotify 憑證，將在掃描時自動完成 Token 刷新！");
+            } else {
+              console.warn("⚠️ 未偵測到 SPOTIFY_REFRESH_TOKEN Secret，將自動降級至 MusicBrainz 發現策略。");
+            }
+          '
+
+      # 7. 執行核心掃描管線 (調度 Spotify/MusicBrainz -> Gemini AI 樂評 -> GitBook 發布)
+      - name: Execute Daily Scan & AI Review Pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+          SCAN_CYCLE_DAYS: ${{ vars.SCAN_CYCLE_DAYS || 7 }}
+          # 若存在已檢出的 social-dancing-notes 則優先使用，否則退回本地 mock-gitbook
+          GITBOOK_PATH: ${{ github.workspace }}/social-dancing-notes
+        run: |
+          if [ ! -d "$GITBOOK_PATH" ]; then
+            export GITBOOK_PATH="${{ github.workspace }}/data/mock-gitbook"
+          fi
+          node scan-releases.js
+
+      # 8. 持久化掃描狀態：將本次掃描後的游標進度與快取回存 Git 倉庫，避免跨日重掃
+      - name: Commit and Push Scanner State
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/scanner-state.json data/spotify-cache.json data/system-state.json
+          if git diff --staged --quiet; then
+            echo "掃描狀態無變更，跳過 Commit。"
+          else
+            git commit -m "chore(scanner): update release scan state and cache [skip ci]"
+            git push
+          fi

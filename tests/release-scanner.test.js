@@ -60,8 +60,10 @@ describe('ReleaseScanner 協調器單元測試 (TDD)', () => {
     
     // 第一策略失敗，第二策略成功
     mockStrategy1.execute.mockRejectedValue(new Error('Rate Limit'));
+    // 使用相對於當前時間的近期日期，防止隨時間推移被 30 天發行窗口過濾掉
+    const recentReleaseDate = new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0];
     mockStrategy2.execute.mockResolvedValue([
-      { id: 'album-1', name: 'Fallback Hit', release_date: '2026-06-05', release_date_precision: 'day', type: 'album' }
+      { id: 'album-1', name: 'Fallback Hit', release_date: recentReleaseDate, release_date_precision: 'day', type: 'album' }
     ]);
 
     const events = [];
