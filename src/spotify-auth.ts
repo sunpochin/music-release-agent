@@ -160,6 +160,10 @@ export async function getSpotifyAccessToken(): Promise<string | null> {
     const tokenData = JSON.parse(rawData) as SpotifyTokens;
 
     if (!tokenData.access_token || !tokenData.refresh_token) {
+      // 雲端無頭環境 (GitHub Actions) 無法走瀏覽器互動授權，若存在 Secret 注入的 Refresh Token 則直接刷新
+      if (process.env.SPOTIFY_REFRESH_TOKEN) {
+        return await refreshSpotifyAccessToken(process.env.SPOTIFY_REFRESH_TOKEN);
+      }
       console.warn('[Spotify/Auth] ⚠️ 本地 Token 檔案不完整！請重新進行網頁授權登入。');
       return null;
     }
@@ -172,6 +176,10 @@ export async function getSpotifyAccessToken(): Promise<string | null> {
 
     return tokenData.access_token;
   } catch (err) {
+    // 本地 token 檔案不存在時，若有提供 SPOTIFY_REFRESH_TOKEN 則作為雲端執行之第一優先回退機制
+    if (process.env.SPOTIFY_REFRESH_TOKEN) {
+      return await refreshSpotifyAccessToken(process.env.SPOTIFY_REFRESH_TOKEN);
+    }
     console.warn('[Spotify/Auth] ⚠️ 未能成功讀取本地 Token 檔案，請點擊 Web 連結進行第一次授權登入。');
     return null;
   }

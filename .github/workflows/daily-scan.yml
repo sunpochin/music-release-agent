@@ -1,0 +1,155 @@
+# =====================================================================
+# 🚀 每日 Spotify 新發行自動掃描與筆記庫 (Obsidian Vault) 同步工作流
+# =====================================================================
+# [設計決策] 透過 GitHub Actions Cron 排程擺脫本機 Mac 運行依賴，以無頭 (Headless) 模式
+#            定時執行 scan-releases.js，並在掃描完成後自動將產出的樂評 Markdown 推送至
+#            social-dancing-notes 筆記庫倉庫，並持久化游標狀態回存主倉庫。
+# =====================================================================
+
+name: Daily Release Scan & Obsidian Vault Sync
+
+on:
+  schedule:
+    # 每日 UTC 00:00 (台北時間 08:00) 定時觸發一次全自動掃描
+    - cron: '0 0 * * *'
+  # 支援手動觸發 (workflow_dispatch)，方便工程師隨時於 GitHub 介面進行測試驗證與臨時補掃
+  workflow_dispatch:
+
+# 授權 GITHUB_TOKEN 具備主倉庫寫入權限，以便於執行完畢後自動 commit 並 push 掃描進度至 repo
+permissions:
+  contents: write
+
+jobs:
+  scan-and-sync:
+    runs-on: ubuntu-latest
+    env:
+      # [安全架構決策] 跨倉庫 PAT 憑證支援 VAULT_PAT 或相容舊版 GITBOOK_PAT。
+      # 在 job 層級注入環境變數，確保 step 條件式 (if: ${{ env.VAULT_PAT != '' }}) 能在步驟啟動前被正確評估
+      VAULT_PAT: ${{ secrets.VAULT_PAT || secrets.GITBOOK_PAT }}
+
+    steps:
+      # 1. 檢出 music-release-agent 專案主倉庫
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 設定全域 Git 簽名身分，確保主倉庫與筆記庫 (Obsidian Vault) 執行 commit 均具備合法認證身分
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # 2. 檢出 Obsidian 筆記庫 (social-dancing-notes) 倉庫 (若有配置 VAULT_PAT/GITBOOK_PAT)
+      - name: Checkout Obsidian Vault Repository (Optional)
+        if: ${{ env.VAULT_PAT != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: 'sunpochin/social-dancing-notes'
+          token: ${{ env.VAULT_PAT }}
+          path: 'social-dancing-notes'
+          ref: 'main'
+          fetch-depth: 0
+
+      # 確保 social-dancing-notes 處於具名分支 main 而非 detached HEAD，以利後續 git push
+      - name: Setup Obsidian Vault Branch
+        if: ${{ env.VAULT_PAT != '' }}
+        run: |
+          cd social-dancing-notes
+          git checkout main 2>/dev/null || git checkout -b main
+
+      # 3. 準備筆記庫執行環境降級機制：若未配置外部筆記庫倉庫，自動初始化本地 mock 倉庫避免管線中斷
+      - name: Prepare Vault Workspace Fallback
+        run: |
+          if [ ! -d "social-dancing-notes/.git" ]; then
+            echo "未檢測到外部筆記庫倉庫，啟用本地 data/mock-gitbook 降級工作區..."
+            mkdir -p data/mock-gitbook/new-releases
+            cd data/mock-gitbook
+            if [ ! -d ".git" ]; then
+              git init -b main
+              git add .
+              git commit -m "chore: initialize local fallback vault workspace" || true
+            fi
+            cd ../..
+          fi
+
+      # 4. 配置 Node.js 執行環境 (採用專案相容之 Node 22)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      # 5. 安裝專案依賴套件
+      - name: Install Dependencies
+        run: npm ci
+
+      # 6. 注入 Spotify 授權憑證：無頭環境無瀏覽器可供互動授權，依賴 Secret 注入的 Refresh Token 生成初始憑證
+      - name: Hydrate Spotify Credentials
+        env:
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
+            if (refreshToken) {
+              const payload = {
+                access_token: "init_pending_refresh",
+                refresh_token: refreshToken,
+                expires_at: 0
+              };
+              fs.writeFileSync("spotify_tokens.json", JSON.stringify(payload, null, 2));
+              console.log("✅ 成功由 Secrets 注入初始 Spotify 憑證，將在掃描時自動完成 Token 刷新！");
+            } else {
+              console.warn("⚠️ 未偵測到 SPOTIFY_REFRESH_TOKEN Secret，將自動降級至 MusicBrainz 發現策略。");
+            }
+          '
+
+      # 7. 執行核心掃描管線 (調度 Spotify/MusicBrainz -> Gemini AI 樂評 -> 筆記庫發布)
+      - name: Execute Daily Scan & AI Review Pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+          SCAN_CYCLE_DAYS: ${{ vars.SCAN_CYCLE_DAYS || 7 }}
+          # 若存在已檢出的 social-dancing-notes 則優先使用，否則退回本地 mock-gitbook
+          GITBOOK_PATH: ${{ github.workspace }}/social-dancing-notes
+        run: |
+          if [ ! -d "$GITBOOK_PATH" ]; then
+            export GITBOOK_PATH="${{ github.workspace }}/data/mock-gitbook"
+          fi
+          node scan-releases.js
+
+      # 8. 同步並推送樂評 Markdown 至 Obsidian 筆記庫 (social-dancing-notes)
+      # [雙重保險防禦] 即使應用層已呼叫 gitPushChanges，此步驟仍會掃描是否有未提交或超前之 Commits，確保樂評 100% 同步
+      - name: Push Reviews to Obsidian Vault
+        if: ${{ env.VAULT_PAT != '' }}
+        run: |
+          cd social-dancing-notes
+          # 檢查是否有新產生的 Markdown 樂評或目錄變更
+          git add new-releases/ SUMMARY.md README.md
+          if ! git diff --staged --quiet; then
+            echo "📝 偵測到尚未提交之樂評檔案，執行 Commit..."
+            git commit -m "docs(music): auto sync new album reviews from music-release-agent [skip ci]"
+          fi
+          # 檢查本地是否超前遠端 (防止應用程式層推送失敗時遺漏變更)
+          LOCAL_REV=$(git rev-parse HEAD)
+          REMOTE_REV=$(git rev-parse origin/main 2>/dev/null || echo "")
+          if [ "$LOCAL_REV" != "$REMOTE_REV" ]; then
+            echo "🚀 正在將新樂評 Markdown 推送至 social-dancing-notes (origin/main)..."
+            git push origin main
+          else
+            echo "✅ Obsidian Vault 倉庫已是最新狀態，無需重複推送。"
+          fi
+
+      # 9. 持久化掃描狀態：將本次掃描後的游標進度與快取回存主倉庫，避免跨日重掃
+      - name: Commit and Push Scanner State
+        run: |
+          git add data/scanner-state.json data/spotify-cache.json data/system-state.json
+          if git diff --staged --quiet; then
+            echo "掃描狀態無變更，跳過 Commit。"
+          else
+            git commit -m "chore(scanner): update release scan state and cache [skip ci]"
+            git push
+          fi

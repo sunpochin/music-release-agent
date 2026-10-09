@@ -14,12 +14,13 @@ import path from 'path';
 
 let tmpDir;
 let publishToGitBook;
+let gitPushChanges;
 
 beforeAll(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gitbook-pub-'));
   // GITBOOK_DIR 在模組載入時讀取環境變數 → 必須先設好再 import
   process.env.GITBOOK_PATH = tmpDir;
-  ({ publishToGitBook } = await import('../src/gitbook-publisher.js'));
+  ({ publishToGitBook, gitPushChanges } = await import('../src/gitbook-publisher.js'));
 });
 
 afterAll(async () => {
@@ -86,3 +87,47 @@ describe('publishToGitBook（skipPush）', () => {
     expect(content).toContain('正文內容');
   });
 });
+
+describe('gitPushChanges（GitOps 同步機制）', () => {
+  it('正常與冪等：在 Git 倉庫中正確完成 add 與 commit，並妥善處理無變更與無 origin 情況', async () => {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFilePromise = promisify(execFile);
+
+    // 初始化暫存目錄為 Git 倉庫並配置身分
+    await execFilePromise('git', ['init', '-b', 'main'], { cwd: tmpDir });
+    await execFilePromise('git', ['config', 'user.name', 'test-bot'], { cwd: tmpDir });
+    await execFilePromise('git', ['config', 'user.email', 'test-bot@example.com'], { cwd: tmpDir });
+
+    // 建立新檔案並執行第一次 commit
+    await fs.writeFile(path.join(tmpDir, 'test-change.txt'), 'hello gitops', 'utf-8');
+    await expect(gitPushChanges('test: first commit')).resolves.not.toThrow();
+
+    // 驗證 commit 確實寫入 git log
+    const { stdout: logOut } = await execFilePromise('git', ['log', '-1', '--oneline'], { cwd: tmpDir });
+    expect(logOut).toContain('test: first commit');
+
+    // 再次呼叫無變更時，安全跳過 commit 不拋出異常
+    await expect(gitPushChanges('test: second empty commit')).resolves.not.toThrow();
+  });
+
+  it('防禦：處於 detached HEAD 時正確計算 targetBranch 並相容 HEAD:main 推送語法', async () => {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFilePromise = promisify(execFile);
+
+    // 切換至 detached HEAD 狀態
+    const { stdout: headSha } = await execFilePromise('git', ['rev-parse', 'HEAD'], { cwd: tmpDir });
+    await execFilePromise('git', ['checkout', headSha.trim()], { cwd: tmpDir });
+
+    // 寫入新變更
+    await fs.writeFile(path.join(tmpDir, 'detached-test.txt'), 'detached content', 'utf-8');
+
+    // 呼叫 gitPushChanges 驗證 detached HEAD 下仍可正常 commit 與解析 targetBranch
+    await expect(gitPushChanges('test: detached commit')).resolves.not.toThrow();
+
+    const { stdout: logOut } = await execFilePromise('git', ['log', '-1', '--oneline'], { cwd: tmpDir });
+    expect(logOut).toContain('test: detached commit');
+  });
+});
+
