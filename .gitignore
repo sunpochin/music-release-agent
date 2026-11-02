@@ -21,3 +21,9 @@ data/lyrics-cache/
 .env.local
 
 
+
+# 為什麼排除工具狀態與環境檔：本機資料不能跟隨規則移植進 Git。
+.env.*
+!.env.example
+.serena/
+.DS_Store

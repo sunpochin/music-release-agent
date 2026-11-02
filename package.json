@@ -21,7 +21,11 @@
     "verify:report": "node scripts/generate-report.js",
     "demo:verify:lyrics": "node scripts/demo-verify-lyrics-handoff.js",
     "demo:verify:lyrics:down": "node scripts/demo-verify-lyrics-down.js",
-    "verify:readme": "node scripts/verify-readme-commands.js"
+    "verify:readme": "node scripts/verify-readme-commands.js",
+    "harness:check": "node scripts/check-harness.mjs",
+    "harness:test": "vitest run tests/harness",
+    "harness:staged": "node scripts/check-staged.mjs",
+    "harness:tracked": "node scripts/check-staged.mjs --tracked"
   },
   "dependencies": {
     "@google/genai": "^2.3.0",
