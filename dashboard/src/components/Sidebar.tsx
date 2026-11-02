@@ -1,4 +1,6 @@
+/** 檔案用途：音樂庫導覽；所在層：dashboard/src/components；主要關聯：App.jsx、LyricsPage.jsx。 */
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { Music } from 'lucide-react'
 import SpotifyAuthButton from './SpotifyAuthButton'
 import TopTracksReview from './TopTracksReview'
@@ -14,6 +16,8 @@ const Sidebar = ({ albums, selectedAlbum, handleSelectAlbum }: any) => {
           </div>
           <h1 className="text-xl font-bold tracking-tight">Music Release</h1>
         </div>
+        {/* 翻譯不需要先選專輯，讓使用者從首頁就找得到獨立入口。 */}
+        <Link to="/lyrics" className="rounded-xl bg-spotify-green px-4 py-3 text-center font-bold text-black hover:bg-green-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">歌詞翻譯</Link>
         <SpotifyAuthButton />
         <TopTracksReview />
       </div>

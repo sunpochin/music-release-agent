@@ -1,4 +1,15 @@
+<!-- 檔案用途：系統設計決策；所在層：root；主要關聯：src/app.js、dashboard/src/main.jsx、contracts。 -->
 # TECHNICAL.md - Music Release Agent 技術文件
+
+## 獨立歌詞翻譯頁（2026-11-03）
+
+- `/lyrics` 是與專輯 App 平行的路由，不掛載 Spotify 播放器、專輯查詢或樂評功能；首頁側欄提供直接入口。可只輸入歌名查詢 LRCLIB，補歌手縮小範圍，再選歌手／專輯／時長對應版本；亦可貼上原文、來源名稱、HTTPS 連結和版權／署名。
+- 確認原文後才送出翻譯，結果以原句＋繁體中文逐行呈現，複製會連同來源與署名一起帶走。編輯歌曲、原文或來源會撤銷確認與舊結果，處理中停用編輯與重複送出，錯誤保留原文；無原文、演奏曲、超過行數和儲存失敗皆有提示。
+- 核心新增 `POST /api/lyrics/search` 與 `/api/lyrics/translate` 薄轉接，保持 companion 的錯誤狀態；請求和回應都驗證 `contracts/lyrics-handoff.schema.json`，正本仍在姊妹 repo。搜尋 12 秒、翻譯 200 秒逾時；歌詞、prompt、來源驗證及儲存只在 companion。
+- 兩行對照由 companion 保留原句並驗證中文陣列長度；不信任模型重抄原文。UI 以 React 純文字呈現，來源連結由 companion 限制 HTTPS。複製失敗可選取文字；私人歌詞不寫入前端持久儲存。
+- 排除新增另一個前端服務：沿用 Vite 獨立路由即可，不需多一個 PM2 程序。不以專輯列表當查歌來源，不爬 Musixmatch；使用者接受先用 LRCLIB 自動查詞與手動貼上 Musixmatch 原文。官方 Musixmatch API 未串接，不宣稱自動取得該來源。
+- 驗證：`npm test -- tests/lyrics-workbench-proxy.test.js tests/contract/lyrics-handoff-drift.test.js tests/server-routes.test.js`；前端 `npm run build --prefix dashboard` 與修改檔案 ESLint。跨服務配合姊妹 repo 的同名功能分支；現有工作基線為 `feat/issue-18-connect-obsidian-vault`，不夾帶合併或發布。
+- 本機結果：116 項單元／契約測試通過，build 與修改檔案 ESLint 通過（build 保留現有大 bundle 警告）。瀏覽器以隔離假來源／假模型驗證完整兩種流程、快取、切換模式保留草稿、修改撤銷確認，以及 390／1280px 無水平溢出。真實搜尋可達；未用付費翻譯或私人 vault 驗收。`npm run typecheck` 仍受未修改的 `tests/e2e/dashboard-live.spec.js` 既有語法錯誤阻擋。
 
 ## 1. 架構概述 (Architecture Overview)
 
