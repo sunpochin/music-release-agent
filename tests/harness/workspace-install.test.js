@@ -5,7 +5,7 @@
  */
 import { it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, symlinkSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,10 +24,44 @@ function fixture(run) {
 it('restores the versioned workspace and permits an identical second run', () => {
   fixture((cwd, install) => {
     install();
+    const before = statSync(join(cwd, 'AGENTS.md')).mtimeMs;
     install();
+    expect(statSync(join(cwd, 'AGENTS.md')).mtimeMs).toBe(before);
     for (const [name, content] of Object.entries(snapshot.files)) {
       expect(readFileSync(join(cwd, name), 'utf8')).toBe(content);
     }
+  });
+});
+it('rejects a parent file or parent symlink before creating any root files', () => {
+  for (const symlink of [false, true]) fixture((cwd, install) => {
+    if (symlink) symlinkSync(join(cwd, 'missing-directory'), join(cwd, 'scripts'));
+    else writeFileSync(join(cwd, 'scripts'), 'local work');
+    expect(install).toThrow();
+    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
+  });
+});
+it('rejects a dangling destination symlink without creating its outside target', () => {
+  fixture((cwd, install) => {
+    const outside = join(cwd, 'outside-file');
+    symlinkSync(outside, join(cwd, 'TECHNICAL.md'));
+    expect(install).toThrow();
+    expect(existsSync(outside)).toBe(false);
+    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
+  });
+});
+it('preserves a file created between preflight and the exclusive write', () => {
+  fixture((cwd) => {
+    // 為什麼攔截實際寫入：穩定重現另一個程序在預檢後搶先建立檔案的時序。
+    const preload = join(cwd, 'race.cjs');
+    writeFileSync(preload, `const fs = require('node:fs');
+const original = fs.writeFileSync;
+fs.writeFileSync = function(path, ...args) {
+  if (path.endsWith('/AGENTS.md')) original(path, 'concurrent edit');
+  return original(path, ...args);
+};
+require('node:module').syncBuiltinESMExports();`);
+    expect(() => execFileSync(process.execPath, ['--require', preload, installer, cwd], { stdio: 'pipe' })).toThrow();
+    expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf8')).toBe('concurrent edit');
   });
 });
 it('preflights every destination before writing and preserves different existing content', () => {

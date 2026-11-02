@@ -39,3 +39,5 @@ JSON、lockfile、短轉接與原樣 ELI5 skill 不加不支援的檔頭註解�
 本次分支依賴 `feat/issue-18-connect-obsidian-vault`，PR 以該分支為 base，避免混入既有功能；不執行其 daily-scan 或 vault 發布。
 
 非 Git 父工作區的四個入口檔已保存於 `workspace-harness.json`（本目錄）；四個相鄰 repo 就緒後，可用 `node scripts/install-workspace-harness.mjs` 還原缺少的入口。先預檢所有目的地，已有不同內容就停止，不覆寫。根目錄本身不假報 commit。
+
+還原腳本先檢查所有目的地及父路徑；拒絕檔案型父路徑與 symlink，相同檔案完全不寫。缺少的檔案以 exclusive create 建立，預檢後若有人搶先建立就失敗保留其內容；回歸測試涵蓋這個競態。

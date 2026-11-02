@@ -31,4 +31,4 @@
 
 ## 2026-11-03 移植驗證
 
-本機 harness 靜態檢查與測試通過；本次總計 133 項測試通過（包含提交與 review gate 防線）。 `npm run lint` 在既有 `tests/e2e/dashboard-live.spec.js:17` 因 Unexpected token 失敗；該檔與本次基線 HEAD 完全相同，不修改產品測試掩蓋問題。 hosted CI／review gate、真人／真實 provider 與正式發布沒有以本機結果冒充通過。
+本機 harness 靜態檢查與測試通過；本次總計 136 項測試通過（包含提交與 review gate 防線）。 `npm run lint` 在既有 `tests/e2e/dashboard-live.spec.js:17` 因 Unexpected token 失敗；該檔與本次基線 HEAD 完全相同，不修改產品測試掩蓋問題。 hosted CI／review gate、真人／真實 provider 與正式發布沒有以本機結果冒充通過。
